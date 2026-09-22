@@ -1,1117 +1,1498 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#070a10">
 <title>0DTE Options Command Center</title>
 
 <style>
-:root{
---bg:#070a10;
---p:#111925;
---p2:#090e16;
---t:#f4f7fb;
---m:#8d9aad;
---l:#263244;
---g:#35d07f;
---y:#f5c451;
---b:#5da9ff;
---r:#ff6b6b
-}
-
 *{box-sizing:border-box}
-
 body{
-margin:0;
-background:radial-gradient(circle at 50% -10%,#17253b,#070a10 45%);
-color:var(--t);
-font:15px -apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif
+  margin:0;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  background:#080b10;
+  color:#f5f7fa;
 }
-
-main{
-max-width:1100px;
-margin:auto;
-padding:20px 14px 40px
-}
-
-.ey{
-color:var(--b);
-font-weight:800;
-font-size:11px;
-letter-spacing:.12em
-}
-
-.title{
-font-size:28px;
-font-weight:850;
-margin:4px 0
-}
-
-.muted{
-color:var(--m);
-line-height:1.45
-}
-
-.top{
-display:flex;
-justify-content:space-between;
-gap:12px
-}
-
-.clock{
-color:var(--m);
-font-size:11px
-}
-
-.stats,.grid{
-display:grid;
-gap:10px
-}
-
-.stats{
-grid-template-columns:repeat(4,1fr);
-margin:18px 0
-}
-
+.container{max-width:1200px;margin:auto;padding:20px}
+h1{margin:0;font-size:28px}
+h2{font-size:18px;margin:0 0 12px}
+h3{margin:0 0 8px}
+.muted{color:#8d98a8}
+.small{font-size:12px}
 .grid{
-grid-template-columns:repeat(2,1fr)
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+  gap:14px;
 }
-
-.stat,.card,.rules{
-background:linear-gradient(180deg,#111925,#0b1018);
-border:1px solid var(--l);
-border-radius:16px;
-padding:14px
-}
-
-.stat b{
-display:block;
-font-size:21px
-}
-
-.stat span{
-font-size:10px;
-color:var(--m)
-}
-
 .card{
-padding:15px
+  background:#11161e;
+  border:1px solid #222b38;
+  border-radius:14px;
+  padding:16px;
+  margin-bottom:14px;
 }
-
-.row{
-display:flex;
-justify-content:space-between;
-align-items:center;
-gap:10px
+.header{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:center;
+  margin-bottom:18px;
 }
-
-.ticker{
-font-size:22px;
-font-weight:850
+.badge{
+  display:inline-block;
+  padding:5px 9px;
+  border-radius:999px;
+  font-size:11px;
+  font-weight:700;
+  margin:2px;
+  background:#263140;
 }
-
-.tag{
-font-size:10px;
-font-weight:800;
-padding:5px 8px;
-border-radius:99px;
-background:#182537;
-color:var(--y)
+.green{background:#123d29;color:#62e69b}
+.yellow{background:#453915;color:#ffd86a}
+.red{background:#481d24;color:#ff8794}
+.blue{background:#163653;color:#78c9ff}
+.purple{background:#32214c;color:#d0a2ff}
+.stat{
+  font-size:26px;
+  font-weight:800;
 }
-
-.c{
-margin:11px 0;
-line-height:1.45
+button,input,select{
+  font:inherit;
 }
-
-.kv{
-display:grid;
-grid-template-columns:1fr 1fr;
-gap:7px
+button{
+  border:0;
+  border-radius:9px;
+  padding:9px 12px;
+  background:#273344;
+  color:white;
+  cursor:pointer;
 }
-
-.kv div{
-background:var(--p2);
-border:1px solid #1b2431;
-border-radius:9px;
-padding:8px
+button:hover{background:#344258}
+input,select{
+  background:#0a0e14;
+  color:white;
+  border:1px solid #303b4b;
+  border-radius:8px;
+  padding:8px;
 }
-
-.kv small{
-display:block;
-color:var(--m);
-font-size:9px
+.controls{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  align-items:center;
 }
-
-.kv b{
-display:block;
-margin-top:3px;
-font-size:12px
+.control-row{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  align-items:center;
+  margin:8px 0;
 }
-
+.refresh-status{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
+  gap:10px;
+  margin-top:12px;
+}
+.status-box{
+  background:#0b1017;
+  border:1px solid #202a36;
+  border-radius:10px;
+  padding:10px;
+}
+.candidate{
+  background:#0c1118;
+  border:1px solid #263140;
+  border-radius:12px;
+  padding:14px;
+}
+.candidate + .candidate{margin-top:10px}
 .contract{
-margin-top:9px;
-background:#0a111b;
-border:1px solid #26384e;
-border-radius:11px;
-padding:10px
+  background:#101721;
+  border:1px solid #283546;
+  border-radius:10px;
+  padding:10px;
+  margin-top:8px;
 }
-
-.contract .head{
-display:flex;
-justify-content:space-between;
-font-weight:800
+.row{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  flex-wrap:wrap;
 }
-
-.contract .sub{
-color:var(--m);
-font-size:11px;
-margin-top:4px;
-line-height:1.5
+.price{
+  font-size:22px;
+  font-weight:800;
 }
-
-.preferred{
-border-color:#2d8a60
+.metric{
+  color:#aeb9c8;
+  font-size:12px;
 }
-
-.rules{
-margin-top:14px
+.reason{
+  margin-top:10px;
+  padding:9px;
+  background:#0a0e14;
+  border-radius:8px;
+  font-size:13px;
+  line-height:1.45;
 }
-
-.rules ol{
-line-height:1.8;
-margin:8px 0 0 20px
+table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:13px;
 }
-
-.btn{
-display:inline-block;
-margin-top:12px;
-padding:10px 13px;
-border-radius:10px;
-background:#1d5fb5;
-color:white;
-text-decoration:none;
-font-weight:750;
-margin-right:7px
+th,td{
+  padding:8px;
+  border-bottom:1px solid #242d39;
+  text-align:left;
 }
-
-.foot{
-font-size:10px;
-color:#687589;
-text-align:center;
-margin-top:18px
+a{color:#6fc7ff}
+hr{
+  border:0;
+  border-top:1px solid #242d39;
+  margin:16px 0;
 }
-
-.empty{
-padding:20px;
-text-align:center;
-color:var(--m)
+.warning{
+  padding:10px;
+  border-radius:9px;
+  background:#321f0d;
+  color:#ffd48a;
+  margin-top:10px;
 }
-
-.delay{
-font-size:10px;
-color:var(--y);
-margin-top:5px
+.ok{
+  padding:10px;
+  border-radius:9px;
+  background:#102c1d;
+  color:#7ff0ad;
+  margin-top:10px;
 }
-
-/* INTERACTIVE PRICE RANGE */
-
-.interactive-stat{
-cursor:pointer;
-position:relative;
-outline:none
+.danger{
+  padding:10px;
+  border-radius:9px;
+  background:#35161c;
+  color:#ff9aa5;
+  margin-top:10px;
 }
-
-.interactive-stat:focus-visible{
-box-shadow:0 0 0 2px var(--b)
-}
-
-.range-panel{
-display:none;
-text-align:left;
-margin-top:10px;
-padding-top:10px;
-border-top:1px solid #263244
-}
-
-.interactive-stat.open .range-panel{
-display:block
-}
-
-.range-title{
-font-size:11px;
-font-weight:800;
-margin-bottom:8px
-}
-
-.range-fields{
-display:grid;
-grid-template-columns:1fr 1fr;
-gap:7px
-}
-
-.range-fields label{
-font-size:9px;
-color:var(--m)
-}
-
-.range-fields input{
-display:block;
-width:100%;
-margin-top:4px;
-background:#090e16;
-color:var(--t);
-border:1px solid #263244;
-border-radius:8px;
-padding:8px;
-font-size:16px
-}
-
-.range-actions{
-display:flex;
-gap:7px;
-margin-top:8px
-}
-
-.range-actions button{
-border:0;
-border-radius:8px;
-padding:8px 10px;
-font-weight:750;
-color:white;
-background:#1d5fb5
-}
-
-.range-actions #resetRange{
-background:#263244
-}
-
-.range-note{
-font-size:9px;
-color:var(--m);
-line-height:1.35;
-margin-top:7px
-}
-
-@media(max-width:700px){
-.stats{
-grid-template-columns:1fr 1fr
-}
-
-.grid{
-grid-template-columns:1fr
-}
-
-.top{
-display:block
-}
+@media(max-width:600px){
+  .container{padding:12px}
+  h1{font-size:23px}
 }
 </style>
 </head>
 
 <body>
-<main>
+<div class="container">
 
-<div class="top">
-<div>
-<div class="ey">LIVE TRADING WORKSPACE</div>
-<div class="title">0DTE Options Command Center</div>
-<div class="muted">
-Catalyst → momentum → flow → contract → confirmation
-</div>
-</div>
-
-<div class="clock" id="clock">
-Loading scan…
-</div>
+<div class="header">
+  <div>
+    <h1>0DTE OPTIONS COMMAND CENTER</h1>
+    <div class="muted small">Catalyst → Momentum → Options → Confirmation</div>
+  </div>
+  <div id="marketStatus" class="badge">LOADING</div>
 </div>
 
+<!-- REFRESH CONTROL -->
+<div class="card">
+  <h2>🔄 REFRESH CONTROL</h2>
 
-<div class="stats">
+  <div class="control-row">
+    <strong>Auto Refresh</strong>
+    <button id="autoBtn" onclick="toggleAuto()">ON</button>
 
-<div class="stat">
-<b id="active">—</b>
-<span>SCANNED CANDIDATES</span>
+    <select id="intervalSelect" onchange="changeInterval()">
+      <option value="30000">30 sec</option>
+      <option value="60000" selected>1 min</option>
+      <option value="120000">2 min</option>
+      <option value="300000">5 min</option>
+      <option value="600000">10 min</option>
+    </select>
+
+    <button onclick="refreshNow()">↻ Refresh Now</button>
+    <a
+      href="https://github.com/Carooch62/0dte-options-command-center/actions"
+      target="_blank">
+      <button>GitHub Actions</button>
+    </a>
+  </div>
+
+  <div class="refresh-status">
+    <div class="status-box">
+      <div class="metric">Dashboard</div>
+      <strong id="dashboardRefresh">—</strong>
+    </div>
+
+    <div class="status-box">
+      <div class="metric">Scanner Data</div>
+      <strong id="scannerTime">—</strong>
+    </div>
+
+    <div class="status-box">
+      <div class="metric">Data Age</div>
+      <strong id="dataAge">—</strong>
+    </div>
+
+    <div class="status-box">
+      <div class="metric">Auto Refresh</div>
+      <strong id="autoStatus">ON • 1 min</strong>
+    </div>
+  </div>
+
+  <div id="freshnessMessage"></div>
 </div>
 
-<div class="stat">
-<b id="ready">—</b>
-<span>PREFERRED CONTRACTS</span>
-</div>
+<!-- TOP STATS -->
+<div class="grid">
 
+  <div class="card">
+    <div class="metric">Candidates Scanned</div>
+    <div class="stat" id="candidateCount">—</div>
+  </div>
 
-<!-- INTERACTIVE PREFERRED ENTRY -->
+  <div class="card">
+    <div class="metric">Preferred Contracts</div>
+    <div class="stat" id="preferredCount">—</div>
+  </div>
 
-<div
-class="stat interactive-stat"
-id="rangeStat"
-role="button"
-tabindex="0"
-aria-expanded="false"
-aria-controls="rangePanel"
->
-
-<b id="rangeLabel">$0.10–$0.30</b>
-
-<span>
-PREFERRED ENTRY • TAP TO EDIT
-</span>
-
-
-<div
-class="range-panel"
-id="rangePanel"
->
-
-<div class="range-title">
-Preferred contract range
-</div>
-
-
-<div class="range-fields">
-
-<label>
-Min
-
-<input
-id="minPrice"
-type="number"
-min="0.05"
-max="5"
-step="0.05"
-value="0.10"
-inputmode="decimal"
->
-
-</label>
-
-
-<label>
-Max
-
-<input
-id="maxPrice"
-type="number"
-min="0.05"
-max="5"
-step="0.05"
-value="0.30"
-inputmode="decimal"
->
-
-</label>
+  <div class="card">
+    <div class="metric">Market Date</div>
+    <div class="stat" id="marketDate">—</div>
+  </div>
 
 </div>
 
+<!-- PREFERRED RANGE -->
+<div class="card">
+  <h2>🎯 PREFERRED ENTRY RANGE</h2>
 
-<div class="range-actions">
+  <div class="control-row">
+    <label>Min $</label>
+    <input id="minPremium" type="number" min="0.01" step="0.01" value="0.10">
 
-<button
-type="button"
-id="applyRange"
->
-Apply
-</button>
+    <label>Max $</label>
+    <input id="maxPremium" type="number" min="0.01" step="0.01" value="0.30">
 
-<button
-type="button"
-id="resetRange"
->
-Reset
-</button>
+    <button onclick="applyRange()">Apply</button>
+    <button onclick="resetRange()">Reset</button>
+  </div>
 
+  <div class="muted small">
+    Dashboard filtering only. The backend scanner still collects its configured range.
+  </div>
 </div>
 
+<!-- SCAN CHANGE DETECTOR -->
+<div class="card">
+  <h2>⚡ SCAN-TO-SCAN CHANGE DETECTOR</h2>
+  <div id="changeDetector">
+    Waiting for scanner data…
+  </div>
+</div>
 
-<div class="range-note">
-Changes which contracts are highlighted on this dashboard.
-The scanner backend range is unchanged.
+<!-- CANDIDATES -->
+<div class="card">
+  <div class="row">
+    <div>
+      <h2>🚨 ACTIONABLE SETUPS</h2>
+      <div class="muted small">
+        Delayed market data. Live contract confirmation is required before entry.
+      </div>
+    </div>
+  </div>
+
+  <div id="candidates"></div>
+</div>
+
+<!-- TRADE JOURNAL -->
+<div class="card">
+  <h2>📓 TRADE JOURNAL</h2>
+
+  <div class="control-row">
+    <input id="journalTicker" placeholder="Ticker">
+    <input id="journalContract" placeholder="Contract">
+    <input id="journalEntry" type="number" step="0.01" placeholder="Entry">
+    <input id="journalExit" type="number" step="0.01" placeholder="Exit">
+    <input id="journalQty" type="number" min="1" value="1" placeholder="Qty">
+    <button onclick="addTrade()">Add Trade</button>
+  </div>
+
+  <div class="grid">
+    <div class="status-box">
+      <div class="metric">Trades</div>
+      <div class="stat" id="tradeCount">0</div>
+    </div>
+    <div class="status-box">
+      <div class="metric">Win Rate</div>
+      <div class="stat" id="winRate">0%</div>
+    </div>
+    <div class="status-box">
+      <div class="metric">Total P/L</div>
+      <div class="stat" id="totalPL">$0.00</div>
+    </div>
+  </div>
+
+  <hr>
+
+  <div id="journal"></div>
+
+  <button onclick="clearJournal()">Clear Journal</button>
+</div>
+
+<!-- RULES -->
+<div class="card">
+  <h2>📋 EXECUTION RULES</h2>
+
+  <div class="reason">
+    <strong>1. Find the catalyst.</strong><br>
+    Earnings, guidance, analyst action, FDA/news, contracts, M&A,
+    major company news or another identifiable reason for movement.
+  </div>
+
+  <div class="reason">
+    <strong>2. Confirm momentum.</strong><br>
+    Price movement should be supported by accelerating volume and,
+    ideally, continuation rather than a single isolated spike.
+  </div>
+
+  <div class="reason">
+    <strong>3. Confirm the options.</strong><br>
+    Prefer liquid contracts, reasonable spreads, meaningful volume/OI,
+    near-ATM positioning and useful delta/gamma.
+  </div>
+
+  <div class="reason">
+    <strong>4. Re-scan rejected names.</strong><br>
+    A stock rejected earlier can become actionable if price,
+    volume or options activity materially accelerates.
+  </div>
+
+  <div class="reason">
+    <strong>5. ENTER-READY requires live confirmation.</strong><br>
+    The dashboard can identify a setup, but delayed CBOE data does not
+    independently authorize an entry.
+  </div>
 </div>
 
 </div>
-</div>
-
-
-<div class="stat">
-<b>5 MIN</b>
-<span>BEST-EFFORT SCAN</span>
-</div>
-
-</div>
-
-
-<div class="grid" id="board">
-
-<div class="card empty">
-Fetching the latest free market scan…
-</div>
-
-</div>
-
-
-<div class="rules">
-
-<h2>Execution Rules</h2>
-
-<ol>
-
-<li>
-Fresh company-specific catalyst whenever available.
-</li>
-
-<li>
-Price break/reclaim confirmation before entry.
-</li>
-
-<li>
-Volume acceleration must support the move.
-</li>
-
-<li>
-Use option flow, spread, volume, OI and Greeks together.
-</li>
-
-<li>
-Prefer the selected range; usable contracts can extend to $0.75 when liquidity/Greeks justify it.
-</li>
-
-<li>
-Re-scan rejected names if momentum accelerates.
-</li>
-
-<li>
-The scanner never declares a trade ENTER-READY by itself; confirm live price/volume first.
-</li>
-
-</ol>
-
-
-<a
-class="btn"
-href="robinhood://"
->
-Open Robinhood
-</a>
-
-
-<a
-class="btn"
-href="./data/market.json"
->
-View raw scan
-</a>
-
-
-<p
-class="muted"
-id="source"
->
-Free GitHub Actions scanner. CBOE options data is delayed and not tick-by-tick.
-</p>
-
-</div>
-
-
-<div class="foot">
-0DTE Command Center • Free infrastructure • Delayed options data • Not financial advice
-</div>
-
-</main>
-
 
 <script>
 
-const esc=s=>String(s??"").replace(
-/[&<>"']/g,
-m=>({
-"&":"&amp;",
-"<":"&lt;",
-">":"&gt;",
-'"':"&quot;",
-"'":"&#39;"
-}[m])
-);
+const DATA_URL = "./data/market.json";
 
+let marketData = null;
+let previousData = null;
+let autoRefresh = true;
+let refreshTimer = null;
+
+let preferredRange =
+  JSON.parse(localStorage.getItem("0dtePreferredRange")) ||
+  {min:0.10,max:0.30};
+
+document.getElementById("minPremium").value = preferredRange.min;
+document.getElementById("maxPremium").value = preferredRange.max;
+
+
+/* =========================
+   REFRESH SYSTEM
+========================= */
+
+function startTimer(){
+  clearInterval(refreshTimer);
+
+  if(!autoRefresh) return;
+
+  const interval =
+    Number(document.getElementById("intervalSelect").value);
+
+  refreshTimer = setInterval(loadData, interval);
+
+  updateAutoStatus();
+}
+
+function toggleAuto(){
+  autoRefresh = !autoRefresh;
+
+  document.getElementById("autoBtn").textContent =
+    autoRefresh ? "ON" : "OFF";
+
+  startTimer();
+}
+
+function changeInterval(){
+  startTimer();
+}
+
+function updateAutoStatus(){
+  const select =
+    document.getElementById("intervalSelect");
+
+  const seconds =
+    Number(select.value)/1000;
+
+  let label;
+
+  if(seconds < 60){
+    label = seconds + " sec";
+  }else{
+    label = (seconds/60) + " min";
+  }
+
+  document.getElementById("autoStatus").textContent =
+    autoRefresh ? "ON • " + label : "OFF";
+}
+
+function refreshNow(){
+  loadData();
+}
+
+
+/* =========================
+   DATA
+========================= */
+
+async function loadData(){
+
+  try{
+
+    const response =
+      await fetch(DATA_URL + "?x=" + Date.now(), {
+        cache:"no-store"
+      });
+
+    if(!response.ok){
+      throw new Error("HTTP " + response.status);
+    }
+
+    const data = await response.json();
+
+    previousData = marketData;
+    marketData = data;
+
+    render();
+
+    document.getElementById("dashboardRefresh").textContent =
+      new Date().toLocaleTimeString();
+
+  }catch(error){
+
+    document.getElementById("marketStatus").textContent =
+      "DATA ERROR";
+
+    document.getElementById("freshnessMessage").innerHTML =
+      `<div class="danger">
+        Could not load market.json: ${escapeHTML(error.message)}
+      </div>`;
+  }
+}
+
+
+/* =========================
+   HELPERS
+========================= */
+
+function escapeHTML(value){
+  return String(value ?? "")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
+function number(v){
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
 
 function money(v){
-return Number(v||0).toFixed(2)
+  return "$" + number(v).toFixed(2);
+}
+
+function pct(v){
+  return number(v).toFixed(1) + "%";
+}
+
+function getContracts(candidate){
+
+  const sources = [
+    candidate.options,
+    candidate.preferred_contracts,
+    candidate.cheap_contracts,
+    candidate.usable_contracts
+  ];
+
+  let result = [];
+
+  for(const source of sources){
+
+    if(Array.isArray(source)){
+      result = result.concat(source);
+    }
+  }
+
+  const seen = new Set();
+
+  return result.filter(c => {
+
+    const key =
+      [
+        c.symbol,
+        c.ticker,
+        c.contract,
+        c.strike,
+        c.expiration,
+        c.type,
+        c.option_type
+      ].join("|");
+
+    if(seen.has(key)) return false;
+
+    seen.add(key);
+
+    return true;
+  });
+}
+
+function contractMid(c){
+
+  if(c.mid != null) return number(c.mid);
+
+  const bid = number(c.bid);
+  const ask = number(c.ask);
+
+  if(bid || ask){
+    return (bid + ask) / 2;
+  }
+
+  return number(c.last || c.price || c.premium);
+}
+
+function spreadPct(c){
+
+  const bid = number(c.bid);
+  const ask = number(c.ask);
+  const mid = contractMid(c);
+
+  if(!mid) return 999;
+
+  return ((ask-bid)/mid)*100;
+}
+
+function contractPasses(c){
+
+  const mid = contractMid(c);
+
+  if(mid < preferredRange.min ||
+     mid > preferredRange.max){
+    return false;
+  }
+
+  const volume = number(c.volume);
+  const spread = spreadPct(c);
+
+  if(volume < 5) return false;
+
+  if(spread > 60 && (number(c.ask)-number(c.bid)) > 0.10){
+    return false;
+  }
+
+  return true;
 }
 
 
-const DEFAULT_MIN=.10;
-const DEFAULT_MAX=.30;
-
-let rangeMin=DEFAULT_MIN;
-let rangeMax=DEFAULT_MAX;
-let latestData=null;
-
-
-function loadRange(){
-
-try{
-
-const s=JSON.parse(
-localStorage.getItem("0dtePreferredRange")||"null"
-);
-
-if(
-s &&
-Number.isFinite(s.min) &&
-Number.isFinite(s.max)
-){
-
-rangeMin=Math.max(
-.05,
-Math.min(5,Number(s.min))
-);
-
-rangeMax=Math.max(
-rangeMin,
-Math.min(5,Number(s.max))
-);
-
-}
-
-}catch(e){}
-
-document.getElementById("minPrice").value=
-rangeMin.toFixed(2);
-
-document.getElementById("maxPrice").value=
-rangeMax.toFixed(2);
-
-updateRangeLabel();
-
-}
-
-
-function updateRangeLabel(){
-
-document.getElementById("rangeLabel").textContent=
-`$${rangeMin.toFixed(2)}–$${rangeMax.toFixed(2)}`;
-
-}
-
-
-function selectedContracts(x){
-
-const opts=(x.options||[]).filter(o=>{
-
-const mid=Number(o.mid);
-
-const vol=Number(o.volume||0);
-
-const spread=Number(o.spread||0);
-
-const maxSpread=
-Math.max(.10,mid*.60);
-
-return(
-Number.isFinite(mid) &&
-mid>=rangeMin &&
-mid<=rangeMax &&
-vol>=5 &&
-spread<=maxSpread
-);
-
-});
-
-
-return opts
-.sort(
-(a,b)=>
-Number(b.contract_score||0)-
-Number(a.contract_score||0)
-)
-.slice(0,2);
-
-}
-
-
-function contract(o){
-
-return `
-
-<div class="contract preferred">
-
-<div class="head">
-
-<span>
-${o.side.toUpperCase()}
-$${Number(o.strike).toFixed(2)}
-</span>
-
-<span>
-$${money(o.mid)}
-</span>
-
-</div>
-
-
-<div class="sub">
-
-Bid/Ask
-$${money(o.bid)}
-/
-$${money(o.ask)}
-
-•
-
-Vol
-${Number(o.volume||0).toLocaleString()}
-
-•
-
-OI
-${Number(o.oi||0).toLocaleString()}
-
-<br>
-
-Δ
-${Number(o.delta||0).toFixed(2)}
-
-•
-
-Γ
-${Number(o.gamma||0).toFixed(3)}
-
-•
-
-IV
-${Number(o.iv||0).toFixed(1)}
-
-•
-
-Spread
-$${money(o.spread)}
-
-(${Number(o.spread_pct||0).toFixed(0)}%)
-
-•
-
-Score
-${Number(o.contract_score||0).toFixed(1)}
-
-</div>
-
-</div>
-
-`;
-
-}
-
-
-function card(x){
-
-const contracts=selectedContracts(x);
-
-
-const chtml=contracts.length
-?
-contracts.map(contract).join("")
-:
-`
-<div class="contract">
-<div class="sub">
-No qualifying contract in the selected range.
-</div>
-</div>
-`;
-
-
-const news=(x.news||[])[0];
-
-const catalyst=news
-?
-`<b>Fresh news:</b> ${esc(news.title)}`
-:
-"No fresh company news detected";
-
-
-const ratio=x.option_call_put_ratio
-?
-Number(x.option_call_put_ratio).toFixed(2)
-:
-"—";
-
-
-return `
-
-<article class="card">
-
-<div class="row">
-
-<div class="ticker">
-${esc(x.ticker)}
-</div>
-
-<div class="tag">
-${esc(x.status)}
-</div>
-
-</div>
-
-
-<div class="muted">
-
-$${money(x.price)}
-
-•
-
-day
-${x.day_move>=0?"+":""}${x.day_move}%
-
-•
-
-volume
-${x.volume_ratio}×
-
-</div>
-
-
-<div class="c">
-${catalyst}
-</div>
-
-
-<div class="kv">
-
-
-<div>
-<small>STOCK MOVE</small>
-
-<b>
-${x.day_move>=0?"+":""}${x.day_move}%
-</b>
-
-</div>
-
-
-<div>
-<small>OPTION FLOW</small>
-
-<b>
-${ratio}× C/P
-</b>
-
-</div>
-
-
-<div>
-<small>DIRECTION</small>
-
-<b>
-${esc(x.option_direction||"—")}
-</b>
-
-</div>
-
-
-<div>
-<small>SELECTED CONTRACTS</small>
-
-<b>
-${contracts.length}
-</b>
-
-</div>
-
-
-</div>
-
-
-${chtml}
-
-
-<div class="delay">
-
-${esc(x.option_source||"No option source")}
-
-${x.option_timestamp
-?
-" • "+esc(x.option_timestamp)
-:
-""}
-
-</div>
-
-
-<div
-class="muted"
-style="margin-top:8px;font-size:11px"
->
-
-Trigger:
-break/reclaim + volume confirmation.
-
-</div>
-
-
-</article>
-
-`;
-
-}
-
-
-function render(){
-
-if(!latestData)return;
-
-const a=latestData.candidates||[];
-
-
-document.getElementById("active").textContent=
-a.length;
-
-
-document.getElementById("ready").textContent=
-a.reduce(
-(n,x)=>
-n+selectedContracts(x).length,
-0
-);
-
-
-const rank={
-"0DTE CANDIDATE":4,
-"0DTE WATCH":3,
-"RE-SCAN":2,
-"WATCH / WAIT":1
-};
-
-
-const sorted=[...a].sort(
-(x,y)=>
-(rank[y.status]||0)-
-(rank[x.status]||0)
-);
-
-
-document.getElementById("board").innerHTML=
-sorted
-.slice(0,10)
-.map(card)
-.join("")
-||
-'<div class="card empty">No candidates returned.</div>';
-
-
-document.getElementById("clock").textContent=
-"Scan: "+
-new Date(
-latestData.generated_at
-).toLocaleString();
-
-
-document.getElementById("source").textContent=
-latestData.source||
-"Free scanner";
-
-}
-
-
-async function load(){
-
-try{
-
-const r=await fetch(
-"./data/market.json?x="+Date.now(),
-{cache:"no-store"}
-);
-
-if(!r.ok)throw 0;
-
-latestData=await r.json();
-
-render();
-
-}catch(e){
-
-document.getElementById("clock").textContent=
-"No scan yet";
-
-document.getElementById("board").innerHTML=
-`
-<div class="card empty">
-The scanner has not published data yet.
-</div>
-`;
-
-}
-
-}
-
+/* =========================
+   RANGE
+========================= */
 
 function applyRange(){
 
-let min=Number(
-document.getElementById("minPrice").value
-);
+  const min =
+    Number(document.getElementById("minPremium").value);
 
-let max=Number(
-document.getElementById("maxPrice").value
-);
+  const max =
+    Number(document.getElementById("maxPremium").value);
 
+  if(!Number.isFinite(min) ||
+     !Number.isFinite(max) ||
+     min <= 0 ||
+     max <= min){
 
-if(!Number.isFinite(min))
-min=DEFAULT_MIN;
+    alert("Enter a valid premium range.");
+    return;
+  }
 
-if(!Number.isFinite(max))
-max=DEFAULT_MAX;
+  preferredRange = {min,max};
 
+  localStorage.setItem(
+    "0dtePreferredRange",
+    JSON.stringify(preferredRange)
+  );
 
-min=Math.max(
-.05,
-Math.min(5,min)
-);
+  render();
+}
 
-max=Math.max(
-.05,
-Math.min(5,max)
-);
+function resetRange(){
 
+  preferredRange = {
+    min:0.10,
+    max:0.30
+  };
 
-if(max<min)
-[min,max]=[max,min];
+  document.getElementById("minPremium").value = 0.10;
+  document.getElementById("maxPremium").value = 0.30;
 
+  localStorage.setItem(
+    "0dtePreferredRange",
+    JSON.stringify(preferredRange)
+  );
 
-rangeMin=
-Number(min.toFixed(2));
-
-rangeMax=
-Number(max.toFixed(2));
-
-
-document.getElementById("minPrice").value=
-rangeMin.toFixed(2);
-
-document.getElementById("maxPrice").value=
-rangeMax.toFixed(2);
-
-
-try{
-
-localStorage.setItem(
-"0dtePreferredRange",
-JSON.stringify({
-min:rangeMin,
-max:rangeMax
-})
-);
-
-}catch(e){}
-
-
-updateRangeLabel();
-
-render();
-
-
-document
-.getElementById("rangeStat")
-.classList.remove("open");
-
-
-document
-.getElementById("rangeStat")
-.setAttribute(
-"aria-expanded",
-"false"
-);
-
+  render();
 }
 
 
-document
-.getElementById("rangeStat")
-.addEventListener(
-"click",
-e=>{
+/* =========================
+   FRESHNESS
+========================= */
 
-if(
-e.target.closest("input,button")
-)return;
+function renderFreshness(){
 
-const el=
-document.getElementById("rangeStat");
+  if(!marketData) return;
 
-const open=
-el.classList.toggle("open");
+  const timestamp =
+    marketData.generated_at ||
+    marketData.timestamp ||
+    marketData.updated_at;
 
-el.setAttribute(
-"aria-expanded",
-String(open)
-);
+  if(!timestamp){
 
+    document.getElementById("scannerTime").textContent =
+      "Unavailable";
+
+    return;
+  }
+
+  const date = new Date(timestamp);
+  const ageMs = Date.now() - date.getTime();
+  const ageMin = ageMs / 60000;
+
+  document.getElementById("scannerTime").textContent =
+    date.toLocaleString();
+
+  document.getElementById("dataAge").textContent =
+    ageMin < 1
+      ? "<1 min"
+      : Math.round(ageMin) + " min";
+
+  let message = "";
+
+  if(ageMin <= 5){
+
+    message =
+      `<div class="ok">
+        Scanner data is fresh.
+      </div>`;
+
+  }else if(ageMin <= 15){
+
+    message =
+      `<div class="warning">
+        Scanner data is aging. The backend normally updates every few minutes.
+      </div>`;
+
+  }else{
+
+    message =
+      `<div class="danger">
+        Scanner data is stale. Do not treat delayed data as live execution data.
+      </div>`;
+  }
+
+  document.getElementById("freshnessMessage").innerHTML =
+    message;
 }
-);
 
 
-document
-.getElementById("rangeStat")
-.addEventListener(
-"keydown",
-e=>{
+/* =========================
+   CHANGE DETECTOR
+========================= */
 
-if(
-e.key==="Enter" ||
-e.key===" "
-){
-
-e.preventDefault();
-
-e.currentTarget.click();
-
+function candidateKey(c){
+  return c.symbol || c.ticker || c.name;
 }
 
+function candidateMap(data){
+
+  const map = {};
+
+  const candidates =
+    data?.candidates ||
+    data?.results ||
+    data?.setups ||
+    [];
+
+  for(const c of candidates){
+
+    const key = candidateKey(c);
+
+    if(key){
+      map[key] = c;
+    }
+  }
+
+  return map;
 }
-);
 
+function renderChanges(){
 
-document
-.getElementById("applyRange")
-.addEventListener(
-"click",
-applyRange
-);
+  const box =
+    document.getElementById("changeDetector");
 
+  if(!previousData){
 
-document
-.getElementById("resetRange")
-.addEventListener(
-"click",
-()=>{
+    box.innerHTML =
+      `<div class="muted">
+        First scan loaded. Changes will appear after the next scanner update.
+      </div>`;
 
-document.getElementById("minPrice").value=
-DEFAULT_MIN.toFixed(2);
+    return;
+  }
 
-document.getElementById("maxPrice").value=
-DEFAULT_MAX.toFixed(2);
+  const oldMap = candidateMap(previousData);
+  const newMap = candidateMap(marketData);
 
-applyRange();
+  const changes = [];
 
+  for(const key of Object.keys(newMap)){
+
+    const n = newMap[key];
+    const o = oldMap[key];
+
+    if(!o){
+
+      changes.push(
+        `<div class="badge green">
+          NEW: ${escapeHTML(key)}
+        </div>`
+      );
+
+      continue;
+    }
+
+    const oldMove =
+      number(o.change_pct ?? o.percent_change ?? o.change);
+
+    const newMove =
+      number(n.change_pct ?? n.percent_change ?? n.change);
+
+    const oldVol =
+      number(o.volume);
+
+    const newVol =
+      number(n.volume);
+
+    if(newMove > oldMove + 1){
+
+      changes.push(
+        `<div class="badge green">
+          ACCELERATING: ${escapeHTML(key)}
+          ${pct(oldMove)} → ${pct(newMove)}
+        </div>`
+      );
+    }
+
+    if(newVol > oldVol * 1.5 && oldVol > 0){
+
+      changes.push(
+        `<div class="badge blue">
+          VOLUME SURGE: ${escapeHTML(key)}
+        </div>`
+      );
+    }
+
+    if(newMove < oldMove - 2){
+
+      changes.push(
+        `<div class="badge red">
+          THESIS WEAKENING: ${escapeHTML(key)}
+        </div>`
+      );
+    }
+  }
+
+  box.innerHTML =
+    changes.length
+      ? changes.join(" ")
+      : `<div class="muted">
+          No major scan-to-scan changes detected.
+        </div>`;
 }
-);
 
 
-document
-.getElementById("rangePanel")
-.addEventListener(
-"click",
-e=>e.stopPropagation()
-);
+/* =========================
+   WHY THIS IS HERE
+========================= */
+
+function whyHere(c){
+
+  const reasons = [];
+
+  const move =
+    number(c.change_pct ??
+           c.percent_change ??
+           c.change);
+
+  const volumeRatio =
+    number(c.volume_ratio ??
+           c.relative_volume ??
+           c.rvol);
+
+  const cp =
+    number(c.call_put_ratio ??
+           c.cp_ratio);
+
+  if(Math.abs(move) >= 3){
+    reasons.push(
+      `Price move: ${move.toFixed(1)}%`
+    );
+  }
+
+  if(volumeRatio >= 1.5){
+    reasons.push(
+      `Volume acceleration: ${volumeRatio.toFixed(1)}x`
+    );
+  }
+
+  if(cp >= 1.5){
+    reasons.push(
+      `Call/put activity favors calls: ${cp.toFixed(2)}x`
+    );
+  }else if(cp > 0 && cp <= 0.67){
+    reasons.push(
+      `Put activity is elevated: ${cp.toFixed(2)}x C/P`
+    );
+  }
+
+  if(c.news || c.catalyst || c.headline){
+    reasons.push(
+      `Fresh catalyst/news detected`
+    );
+  }
+
+  if(!reasons.length){
+    reasons.push(
+      `Scanner score / momentum criteria`
+    );
+  }
+
+  return reasons;
+}
 
 
-loadRange();
+/* =========================
+   CONTRACT QUALITY
+========================= */
 
-load();
+function contractQuality(c){
 
-setInterval(
-load,
-60000
-);
+  const mid = contractMid(c);
+  const volume = number(c.volume);
+  const oi = number(c.open_interest ?? c.oi);
+  const delta = Math.abs(number(c.delta));
+  const gamma = number(c.gamma);
+  const spread = spreadPct(c);
+
+  const good = [];
+
+  if(volume >= 100) good.push("volume");
+  if(oi >= 100) good.push("OI");
+  if(delta >= .20) good.push("delta");
+  if(gamma >= .05) good.push("gamma");
+  if(spread <= 35) good.push("spread");
+
+  let level = "WATCH";
+
+  if(
+    good.length >= 4 &&
+    spread <= 45 &&
+    volume >= 25
+  ){
+    level = "GOOD";
+  }
+
+  if(
+    good.length >= 4 &&
+    spread <= 25 &&
+    volume >= 100
+  ){
+    level = "STRONG";
+  }
+
+  return {
+    level,
+    good,
+    spread,
+    mid
+  };
+}
+
+
+/* =========================
+   CANDIDATES
+========================= */
+
+function renderCandidates(){
+
+  const container =
+    document.getElementById("candidates");
+
+  const candidates =
+    marketData?.candidates ||
+    marketData?.results ||
+    marketData?.setups ||
+    [];
+
+  document.getElementById("candidateCount").textContent =
+    candidates.length;
+
+  if(!candidates.length){
+
+    container.innerHTML =
+      `<div class="muted">
+        No candidates returned by the scanner.
+      </div>`;
+
+    document.getElementById("preferredCount").textContent = "0";
+
+    return;
+  }
+
+  let preferredTotal = 0;
+
+  const html =
+    candidates.map((c,index) => {
+
+      const ticker =
+        c.symbol ||
+        c.ticker ||
+        c.name ||
+        "UNKNOWN";
+
+      const price =
+        number(c.price ??
+               c.current_price ??
+               c.last);
+
+      const move =
+        number(c.change_pct ??
+               c.percent_change ??
+               c.change);
+
+      const volume =
+        number(c.volume);
+
+      const cp =
+        number(c.call_put_ratio ??
+               c.cp_ratio);
+
+      const contracts =
+        getContracts(c)
+          .filter(contractPasses)
+          .sort(
+            (a,b) =>
+              number(b.contract_score) -
+              number(a.contract_score)
+          )
+          .slice(0,2);
+
+      preferredTotal += contracts.length;
+
+      let state = "WATCH / WAIT";
+      let stateClass = "yellow";
+
+      if(move >= 5){
+
+        state = "CONFIRMING";
+        stateClass = "blue";
+      }
+
+      if(
+        previousData &&
+        move >= 5
+      ){
+
+        state = "RE-SCAN / ACCELERATING";
+        stateClass = "green";
+      }
+
+      const reasons =
+        whyHere(c)
+          .map(x => `<div>• ${escapeHTML(x)}</div>`)
+          .join("");
+
+      const contractsHTML =
+        contracts.length
+          ? contracts.map(contractHTML).join("")
+          : `<div class="muted small">
+              No preferred contracts in the selected range.
+            </div>`;
+
+      return `
+        <div class="candidate">
+
+          <div class="row">
+
+            <div>
+              <h3>${escapeHTML(ticker)}</h3>
+
+              <span class="badge ${stateClass}">
+                ${state}
+              </span>
+
+              ${
+                c.direction
+                  ? `<span class="badge blue">
+                      ${escapeHTML(c.direction)}
+                     </span>`
+                  : ""
+              }
+            </div>
+
+            <div style="text-align:right">
+              <div class="price">${money(price)}</div>
+              <div class="${move >= 0 ? "green" : "red"}">
+                ${move >= 0 ? "+" : ""}${move.toFixed(2)}%
+              </div>
+            </div>
+
+          </div>
+
+          <div class="control-row">
+
+            <span class="badge">
+              Vol ${volume.toLocaleString()}
+            </span>
+
+            ${
+              cp
+                ? `<span class="badge">
+                    C/P ${cp.toFixed(2)}x
+                   </span>`
+                : ""
+            }
+
+            ${
+              c.score != null
+                ? `<span class="badge purple">
+                    Score ${number(c.score).toFixed(1)}
+                   </span>`
+                : ""
+            }
+
+          </div>
+
+          <div class="reason">
+            <strong>Why it's here</strong>
+            ${reasons}
+          </div>
+
+          <div style="margin-top:12px">
+            <strong>Preferred Contracts</strong>
+            ${contractsHTML}
+          </div>
+
+          ${
+            c.news || c.catalyst || c.headline
+              ? `
+                <div class="reason">
+                  <strong>📰 Catalyst</strong><br>
+                  ${escapeHTML(
+                    c.news ||
+                    c.catalyst ||
+                    c.headline
+                  )}
+                </div>
+              `
+              : ""
+          }
+
+          <div class="reason">
+            <strong>Execution</strong><br>
+            This is a setup state, not an automatic entry signal.
+            Verify the live Robinhood/DTC contract price, bid/ask,
+            volume and price action before entering.
+          </div>
+
+          ${
+            c.source
+              ? `<div class="small muted" style="margin-top:8px">
+                  Source: ${escapeHTML(c.source)}
+                 </div>`
+              : ""
+          }
+
+        </div>
+      `;
+
+    }).join("");
+
+  container.innerHTML = html;
+
+  document.getElementById("preferredCount").textContent =
+    preferredTotal;
+}
+
+
+function contractHTML(c){
+
+  const mid = contractMid(c);
+
+  const bid = number(c.bid);
+  const ask = number(c.ask);
+  const volume = number(c.volume);
+  const oi = number(c.open_interest ?? c.oi);
+  const delta = number(c.delta);
+  const gamma = number(c.gamma);
+
+  const quality =
+    contractQuality(c);
+
+  const strike =
+    c.strike != null
+      ? "$" + number(c.strike).toFixed(2)
+      : "";
+
+  const expiration =
+    c.expiration ||
+    c.expiry ||
+    c.exp ||
+    "";
+
+  const type =
+    c.type ||
+    c.option_type ||
+    "";
+
+  const contractName =
+    c.contract ||
+    c.symbol ||
+    `${expiration} ${strike} ${type}`;
+
+  const spread =
+    quality.spread;
+
+  return `
+    <div class="contract">
+
+      <div class="row">
+
+        <div>
+          <strong>${escapeHTML(contractName)}</strong>
+
+          ${
+            quality.level === "STRONG"
+              ? `<span class="badge green">STRONG</span>`
+              : quality.level === "GOOD"
+                ? `<span class="badge blue">GOOD</span>`
+                : `<span class="badge yellow">WATCH</span>`
+          }
+        </div>
+
+        <div>
+          <strong>${money(mid)}</strong>
+        </div>
+
+      </div>
+
+      <div class="control-row">
+
+        <span class="badge">
+          Bid ${money(bid)}
+        </span>
+
+        <span class="badge">
+          Ask ${money(ask)}
+        </span>
+
+        <span class="badge">
+          Spread ${spread.toFixed(1)}%
+        </span>
+
+        <span class="badge">
+          Vol ${volume.toLocaleString()}
+        </span>
+
+        ${
+          oi
+            ? `<span class="badge">
+                OI ${oi.toLocaleString()}
+               </span>`
+            : ""
+        }
+
+        ${
+          delta
+            ? `<span class="badge">
+                Δ ${delta.toFixed(2)}
+               </span>`
+            : ""
+        }
+
+        ${
+          gamma
+            ? `<span class="badge">
+                Γ ${gamma.toFixed(3)}
+               </span>`
+            : ""
+        }
+
+      </div>
+
+      ${
+        c.contract_score != null
+          ? `<div class="metric">
+              Contract score:
+              ${number(c.contract_score).toFixed(2)}
+             </div>`
+          : ""
+      }
+
+    </div>
+  `;
+}
+
+
+/* =========================
+   RENDER
+========================= */
+
+function render(){
+
+  if(!marketData) return;
+
+  document.getElementById("marketStatus").textContent =
+    "LIVE SCAN DATA";
+
+  document.getElementById("marketDate").textContent =
+    marketData.market_date ||
+    marketData.date ||
+    "—";
+
+  renderFreshness();
+  renderChanges();
+  renderCandidates();
+  renderJournal();
+}
+
+
+/* =========================
+   JOURNAL
+========================= */
+
+function getJournal(){
+
+  try{
+    return JSON.parse(
+      localStorage.getItem("0dteTradeJournal") || "[]"
+    );
+  }catch{
+    return [];
+  }
+}
+
+function saveJournal(data){
+
+  localStorage.setItem(
+    "0dteTradeJournal",
+    JSON.stringify(data)
+  );
+}
+
+function addTrade(){
+
+  const ticker =
+    document.getElementById("journalTicker").value.trim();
+
+  const contract =
+    document.getElementById("journalContract").value.trim();
+
+  const entry =
+    Number(document.getElementById("journalEntry").value);
+
+  const exit =
+    Number(document.getElementById("journalExit").value);
+
+  const qty =
+    Number(document.getElementById("journalQty").value);
+
+  if(!ticker ||
+     !Number.isFinite(entry) ||
+     !Number.isFinite(exit) ||
+     !Number.isFinite(qty) ||
+     qty <= 0){
+
+    alert("Enter ticker, entry, exit and quantity.");
+    return;
+  }
+
+  const pnl =
+    (exit-entry)*100*qty;
+
+  const journal = getJournal();
+
+  journal.push({
+    date:new Date().toLocaleString(),
+    ticker,
+    contract,
+    entry,
+    exit,
+    qty,
+    pnl
+  });
+
+  saveJournal(journal);
+
+  document.getElementById("journalTicker").value = "";
+  document.getElementById("journalContract").value = "";
+  document.getElementById("journalEntry").value = "";
+  document.getElementById("journalExit").value = "";
+  document.getElementById("journalQty").value = "1";
+
+  renderJournal();
+}
+
+function deleteTrade(index){
+
+  const journal = getJournal();
+
+  journal.splice(index,1);
+
+  saveJournal(journal);
+
+  renderJournal();
+}
+
+function clearJournal(){
+
+  if(!confirm("Clear the entire trade journal?")){
+    return;
+  }
+
+  localStorage.removeItem("0dteTradeJournal");
+
+  renderJournal();
+}
+
+function renderJournal(){
+
+  const journal = getJournal();
+
+  document.getElementById("tradeCount").textContent =
+    journal.length;
+
+  const wins =
+    journal.filter(x => number(x.pnl) > 0).length;
+
+  const winRate =
+    journal.length
+      ? (wins/journal.length)*100
+      : 0;
+
+  const total =
+    journal.reduce(
+      (sum,x) => sum + number(x.pnl),
+      0
+    );
+
+  document.getElementById("winRate").textContent =
+    winRate.toFixed(1) + "%";
+
+  document.getElementById("totalPL").textContent =
+    (total >= 0 ? "+" : "") +
+    "$" +
+    total.toFixed(2);
+
+  const container =
+    document.getElementById("journal");
+
+  if(!journal.length){
+
+    container.innerHTML =
+      `<div class="muted">
+        No trades logged yet.
+      </div>`;
+
+    return;
+  }
+
+  container.innerHTML = `
+    <table>
+
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Ticker</th>
+          <th>Contract</th>
+          <th>Entry</th>
+          <th>Exit</th>
+          <th>Qty</th>
+          <th>P/L</th>
+          <th></th>
+        </tr>
+      </thead>
+
+      <tbody>
+
+        ${
+          journal.map((x,i) => {
+
+            const pnl =
+              number(x.pnl);
+
+            return `
+              <tr>
+
+                <td>${escapeHTML(x.date)}</td>
+
+                <td>${escapeHTML(x.ticker)}</td>
+
+                <td>${escapeHTML(x.contract)}</td>
+
+                <td>${money(x.entry)}</td>
+
+                <td>${money(x.exit)}</td>
+
+                <td>${x.qty}</td>
+
+                <td class="${pnl >= 0 ? "green" : "red"}">
+                  ${pnl >= 0 ? "+" : ""}
+                  $${pnl.toFixed(2)}
+                </td>
+
+                <td>
+                  <button onclick="deleteTrade(${i})">
+                    ×
+                  </button>
+                </td>
+
+              </tr>
+            `;
+
+          }).join("")
+        }
+
+      </tbody>
+
+    </table>
+  `;
+}
+
+
+/* =========================
+   START
+========================= */
+
+loadData();
+startTimer();
+renderJournal();
 
 </script>
 
