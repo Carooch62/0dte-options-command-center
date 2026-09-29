@@ -32,14 +32,13 @@ background_terms = (
 
 
 def ticker_explicit(ticker, item):
-    if item.get('explicit_ticker') is True:
-        return True
+    """Require the candidate ticker to be explicitly named in the article title/URL.
+    relatedTickers alone is not enough because broad articles can list many symbols."""
     t = str(ticker or '').upper().strip()
     title = str(item.get('title', ''))
     url = str(item.get('url', ''))
-    related = [str(v).upper() for v in (item.get('related_tickers') or [])]
     pat = re.compile(r'(?<![A-Z0-9])' + re.escape(t) + r'(?![A-Z0-9])', re.I)
-    return bool(pat.search(title) or pat.search(url) or t in related)
+    return bool(pat.search(title) or pat.search(url))
 
 
 for x in data.get('candidates', []):
