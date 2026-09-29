@@ -5,6 +5,7 @@ on:
     paths:
       - "scanner.py"
       - "schema_normalizer.py"
+      - "option_expander.py"
       - "tests/**"
       - ".github/workflows/market-scan.yml"
   workflow_dispatch:
@@ -45,6 +46,8 @@ jobs:
         env:
           SCAN_MODE: ${{ github.event.inputs.scan_mode || 'scheduled' }}
         run: python scanner.py
+      - name: Expand options pass
+        run: python option_expander.py
       - name: Normalize dashboard data
         env:
           SCAN_MODE: ${{ github.event.inputs.scan_mode || 'scheduled' }}
@@ -65,6 +68,8 @@ jobs:
                   raise SystemExit(f"{name} candidates must be a list")
               if name.endswith("dashboard.json") and data.get("schema_version") != 4:
                   raise SystemExit("dashboard schema version mismatch")
+              if name.endswith("market.json") and data.get("option_chain_universe", 0) < min(60, data.get("scanned_rows", 0)):
+                  raise SystemExit("options expansion did not reach the configured coverage target")
           print("market data validated")
           PY
       - name: Commit market data
