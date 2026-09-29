@@ -1,5 +1,6 @@
 const REPO = "Carooch62/0dte-options-command-center";
 const WORKFLOW = "market-scan.yml";
+const VERSION = "2026-09-29.1";
 
 const ALLOWED_ORIGINS = new Set([
   "https://carooch62.github.io",
@@ -28,12 +29,14 @@ async function handleHealth(env) {
   const tokenConfigured = Boolean(env.GITHUB_TOKEN);
   const result = {
     ok: true,
+    version: VERSION,
     worker: "0dte-options-command-center",
     workflow: WORKFLOW,
     tokenConfigured,
     tokenType: typeof env.GITHUB_TOKEN,
     githubRepo: { ok: false, status: null },
     githubWorkflow: { ok: false, status: null },
+    latestRun: { status: null, conclusion: null, id: null, createdAt: null },
   };
 
   if (!tokenConfigured) return json(result);
@@ -51,6 +54,27 @@ async function handleHealth(env) {
     result.githubWorkflow = { ok: r.ok, status: r.status };
   } catch {
     result.githubWorkflow = { ok: false, status: 0 };
+  }
+
+  try {
+    const r = await fetch(
+      `https://api.github.com/repos/${REPO}/actions/workflows/${WORKFLOW}/runs?branch=main&per_page=1`,
+      { headers },
+    );
+    if (r.ok) {
+      const payload = await r.json();
+      const run = payload.workflow_runs?.[0];
+      if (run) {
+        result.latestRun = {
+          status: run.status ?? null,
+          conclusion: run.conclusion ?? null,
+          id: run.id ?? null,
+          createdAt: run.created_at ?? null,
+        };
+      }
+    }
+  } catch {
+    // Health remains useful even if the latest-run lookup is unavailable.
   }
 
   return json(result);
@@ -116,7 +140,7 @@ function corsHeaders(request) {
     : "https://carooch62.github.io";
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Max-Age": "86400",
     "Vary": "Origin",
