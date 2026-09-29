@@ -5,6 +5,7 @@ on:
     paths:
       - "scanner.py"
       - "schema_normalizer.py"
+      - "tests/**"
       - ".github/workflows/market-scan.yml"
   workflow_dispatch:
     inputs:
@@ -38,6 +39,8 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install requests
+      - name: Run regression tests
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
       - name: Run scanner
         env:
           SCAN_MODE: ${{ github.event.inputs.scan_mode || 'scheduled' }}
