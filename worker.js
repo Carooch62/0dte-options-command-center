@@ -17,17 +17,66 @@ export default {
     }
 
     if (url.pathname === "/health") {
-      return json({
-        ok: true,
-        worker: "0dte-options-command-center",
-        workflow: WORKFLOW,
-        tokenConfigured: Boolean(env.GITHUB_TOKEN),
-      });
+      return handleHealth(env);
     }
 
     return env.ASSETS.fetch(request);
   },
 };
+
+async function handleHealth(env) {
+  const tokenConfigured = Boolean(env.GITHUB_TOKEN);
+
+  const result = {
+    ok: true,
+    worker: "0dte-options-command-center",
+    workflow: WORKFLOW,
+    tokenConfigured,
+    tokenType: typeof env.GITHUB_TOKEN,
+    githubRepo: { ok: false, status: null },
+    githubWorkflow: { ok: false, status: null },
+  };
+
+  // Do not expose the token or any response body. These checks only tell us
+  // whether the deployed Worker can authenticate to the target repository.
+  if (!tokenConfigured) {
+    return json(result);
+  }
+
+  const headers = {
+    Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    "User-Agent": "0DTE-Options-Command-Center",
+  };
+
+  try {
+    const repoResponse = await fetch(`https://api.github.com/repos/${REPO}`, {
+      headers,
+    });
+    result.githubRepo = {
+      ok: repoResponse.ok,
+      status: repoResponse.status,
+    };
+  } catch {
+    result.githubRepo = { ok: false, status: 0 };
+  }
+
+  try {
+    const workflowResponse = await fetch(
+      `https://api.github.com/repos/${REPO}/actions/workflows/${WORKFLOW}`,
+      { headers },
+    );
+    result.githubWorkflow = {
+      ok: workflowResponse.ok,
+      status: workflowResponse.status,
+    };
+  } catch {
+    result.githubWorkflow = { ok: false, status: 0 };
+  }
+
+  return json(result);
+}
 
 async function handleRefresh(request, env) {
   // Browser fetch() sends an OPTIONS preflight before the cross-origin POST.
