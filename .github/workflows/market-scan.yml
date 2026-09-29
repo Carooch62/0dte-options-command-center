@@ -1,12 +1,29 @@
 name: Free Market Scanner
 
 on:
+  # Secure manual trigger. No GitHub token is exposed to the public dashboard.
   workflow_dispatch:
+    inputs:
+      scan_mode:
+        description: "Scan mode"
+        required: false
+        default: "manual"
+        type: choice
+        options:
+          - manual
+          - second-wave
+
+  # Automatic market-hours refresh.
+  # GitHub Actions scheduled workflows have a 5-minute minimum interval.
   schedule:
     - cron: "*/5 13-20 * * 1-5"
 
 permissions:
   contents: write
+
+concurrency:
+  group: market-scan
+  cancel-in-progress: false
 
 jobs:
   scan:
@@ -21,7 +38,30 @@ jobs:
 
       - run: pip install requests
 
-      - run: python scanner.py
+      - name: Run scanner
+        env:
+          SCAN_MODE: ${{ github.event.inputs.scan_mode || 'scheduled' }}
+        run: python scanner.py
+
+      - name: Validate market data
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("data/market.json")
+          if not path.exists():
+              raise SystemExit("data/market.json was not created")
+
+          data = json.loads(path.read_text())
+          if not isinstance(data, dict):
+              raise SystemExit("market.json must contain a JSON object")
+
+          print("market.json validated")
+          print("market_date:", data.get("market_date"))
+          print("generated_at:", data.get("generated_at"))
+          print("scan_mode:", data.get("scan_mode"))
+          PY
 
       - name: Commit market data
         run: |
