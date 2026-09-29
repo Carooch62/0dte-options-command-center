@@ -107,7 +107,15 @@ def add_news(items):
                     "url": n.get("link", ""),
                     "age_hours": round((now - ts) / 3600, 1),
                 })
-        x["news"] = fresh[:4]
+        # Keep the rich article objects in a separate field for future use,
+        # but expose a plain string in `news` because the current dashboard
+        # renders this field as text. This prevents [object Object] output.
+        x["news_items"] = fresh[:4]
+        x["news"] = " | ".join(
+            f"{n.get('title','')} ({n.get('publisher','')})"
+            for n in fresh[:4]
+            if n.get("title")
+        )
         x["catalyst"] = bool(fresh)
 
 
