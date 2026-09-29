@@ -8,6 +8,8 @@ const ALLOWED_ORIGINS = new Set([
   "https://0dte-options-command-center.h69htk56cq.workers.dev",
 ]);
 
+// Deployment marker: 2026-09-28 asset-binding verification.
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -37,8 +39,6 @@ async function handleHealth(env) {
     githubWorkflow: { ok: false, status: null },
   };
 
-  // Do not expose the token or any response body. These checks only tell us
-  // whether the deployed Worker can authenticate to the target repository.
   if (!tokenConfigured) {
     return json(result);
   }
@@ -79,7 +79,6 @@ async function handleHealth(env) {
 }
 
 async function handleRefresh(request, env) {
-  // Browser fetch() sends an OPTIONS preflight before the cross-origin POST.
   if (request.method === "OPTIONS") {
     return new Response(null, {
       status: 204,
@@ -95,7 +94,6 @@ async function handleRefresh(request, env) {
 
   const origin = request.headers.get("Origin");
 
-  // Never allow missing/null/unknown origins to trigger the workflow.
   if (!origin || !ALLOWED_ORIGINS.has(origin)) {
     return json({ error: "Forbidden origin" }, 403, {}, request);
   }
