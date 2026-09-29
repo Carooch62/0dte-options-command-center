@@ -41,6 +41,43 @@ def ticker_explicit(ticker, item):
     return bool(pat.search(title) or pat.search(url))
 
 
+def timestamp_age_minutes(value):
+    """Return timestamp age in minutes when the source supplies a usable timestamp."""
+    if value in (None, '', 0):
+        return None
+    try:
+        if isinstance(value, (int, float)):
+            seconds = float(value)
+            if seconds > 10_000_000_000:
+                seconds /= 1000.0
+            return max(0.0, (datetime.now(timezone.utc).timestamp() - seconds) / 60.0)
+        raw = str(value).strip()
+        if raw.endswith('Z'):
+            raw = raw[:-1] + '+00:00'
+        dt = datetime.fromisoformat(raw)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return max(0.0, (datetime.now(timezone.utc) - dt.astimezone(timezone.utc)).total_seconds() / 60.0)
+    except Exception:
+        return None
+
+
+def option_freshness(x):
+    quality = str(x.get('options_quality') or 'NONE')
+    age = timestamp_age_minutes(x.get('option_timestamp'))
+    if quality == 'NONE':
+        return 'NONE'
+    if quality == 'CHAIN_ONLY':
+        return 'CHAIN_ONLY'
+    if age is None:
+        return 'DELAYED_UNKNOWN_AGE'
+    if age <= 20:
+        return 'DELAYED_FRESH'
+    if age <= 35:
+        return 'DELAYED_AGING'
+    return 'STALE'
+
+
 for x in data.get('candidates', []):
     move = float(x.get('day_move', x.get('change_pct', 0)) or 0)
     rvol = float(x.get('rvol', x.get('volume_ratio', 0)) or 0)
@@ -59,6 +96,33 @@ for x in data.get('candidates', []):
         flow = 'NEUTRAL'
     x['option_flow_direction'] = flow
     x['option_direction'] = flow
+    x['option_data_freshness'] = option_freshness(x)
+    age = timestamp_age_minutes(x.get('option_timestamp'))
+    x['option_data_age_minutes'] = round(age, 1) if age is not None else None
+
+    # A chain-only fallback can be useful for discovery, but it is not strong
+    # enough to promote a contract to a confirmed setup without verified Greeks.
+    preferred = list(x.get('preferred_contracts') or [])
+    usable = list(x.get('usable_contracts') or [])
+    expected_side = 'call' if move >= 0 else 'put'
+    for contract in preferred + usable:
+        contract['direction_aligned'] = contract.get('side') == expected_side
+        contract['greeks_verified'] = bool(contract.get('greeks_verified'))
+
+    aligned_preferred = [
+        o for o in preferred
+        if o.get('direction_aligned') and o.get('greeks_verified')
+    ]
+    aligned_usable = [o for o in usable if o.get('direction_aligned')]
+    countertrend = [o for o in preferred if not o.get('direction_aligned')]
+
+    aligned_preferred.sort(key=lambda o: (o.get('preferred_delta', False), o.get('contract_score', 0)), reverse=True)
+    aligned_usable.sort(key=lambda o: o.get('contract_score', 0), reverse=True)
+    countertrend.sort(key=lambda o: o.get('contract_score', 0), reverse=True)
+    x['preferred_contracts'] = aligned_preferred[:5]
+    x['cheap_contracts'] = aligned_preferred[:5]
+    x['usable_contracts'] = aligned_usable[:8]
+    x['countertrend_contracts'] = countertrend[:3]
 
     items = x.get('news_items') if isinstance(x.get('news_items'), list) else []
     ticker = x.get('ticker', '')
@@ -90,20 +154,27 @@ for x in data.get('candidates', []):
     x['catalyst'] = x['catalyst_level'] != 'NONE'
     x['news'] = ' | '.join(f"{n.get('title','')} ({n.get('publisher','')})" for n in items if n.get('title'))
 
-    preferred = x.get('preferred_contracts') or []
-    usable = x.get('usable_contracts') or []
     aligned = (flow == 'CALL' and move > 0) or (flow == 'PUT' and move < 0)
     momentum = abs(move) >= 3 and rvol >= 1.5
     acceleration = float(x.get('volume_acceleration', 0) or 0) >= 1.25 and abs(float(x.get('move_5m', 0) or 0)) >= 0.25
     catalyst = x['catalyst_level'] in ('DIRECT', 'LIKELY')
+    fresh_enough = x['option_data_freshness'] in ('DELAYED_FRESH', 'DELAYED_AGING')
+    full_greeks = str(x.get('options_quality')) == 'FULL_GREEKS'
+    strong_option_data = bool(x.get('preferred_contracts')) and full_greeks and fresh_enough
     x['flow_aligned'] = aligned
     x['momentum_confirmed'] = momentum
     x['acceleration_confirmed'] = acceleration
-    x['confirmation_count'] = sum(bool(v) for v in (catalyst, momentum or acceleration, aligned, preferred))
+    x['confirmation_count'] = sum(bool(v) for v in (catalyst, momentum or acceleration, aligned, strong_option_data))
+    x['execution_readiness'] = (
+        'VERIFIED_DELAYED' if strong_option_data and aligned and (momentum or acceleration) else
+        'WATCH_ONLY' if (aligned_usable or preferred or x.get('zero_dte')) else
+        'INSUFFICIENT_DATA'
+    )
 
-    if preferred and x['catalyst_level'] == 'DIRECT' and (momentum or acceleration) and (aligned or flow == 'NEUTRAL'):
+    # Never let stale/chain-only option data masquerade as a confirmed setup.
+    if strong_option_data and x['catalyst_level'] == 'DIRECT' and (momentum or acceleration) and (aligned or flow == 'NEUTRAL'):
         x['setup_bucket'] = 'CONFIRMED WATCH'
-    elif preferred or (usable and (momentum or acceleration)):
+    elif strong_option_data or (aligned_usable and (momentum or acceleration)):
         x['setup_bucket'] = 'WATCH'
     elif catalyst and (momentum or acceleration):
         x['setup_bucket'] = 'SECOND-WAVE'
@@ -115,6 +186,7 @@ if scan_mode == 'second-wave':
         data.get('candidates', []),
         key=lambda x: (
             1 if x.get('setup_bucket') == 'SECOND-WAVE' else 0,
+            1 if x.get('execution_readiness') == 'VERIFIED_DELAYED' else 0,
             float(x.get('volume_acceleration', 0) or 0),
             abs(float(x.get('move_5m', 0) or 0)),
             abs(float(x.get('recent_move', 0) or 0)),
@@ -126,6 +198,7 @@ else:
         data.get('candidates', []),
         key=lambda x: (
             1 if x.get('setup_bucket') == 'CONFIRMED WATCH' else 0,
+            1 if x.get('execution_readiness') == 'VERIFIED_DELAYED' else 0,
             1 if x.get('preferred_contracts') else 0,
             1 if x.get('catalyst_level') == 'DIRECT' else 0,
             1 if x.get('acceleration_confirmed') else 0,
@@ -133,9 +206,16 @@ else:
         ), reverse=True,
     )
 
-data['schema_version'] = 4
-data['data_quality'] = 'DELAYED_BEST_EFFORT'
+data['schema_version'] = 5
+data['data_quality'] = 'DELAYED_BEST_EFFORT_WITH_FRESHNESS_CHECKS'
 data['dashboard_generated_at'] = datetime.now(timezone.utc).isoformat()
 data['scan_mode'] = scan_mode
+data['quality_rules'] = {
+    'confirmed_requires': 'FULL_GREEKS + non-stale CBOE timestamp + direction-aligned preferred contract + price/volume confirmation',
+    'delayed_fresh_max_minutes': 20,
+    'delayed_aging_max_minutes': 35,
+    'chain_only_policy': 'discovery/watch only; never confirmed',
+    'preferred_contract_policy': 'direction aligned + verified Greeks + near ATM + $0.10-$0.30 ask + tight spread + volume',
+}
 Path('data/market-dashboard.json').write_text(json.dumps(data, separators=(',', ':')))
 print(f"normalized {len(data.get('candidates', []))} candidates; mode={scan_mode}")
