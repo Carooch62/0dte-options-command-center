@@ -1,6 +1,11 @@
 name: Free Market Scanner
 
 on:
+  push:
+    paths:
+      - "scanner.py"
+      - "schema_normalizer.py"
+      - ".github/workflows/market-scan.yml"
   workflow_dispatch:
     inputs:
       scan_mode:
@@ -11,9 +16,6 @@ on:
         options:
           - manual
           - second-wave
-
-  # Extended US/Eastern market window. GitHub cron is UTC, so this intentionally
-  # provides a broad window across DST changes rather than pretending UTC is ET.
   schedule:
     - cron: "*/5 12-21 * * 1-5"
 
