@@ -10,14 +10,32 @@ export default {
       return handleRefresh(request, env);
     }
 
+    if (url.pathname === "/health") {
+      return json({
+        ok: true,
+        worker: "0dte-options-command-center",
+        workflow: WORKFLOW,
+        tokenConfigured: Boolean(env.GITHUB_TOKEN),
+      });
+    }
+
     return env.ASSETS.fetch(request);
   },
 };
 
 async function handleRefresh(request, env) {
+  // Browser fetch() sends an OPTIONS preflight before the cross-origin POST.
+  // Without this branch the browser receives 405 and never sends the POST.
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders(),
+    });
+  }
+
   if (request.method !== "POST") {
     return json({ error: "Method not allowed" }, 405, {
-      Allow: "POST",
+      Allow: "OPTIONS, POST",
     });
   }
 
@@ -69,14 +87,23 @@ async function handleRefresh(request, env) {
   }, 202);
 }
 
+function corsHeaders() {
+  return {
+    "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Max-Age": "86400",
+    "Vary": "Origin",
+  };
+}
+
 function json(body, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "no-store",
-      "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-      "Access-Control-Allow-Methods": "POST",
+      ...corsHeaders(),
       ...extraHeaders,
     },
   });
