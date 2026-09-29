@@ -29,6 +29,9 @@ concurrency:
 jobs:
   scan:
     runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      PYTHONUNBUFFERED: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -57,6 +60,8 @@ jobs:
                   raise SystemExit(f"{name} must contain a JSON object")
               if not isinstance(data.get("candidates"), list):
                   raise SystemExit(f"{name} candidates must be a list")
+              if name.endswith("dashboard.json") and data.get("schema_version") != 4:
+                  raise SystemExit("dashboard schema version mismatch")
           print("market data validated")
           PY
       - name: Commit market data
