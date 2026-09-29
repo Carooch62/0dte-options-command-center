@@ -1,6 +1,6 @@
 const REPO = "Carooch62/0dte-options-command-center";
 const WORKFLOW = "market-scan.yml";
-const VERSION = "2026-09-29.1";
+const VERSION = "2026-09-29.2-execution-layer";
 
 const ALLOWED_ORIGINS = new Set([
   "https://carooch62.github.io",
@@ -32,6 +32,7 @@ async function handleHealth(env) {
     version: VERSION,
     worker: "0dte-options-command-center",
     workflow: WORKFLOW,
+    executionLayer: true,
     tokenConfigured,
     tokenType: typeof env.GITHUB_TOKEN,
     githubRepo: { ok: false, status: null },
@@ -130,6 +131,7 @@ async function handleRefresh(request, env) {
     message: mode === "second-wave" ? "Second-wave scan started" : "Market scan started",
     workflow: WORKFLOW,
     scan_mode: mode,
+    execution_layer: true,
   }, 202, {}, request);
 }
 
