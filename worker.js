@@ -1,6 +1,12 @@
 const REPO = "Carooch62/0dte-options-command-center";
 const WORKFLOW = "market-scan.yml";
-const ALLOWED_ORIGIN = "https://carooch62.github.io";
+
+// Only these two origins are allowed to trigger a refresh.
+// The first is the GitHub Pages dashboard; the second is the Worker-hosted dashboard.
+const ALLOWED_ORIGINS = new Set([
+  "https://carooch62.github.io",
+  "https://0dte-options-command-center.h69htk56cq.workers.dev",
+]);
 
 export default {
   async fetch(request, env, ctx) {
@@ -25,27 +31,28 @@ export default {
 
 async function handleRefresh(request, env) {
   // Browser fetch() sends an OPTIONS preflight before the cross-origin POST.
-  // Without this branch the browser receives 405 and never sends the POST.
   if (request.method === "OPTIONS") {
     return new Response(null, {
       status: 204,
-      headers: corsHeaders(),
+      headers: corsHeaders(request),
     });
   }
 
   if (request.method !== "POST") {
     return json({ error: "Method not allowed" }, 405, {
       Allow: "OPTIONS, POST",
-    });
+    }, request);
   }
 
   const origin = request.headers.get("Origin");
-  if (origin !== ALLOWED_ORIGIN) {
-    return json({ error: "Forbidden origin" }, 403);
+
+  // Never allow missing/null/unknown origins to trigger the workflow.
+  if (!origin || !ALLOWED_ORIGINS.has(origin)) {
+    return json({ error: "Forbidden origin" }, 403, {}, request);
   }
 
   if (!env.GITHUB_TOKEN) {
-    return json({ error: "GITHUB_TOKEN is not configured" }, 500);
+    return json({ error: "GITHUB_TOKEN is not configured" }, 500, {}, request);
   }
 
   const response = await fetch(
@@ -77,6 +84,8 @@ async function handleRefresh(request, env) {
         detail: detail.slice(0, 500),
       },
       502,
+      {},
+      request,
     );
   }
 
@@ -84,12 +93,15 @@ async function handleRefresh(request, env) {
     ok: true,
     message: "Market scan started",
     workflow: WORKFLOW,
-  }, 202);
+  }, 202, {}, request);
 }
 
-function corsHeaders() {
+function corsHeaders(request) {
+  const origin = request?.headers?.get("Origin");
+  const allowedOrigin = origin && ALLOWED_ORIGINS.has(origin) ? origin : "https://carooch62.github.io";
+
   return {
-    "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+    "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Max-Age": "86400",
@@ -97,13 +109,13 @@ function corsHeaders() {
   };
 }
 
-function json(body, status = 200, extraHeaders = {}) {
+function json(body, status = 200, extraHeaders = {}, request = null) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "no-store",
-      ...corsHeaders(),
+      ...corsHeaders(request),
       ...extraHeaders,
     },
   });
