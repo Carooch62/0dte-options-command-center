@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
-import json, os, re, time
+import json
+import os
+import re
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timezone
+from datetime import datetime, timezone, time as dtime
 from zoneinfo import ZoneInfo
+
 import requests
 
 UA = "Mozilla/5.0 (0DTE-Options-Command-Center; GitHub Actions)"
@@ -27,10 +31,6 @@ HEADERS = {
 }
 
 
-def pct(a, b):
-    return (a / b - 1) * 100 if b else 0
-
-
 def num(v):
     if v is None:
         return 0.0
@@ -43,6 +43,24 @@ def num(v):
         return float(s)
     except Exception:
         return 0.0
+
+
+def pct(a, b):
+    return (a / b - 1) * 100 if b else 0.0
+
+
+def market_session(now=None):
+    now = now or datetime.now(ET)
+    if now.weekday() >= 5:
+        return "CLOSED"
+    t = now.time()
+    if dtime(4, 0) <= t < dtime(9, 30):
+        return "PREMARKET"
+    if dtime(9, 30) <= t < dtime(16, 0):
+        return "OPEN"
+    if dtime(16, 0) <= t < dtime(20, 0):
+        return "AFTER HOURS"
+    return "CLOSED"
 
 
 def chart(t):
@@ -65,29 +83,75 @@ def news(t):
         return []
 
 
+def explicit_ticker(ticker, item):
+    title = str(item.get("title", ""))
+    link = str(item.get("link", ""))
+    pat = re.compile(r"(?<![A-Z0-9])" + re.escape(ticker) + r"(?![A-Z0-9])", re.I)
+    return bool(pat.search(title) or pat.search(link))
+
+
 def scan_one(t):
     try:
         d = chart(t)
         q = d["indicators"]["quote"][0]
-        c = [x for x in q.get("close", []) if x is not None]
-        v = [x for x in q.get("volume", []) if x is not None]
-        if len(c) < 10:
+        close = [x for x in q.get("close", []) if x is not None]
+        high = [x for x in q.get("high", []) if x is not None]
+        low = [x for x in q.get("low", []) if x is not None]
+        volume = [x for x in q.get("volume", []) if x is not None]
+        if len(close) < 14 or len(high) != len(close) or len(low) != len(close):
             return None
-        price = c[-1]
-        day_move = pct(price, c[0])
-        look = max(0, len(c) - 13)
-        short_move = pct(price, c[look]) if c[look] else 0
-        hist = v[:-5][-20:]
-        avgv = sum(hist) / max(1, len(hist))
-        recentv = sum(v[-5:]) / max(1, len(v[-5:]))
-        vol_ratio = recentv / avgv if avgv else 0
-        score = abs(day_move) * 1.5 + abs(short_move) * 2 + max(0, vol_ratio - 1) * 2
+
+        price = close[-1]
+        day_move = pct(price, close[0])
+        move_5m = pct(price, close[-2])
+        move_15m = pct(price, close[-4])
+        move_30m = pct(price, close[-7])
+        move_60m = pct(price, close[-13])
+
+        hist = volume[:-5][-20:]
+        recent = volume[-5:]
+        prior5 = volume[-10:-5]
+        avg_hist = sum(hist) / max(1, len(hist))
+        avg_recent = sum(recent) / max(1, len(recent))
+        avg_prior5 = sum(prior5) / max(1, len(prior5))
+        vol_burst = avg_recent / avg_hist if avg_hist else 0
+        volume_acceleration = avg_recent / avg_prior5 if avg_prior5 else 0
+
+        typical = [(h + l + c) / 3 for h, l, c in zip(high, low, close)]
+        total_vol = sum(volume)
+        vwap = sum(tp * v for tp, v in zip(typical, volume)) / total_vol if total_vol else price
+        recent_high = max(high[-3:])
+        recent_low = min(low[-3:])
+        direction = "UP" if day_move >= 0 else "DOWN"
+        trigger = recent_high if direction == "UP" else recent_low
+        invalidation = vwap if (direction == "UP" and vwap < price) or (direction == "DOWN" and vwap > price) else (recent_low if direction == "UP" else recent_high)
+
+        score = (
+            abs(day_move) * 1.2
+            + abs(move_15m) * 1.8
+            + abs(move_5m) * 2.2
+            + max(0, vol_burst - 1) * 2.2
+            + max(0, volume_acceleration - 1) * 1.5
+            + (1.5 if abs(price - vwap) / max(price, 0.01) >= 0.005 else 0)
+        )
+
         return {
             "ticker": t,
             "price": round(price, 2),
             "day_move": round(day_move, 2),
-            "recent_move": round(short_move, 2),
-            "volume_ratio": round(vol_ratio, 2),
+            "move_5m": round(move_5m, 2),
+            "recent_move": round(move_15m, 2),
+            "move_30m": round(move_30m, 2),
+            "move_60m": round(move_60m, 2),
+            "volume_ratio": round(vol_burst, 2),
+            "volume_acceleration": round(volume_acceleration, 2),
+            "vwap": round(vwap, 2),
+            "vwap_distance_pct": round((price / vwap - 1) * 100 if vwap else 0, 2),
+            "recent_high_15m": round(recent_high, 2),
+            "recent_low_15m": round(recent_low, 2),
+            "trigger_price": round(trigger, 2),
+            "invalidation_price": round(invalidation, 2),
+            "direction": direction,
             "score": round(score, 2),
         }
     except Exception:
@@ -95,28 +159,35 @@ def scan_one(t):
 
 
 def add_news(items):
-    now = time.time()
-    for x in items:
+    def one(x):
         fresh = []
         for n in news(x["ticker"]):
             ts = n.get("providerPublishTime", 0)
-            if ts and now - ts < 36 * 3600:
-                fresh.append({
-                    "title": n.get("title", ""),
-                    "publisher": n.get("publisher", ""),
-                    "url": n.get("link", ""),
-                    "age_hours": round((now - ts) / 3600, 1),
-                })
-        # Keep the rich article objects in a separate field for future use,
-        # but expose a plain string in `news` because the current dashboard
-        # renders this field as text. This prevents [object Object] output.
-        x["news_items"] = fresh[:4]
-        x["news"] = " | ".join(
-            f"{n.get('title','')} ({n.get('publisher','')})"
-            for n in fresh[:4]
-            if n.get("title")
-        )
-        x["catalyst"] = bool(fresh)
+            if not ts or time.time() - ts >= 36 * 3600:
+                continue
+            related = [str(v).upper() for v in (n.get("relatedTickers") or [])]
+            relevant = explicit_ticker(x["ticker"], n) or x["ticker"].upper() in related
+            fresh.append({
+                "title": n.get("title", ""),
+                "publisher": n.get("publisher", ""),
+                "url": n.get("link", ""),
+                "age_hours": round((time.time() - ts) / 3600, 1),
+                "explicit_ticker": relevant,
+                "related_tickers": related[:8],
+            })
+        fresh.sort(key=lambda n: (1 if n["explicit_ticker"] else 0, -n["age_hours"]), reverse=True)
+        return x["ticker"], fresh[:6]
+
+    with ThreadPoolExecutor(max_workers=10) as pool:
+        futures = [pool.submit(one, x) for x in items]
+        for fut in as_completed(futures):
+            ticker, fresh = fut.result()
+            x = next((z for z in items if z["ticker"] == ticker), None)
+            if x is None:
+                continue
+            x["news_items"] = fresh
+            x["news"] = " | ".join(f"{n['title']} ({n['publisher']})" for n in fresh if n.get("title"))
+            x["catalyst"] = any(n.get("explicit_ticker") for n in fresh)
 
 
 def parse_osi(symbol):
@@ -128,8 +199,7 @@ def parse_osi(symbol):
     yymmdd, side, strike_raw = m.groups()
     try:
         exp = datetime.strptime(yymmdd, "%y%m%d").date()
-        strike = int(strike_raw) / 1000.0
-        return exp, ("call" if side == "C" else "put"), strike
+        return exp, ("call" if side == "C" else "put"), int(strike_raw) / 1000.0
     except Exception:
         return None
 
@@ -162,6 +232,7 @@ def fetch_cboe(t):
                 "gamma": round(num(row.get("gamma")), 6), "theta": round(num(row.get("theta")), 4),
                 "vega": round(num(row.get("vega")), 4), "expiry": exp.isoformat(), "dte": 0,
                 "source": "CBOE delayed (15m)", "option_timestamp": timestamp,
+                "greeks_verified": bool(num(row.get("delta")) or num(row.get("gamma"))),
             })
         return out, timestamp
     except Exception:
@@ -180,7 +251,7 @@ def parse_nasdaq_rows(rows, today):
                 exp = datetime.strptime(str(exp_raw).strip(), fmt).date(); break
             except Exception:
                 pass
-        if not exp:
+        if not exp or exp != today:
             continue
         strike = num(row.get("strike") or row.get("strikePrice"))
         if not strike:
@@ -189,25 +260,29 @@ def parse_nasdaq_rows(rows, today):
             bid = num(row.get(prefix+"Bid") or row.get(prefix+"bid"))
             ask = num(row.get(prefix+"Ask") or row.get(prefix+"ask"))
             last = num(row.get(prefix+"Last") or row.get(prefix+"last"))
-            mid = (bid+ask)/2 if bid > 0 and ask > 0 else last
+            mid = (bid + ask) / 2 if bid > 0 and ask > 0 else last
             if mid <= 0:
                 continue
-            out.append({"side":side,"strike":strike,"bid":round(bid,2),"ask":round(ask,2),
-                        "mid":round(mid,2),"last":round(last,2),
-                        "volume":int(num(row.get(prefix+"Volume") or row.get(prefix+"volume"))),
-                        "oi":int(num(row.get(prefix+"Openinterest") or row.get(prefix+"OpenInterest") or row.get(prefix+"openInterest"))),
-                        "iv":0,"delta":0,"gamma":0,"theta":0,"vega":0,
-                        "expiry":exp.isoformat(),"dte":(exp-today).days,"source":"Nasdaq public chain",
-                        "option_timestamp":None})
+            out.append({
+                "side": side, "strike": strike, "bid": round(bid, 2), "ask": round(ask, 2),
+                "mid": round(mid, 2), "last": round(last, 2),
+                "volume": int(num(row.get(prefix+"Volume") or row.get(prefix+"volume"))),
+                "oi": int(num(row.get(prefix+"Openinterest") or row.get(prefix+"OpenInterest") or row.get(prefix+"openInterest"))),
+                "iv": 0, "delta": 0, "gamma": 0, "theta": 0, "vega": 0,
+                "expiry": exp.isoformat(), "dte": 0, "source": "Nasdaq public chain",
+                "option_timestamp": None, "greeks_verified": False,
+            })
     return out
 
 
 def nasdaq_options(t):
     try:
         today = datetime.now(ET).date()
-        u = f"https://api.nasdaq.com/api/quote/{t}/option-chain"
-        h = {**HEADERS, "Referer":"https://www.nasdaq.com/"}
-        r = requests.get(u, params={"assetclass":"stocks","limit":"1000"}, headers=h, timeout=12)
+        r = requests.get(
+            f"https://api.nasdaq.com/api/quote/{t}/option-chain",
+            params={"assetclass": "stocks", "limit": "1000"},
+            headers={**HEADERS, "Referer": "https://www.nasdaq.com/"}, timeout=12,
+        )
         r.raise_for_status()
         rows = ((r.json().get("data") or {}).get("table") or {}).get("rows") or []
         return parse_nasdaq_rows(rows, today)
@@ -224,37 +299,19 @@ def options(t):
 
 
 def contract_score(o, stock):
-    """Rank contracts for the user's low-premium, momentum-focused strategy."""
     price = stock["price"]
-    day = stock["day_move"]
-    preferred_side = "call" if day >= 0 else "put"
-    side_bonus = 2.5 if o["side"] == preferred_side else 0
     spread = max(0.0, o["ask"] - o["bid"]) if o["bid"] > 0 and o["ask"] > 0 else 9.99
-    spread_pct = spread / max(o["mid"], 0.01)
-    volume = o["volume"]
-    oi = o["oi"]
     delta = abs(o.get("delta", 0))
-    gamma = o.get("gamma", 0)
     dist = abs(o["strike"] - price) / max(price, 0.01)
-
-    # Preferred $0.10-$0.30, but allow usable contracts up to $0.75.
-    if 0.10 <= o["mid"] <= 0.30:
-        price_score = 5.0
-    elif 0.30 < o["mid"] <= 0.50:
-        price_score = 4.0
-    elif 0.50 < o["mid"] <= 0.75:
-        price_score = 2.5
-    elif 0.75 < o["mid"] <= 1.25:
-        price_score = 1.0
-    else:
-        price_score = -3.0
-
-    liquidity = min(5.0, (volume ** 0.5) / 20) + min(2.0, (oi ** 0.5) / 20)
-    delta_score = max(0.0, 4.0 - abs(delta - 0.50) * 8) if delta else 0
-    gamma_score = min(3.0, gamma * 20) if gamma else 0
-    spread_score = max(-5.0, 3.0 - spread_pct * 5)
-    atm_score = max(0.0, 3.0 - dist * 30)
-
+    liquidity = min(5.0, (o["volume"] ** 0.5) / 15) + min(2.0, (o["oi"] ** 0.5) / 15)
+    delta_score = max(0.0, 5.0 - abs(delta - 0.45) * 10) if delta else 0
+    gamma_score = min(3.0, o.get("gamma", 0) * 25) if o.get("gamma") else 0
+    spread_score = max(-6.0, 4.0 - spread * 50)
+    atm_score = max(0.0, 4.0 - dist * 100)
+    side = "call" if stock["direction"] == "UP" else "put"
+    side_bonus = 3.0 if o["side"] == side else 0
+    ask = o["ask"]
+    price_score = 5.0 if 0.10 <= ask <= 0.30 else 3.0 if 0.30 < ask <= 0.50 else 1.0 if 0.50 < ask <= 0.75 else -4.0
     return round(price_score + liquidity + delta_score + gamma_score + spread_score + atm_score + side_bonus, 3)
 
 
@@ -267,54 +324,95 @@ def enrich_options(x, result):
         o["spread_pct"] = round(spread / max(o["mid"], 0.01) * 100, 1) if spread < 99 else 999
         o["distance_pct"] = round(abs(o["strike"] - x["price"]) / max(x["price"], 0.01) * 100, 2)
         o["contract_score"] = contract_score(o, x)
-        o["preferred_price"] = 0.10 <= o["mid"] <= 0.30
-        o["usable_price"] = 0.10 <= o["mid"] <= 0.75
+        o["preferred_price"] = 0.10 <= o["ask"] <= 0.30
+        o["watch_price"] = 0.30 < o["ask"] <= 0.50
+        o["usable_price"] = 0.10 <= o["ask"] <= 0.75
+        o["near_atm"] = o["distance_pct"] <= 3.0
+        o["delta_ok"] = (not o.get("greeks_verified")) or abs(o.get("delta", 0)) >= 0.25
+        o["preferred_delta"] = (not o.get("greeks_verified")) or abs(o.get("delta", 0)) >= 0.40
+        o["tight_spread"] = spread <= 0.05
+        o["usable_spread"] = spread <= 0.10
 
-    calls = sum(o["volume"] for o in zero if o["side"] == "call")
-    puts = sum(o["volume"] for o in zero if o["side"] == "put")
+    near = [o for o in zero if o["near_atm"]]
+    calls = sum(o["volume"] for o in near if o["side"] == "call")
+    puts = sum(o["volume"] for o in near if o["side"] == "put")
     ratio = round(calls / puts, 2) if puts else (99 if calls else 0)
+    if ratio >= 1.25:
+        flow = "CALL"
+    elif ratio <= 0.80 and puts:
+        flow = "PUT"
+    else:
+        flow = "NEUTRAL"
 
-    direction = "CALL" if x["day_move"] > 0.5 else "PUT" if x["day_move"] < -0.5 else "NEUTRAL"
-    preferred = [o for o in zero if o["preferred_price"] and o["volume"] >= 20 and o["spread_pct"] <= 60]
-    usable = [o for o in zero if o["usable_price"] and o["volume"] >= 20 and o["spread_pct"] <= 75]
-    preferred.sort(key=lambda o:o["contract_score"], reverse=True)
-    usable.sort(key=lambda o:o["contract_score"], reverse=True)
+    preferred = [o for o in zero if o["preferred_price"] and o["volume"] >= 20 and o["near_atm"] and o["delta_ok"] and o["tight_spread"]]
+    usable = [o for o in zero if o["usable_price"] and o["volume"] >= 20 and o["near_atm"] and o["delta_ok"] and o["usable_spread"]]
+    preferred.sort(key=lambda o: (o["preferred_delta"], o["contract_score"]), reverse=True)
+    usable.sort(key=lambda o: o["contract_score"], reverse=True)
 
-    x["options"] = sorted(zero, key=lambda o:o["contract_score"], reverse=True)[:40]
+    x["options"] = sorted(zero, key=lambda o: o["contract_score"], reverse=True)[:40]
     x["preferred_contracts"] = preferred[:5]
-    x["cheap_contracts"] = preferred[:5]  # backward compatible with current dashboard
+    x["cheap_contracts"] = preferred[:5]
     x["usable_contracts"] = usable[:8]
     x["zero_dte"] = bool(zero)
     x["option_call_volume"] = calls
     x["option_put_volume"] = puts
     x["option_call_put_ratio"] = ratio
-    x["option_direction"] = direction
+    x["option_flow_direction"] = flow
+    x["option_direction"] = flow
     x["option_source"] = source
     x["option_timestamp"] = timestamp
+    x["options_quality"] = "FULL_GREEKS" if any(o.get("greeks_verified") for o in zero) else ("CHAIN_ONLY" if zero else "NONE")
 
-    # Scanner status is intentionally not ENTER-READY. That requires live confirmation.
     momentum = abs(x["day_move"]) >= 3 and x["volume_ratio"] >= 1.5
-    flow_aligned = (direction == "CALL" and ratio >= 1.25) or (direction == "PUT" and ratio <= 0.80)
-    if preferred:
+    acceleration = x["volume_acceleration"] >= 1.25 and abs(x["move_5m"]) >= 0.25
+    aligned = (flow == "CALL" and x["direction"] == "UP") or (flow == "PUT" and x["direction"] == "DOWN")
+    catalyst = any(n.get("explicit_ticker") for n in x.get("news_items", []))
+    if preferred and catalyst and (momentum or acceleration):
         x["status"] = "0DTE CANDIDATE"
-    elif usable and momentum and (flow_aligned or ratio == 0):
+    elif preferred or (usable and aligned and (momentum or acceleration)):
         x["status"] = "0DTE WATCH"
-    elif zero and momentum:
-        x["status"] = "0DTE WATCH"
-    elif momentum:
+    elif momentum or acceleration:
         x["status"] = "RE-SCAN"
     else:
         x["status"] = "WATCH / WAIT"
 
 
 def main():
-    rows = [x for t in TICKERS if (x := scan_one(t))]
-    rows.sort(key=lambda x:x["score"], reverse=True)
-    top = rows[:30]
-    add_news(top)
+    scan_mode = os.getenv("SCAN_MODE") or "scheduled"
+    session = market_session()
+
+    rows = []
+    with ThreadPoolExecutor(max_workers=12) as pool:
+        futures = {pool.submit(scan_one, t): t for t in TICKERS}
+        for fut in as_completed(futures):
+            try:
+                x = fut.result()
+            except Exception:
+                x = None
+            if x:
+                rows.append(x)
+
+    rows.sort(key=lambda x: x["score"], reverse=True)
+    news_pool = rows[:60]
+    add_news(news_pool)
+    for x in rows:
+        x.setdefault("news_items", [])
+        x.setdefault("news", "")
+        x.setdefault("catalyst", False)
+
+    option_pool = sorted(
+        rows,
+        key=lambda x: (
+            1 if x.get("catalyst") else 0,
+            1 if x.get("volume_acceleration", 0) >= 1.25 else 0,
+            abs(x.get("move_5m", 0)),
+            x.get("score", 0),
+        ),
+        reverse=True,
+    )[:35]
 
     with ThreadPoolExecutor(max_workers=6) as pool:
-        futures = {pool.submit(options, x["ticker"]): x for x in top}
+        futures = {pool.submit(options, x["ticker"]): x for x in option_pool}
         for fut in as_completed(futures):
             x = futures[fut]
             try:
@@ -323,19 +421,54 @@ def main():
                 result = ([], "No same-day chain returned", None)
             enrich_options(x, result)
 
-    # Bring actionable option setups toward the top without hiding broad momentum candidates.
-    top.sort(key=lambda x:(1 if x.get("preferred_contracts") else 0,
-                           1 if x.get("usable_contracts") else 0,
-                           x.get("score",0)), reverse=True)
+    scanned = {x["ticker"] for x in option_pool}
+    for x in rows:
+        if x["ticker"] not in scanned:
+            catalyst = x.get("catalyst", False)
+            momentum = abs(x["day_move"]) >= 3 and x["volume_ratio"] >= 1.5
+            x["status"] = "RE-SCAN" if momentum or catalyst else "WATCH / WAIT"
+            x["option_flow_direction"] = "NEUTRAL"
+            x["option_direction"] = "NEUTRAL"
+            x["option_source"] = "Not scanned in this wave"
+            x["option_timestamp"] = None
+            x["options_quality"] = "NONE"
+            x["zero_dte"] = False
+            x["preferred_contracts"] = []
+            x["usable_contracts"] = []
+            x["options"] = []
+
+    rows.sort(key=lambda x: (
+        1 if x.get("preferred_contracts") else 0,
+        1 if x.get("catalyst") else 0,
+        1 if x.get("volume_acceleration", 0) >= 1.25 else 0,
+        x.get("score", 0),
+    ), reverse=True)
+    top = rows[:60]
 
     out = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "market_date": datetime.now(ET).date().isoformat(),
-        "source": "Yahoo public price/news + CBOE public delayed options chain (15-minute delayed); Nasdaq fallback; not tick-by-tick",
+        "market_session": session,
+        "scan_mode": scan_mode,
+        "source": "Yahoo public 5m price/news + CBOE public delayed options chain (15m) with Nasdaq fallback; not tick-by-tick",
+        "data_quality": "DELAYED_BEST_EFFORT",
         "universe_size": len(TICKERS),
-        "option_chain_universe": len(top),
-        "preferred_contract_range": "$0.10-$0.30",
-        "usable_contract_range": "$0.10-$0.75",
+        "scanned_rows": len(rows),
+        "news_universe": len(news_pool),
+        "option_chain_universe": len(option_pool),
+        "preferred_contract_range": "$0.10-$0.30 ask",
+        "watch_contract_range": "$0.31-$0.50 ask",
+        "usable_contract_range": "$0.10-$0.75 ask",
+        "contract_rules": {
+            "preferred_ask_max": 0.30,
+            "watch_ask_max": 0.50,
+            "min_delta": 0.25,
+            "preferred_delta": 0.40,
+            "near_atm_pct": 3.0,
+            "preferred_spread_max": 0.05,
+            "usable_spread_max": 0.10,
+            "min_volume": 20,
+        },
         "candidates": top,
     }
     os.makedirs("data", exist_ok=True)
@@ -343,10 +476,12 @@ def main():
         json.dump(out, f, separators=(",", ":"))
     print(json.dumps({
         "generated_at": out["generated_at"],
-        "option_chain_universe": len(top),
+        "session": session,
+        "scanned": len(rows),
+        "news_universe": len(news_pool),
+        "option_chain_universe": len(option_pool),
         "actionable": [
-            (x["ticker"], x["day_move"], x["volume_ratio"],
-             len(x.get("preferred_contracts", [])), x["status"])
+            (x["ticker"], x["day_move"], x["volume_ratio"], len(x.get("preferred_contracts", [])), x["status"])
             for x in top[:12]
         ],
     }))
