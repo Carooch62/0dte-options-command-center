@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Normalize scanner output into a stable dashboard contract."""
 import json
+import os
 from pathlib import Path
 from datetime import datetime, timezone
 
 src = Path('data/market.json')
 data = json.loads(src.read_text())
+scan_mode = os.getenv('SCAN_MODE') or data.get('scan_mode') or 'scheduled'
 
 for x in data.get('candidates', []):
     move = float(x.get('day_move', x.get('change_pct', 0)) or 0)
@@ -48,9 +50,27 @@ for x in data.get('candidates', []):
     x['catalyst'] = x['catalyst_level'] != 'NONE'
     x['news'] = ' | '.join(f"{n.get('title','')} ({n.get('publisher','')})" for n in items if n.get('title'))
 
+if scan_mode == 'second-wave':
+    data['candidates'] = sorted(
+        data.get('candidates', []),
+        key=lambda x:(float(x.get('volume_acceleration',0) or 0), abs(float(x.get('recent_move',0) or 0)), float(x.get('score',0) or 0)),
+        reverse=True,
+    )
+else:
+    data['candidates'] = sorted(
+        data.get('candidates', []),
+        key=lambda x:(
+            1 if x.get('preferred_contracts') else 0,
+            1 if x.get('usable_contracts') else 0,
+            1 if x.get('catalyst_level') == 'DIRECT' else 0,
+            float(x.get('score',0) or 0),
+        ),
+        reverse=True,
+    )
+
 data['schema_version'] = 2
 data['data_quality'] = 'DELAYED_BEST_EFFORT'
 data['dashboard_generated_at'] = datetime.now(timezone.utc).isoformat()
-data['scan_mode'] = data.get('scan_mode') or 'scheduled'
+data['scan_mode'] = scan_mode
 Path('data/market-dashboard.json').write_text(json.dumps(data, separators=(',', ':')))
-print(f"normalized {len(data.get('candidates', []))} candidates")
+print(f"normalized {len(data.get('candidates', []))} candidates; mode={scan_mode}")
