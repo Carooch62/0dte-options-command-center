@@ -69,7 +69,7 @@ jobs:
                   raise SystemExit(f"{name} must contain a JSON object")
               if not isinstance(data.get("candidates"), list):
                   raise SystemExit(f"{name} candidates must be a list")
-              if name.endswith("dashboard.json") and data.get("schema_version") != 4:
+              if name.endswith("dashboard.json") and data.get("schema_version") != 5:
                   raise SystemExit("dashboard schema version mismatch")
               if name.endswith("market.json") and data.get("option_chain_universe", 0) < min(60, data.get("scanned_rows", 0)):
                   raise SystemExit("options expansion did not reach the configured coverage target")
