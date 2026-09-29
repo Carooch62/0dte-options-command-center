@@ -40,6 +40,8 @@ jobs:
           SCAN_MODE: ${{ github.event.inputs.scan_mode || 'scheduled' }}
         run: python scanner.py
       - name: Normalize dashboard data
+        env:
+          SCAN_MODE: ${{ github.event.inputs.scan_mode || 'scheduled' }}
         run: python schema_normalizer.py
       - name: Validate market data
         run: |
