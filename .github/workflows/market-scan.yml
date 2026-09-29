@@ -5,6 +5,8 @@ on:
     paths:
       - "scanner.py"
       - "schema_normalizer.py"
+      - "execution_engine.py"
+      - "execution_normalizer.py"
       - "option_expander.py"
       - "core_0dte.py"
       - "tests/**"
@@ -55,6 +57,8 @@ jobs:
         env:
           SCAN_MODE: ${{ github.event.inputs.scan_mode || 'scheduled' }}
         run: python schema_normalizer.py
+      - name: Add execution layer and feedback loop
+        run: python execution_normalizer.py
       - name: Validate market data
         run: |
           python - <<'PY'
@@ -69,18 +73,27 @@ jobs:
                   raise SystemExit(f"{name} must contain a JSON object")
               if not isinstance(data.get("candidates"), list):
                   raise SystemExit(f"{name} candidates must be a list")
-              if name.endswith("dashboard.json") and data.get("schema_version") != 5:
+              if name.endswith("dashboard.json") and data.get("schema_version") != 6:
                   raise SystemExit("dashboard schema version mismatch")
               if name.endswith("market.json") and data.get("option_chain_universe", 0) < min(60, data.get("scanned_rows", 0)):
                   raise SystemExit("options expansion did not reach the configured coverage target")
               if name.endswith("market.json") and not set(("SPY", "QQQ", "IWM", "SMH", "GLD", "XLF")).issubset(set(data.get("core_0dte_scanned", []))):
                   raise SystemExit("core 0DTE ETF pass did not scan the complete required universe")
+          dashboard = json.loads(Path("data/market-dashboard.json").read_text())
+          required = ("market_regime", "execution_counts", "session_feedback")
+          missing = [key for key in required if key not in dashboard]
+          if missing:
+              raise SystemExit(f"execution layer missing: {missing}")
+          for x in dashboard["candidates"][:20]:
+              for key in ("execution_state", "momentum_state", "chase_risk", "key_levels", "contract_selection"):
+                  if key not in x:
+                      raise SystemExit(f"candidate missing execution field: {key}")
           print("market data validated")
           PY
-      - name: Commit market data
+      - name: Commit market data and feedback
         run: |
           git config user.name "0DTE Scanner"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/market.json data/market-dashboard.json
-          git diff --cached --quiet || git commit -m "Update market scan"
+          git add data/market.json data/market-dashboard.json data/scan-history.json data/feedback.json
+          git diff --cached --quiet || git commit -m "Update execution-layer market scan"
           git push
