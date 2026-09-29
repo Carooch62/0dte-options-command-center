@@ -1,0 +1,97 @@
+name: Fix Refresh Button
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-refresh.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix-refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Wire Refresh Now to Cloudflare Worker
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('index.html')
+          text = path.read_text()
+
+          old = '''function refreshNow(){
+  loadData();
+}'''
+
+          new = '''const REFRESH_URL = "https://0dte-options-command-center.h69htk56cq.workers.dev/refresh";
+
+async function refreshNow(){
+  const message = document.getElementById("freshnessMessage");
+  const button = document.querySelector('button[onclick="refreshNow()"]');
+
+  if(button){
+    button.disabled = true;
+    button.textContent = "⟳ Starting scan…";
+  }
+
+  if(message){
+    message.innerHTML = '<div class="warning">Starting a fresh market scan…</div>';
+  }
+
+  try{
+    const response = await fetch(REFRESH_URL, {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      mode: "cors",
+      cache: "no-store"
+    });
+
+    const body = await response.text();
+    let result = {};
+    try { result = JSON.parse(body); } catch (_) {}
+
+    if(!response.ok){
+      throw new Error(result.error || body || ("HTTP " + response.status));
+    }
+
+    if(message){
+      message.innerHTML = '<div class="ok">✓ Fresh market scan started. GitHub Actions is running; the dashboard data will update when the scan finishes.</div>';
+    }
+
+    document.getElementById("dashboardRefresh").textContent =
+      new Date().toLocaleTimeString();
+
+  }catch(error){
+    if(message){
+      message.innerHTML = `<div class="danger">Refresh failed: ${escapeHTML(error.message)}</div>`;
+    }
+  }finally{
+    if(button){
+      button.disabled = false;
+      button.textContent = "↻ Refresh Now";
+    }
+  }
+}'''
+
+          if old not in text:
+              raise SystemExit('Expected refreshNow function was not found; no changes made.')
+
+          if 'const REFRESH_URL = "https://0dte-options-command-center.h69htk56cq.workers.dev/refresh";' in text:
+              raise SystemExit('Refresh button is already wired; no changes needed.')
+
+          path.write_text(text.replace(old, new, 1))
+          PY
+
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet || git commit -m "Fix Refresh Now to trigger secure scan"
+          git push
