@@ -58,7 +58,22 @@ test('scheduler skips queued/recent runs and dispatches when overdue',async()=>{
  const env={GITHUB_TOKEN:'test'},clock=new Date(now);
  assert.equal(await scheduledScan(env,clock),'dispatched');assert.equal(sent,1);
  runs=[{status:'queued',created_at:'2026-09-30T13:00:00Z'}];assert.equal(await scheduledScan(env,clock),'already-running');
- runs=[{status:'completed',created_at:'2026-09-30T13:58:00Z'}];assert.equal(await scheduledScan(env,clock),'recent-request');assert.equal(sent,1);
+ runs=[{status:'completed',display_title:'Scan scheduled-'+Math.floor(now/300000)+' (manual)'}];assert.equal(await scheduledScan(env,clock),'already-requested');assert.equal(sent,1);
+ runs=[{status:'completed',display_title:'Scan user-request (manual)',created_at:'2026-09-30T13:58:00Z'}];assert.equal(await scheduledScan(env,clock),'dispatched');assert.equal(sent,2);
  assert.equal(await scheduledScan(env,new Date('2026-09-30T22:00:00Z')),'outside-session');
  }finally{globalThis.fetch=old;}
+});
+
+import {contractExplanation,contractRank} from '../dashboard-logic.js';
+test('contract messages distinguish coverage, missing delta and low delta',()=>{
+ assert.match(contractExplanation({chain_status:'NOT_SCANNED'}),/not scanned/);
+ assert.match(contractExplanation({chain_status:'SOURCE_FAILURE'}),/source failed/);
+ assert.match(contractExplanation({chain_status:'NO_EXPIRATION_TODAY'}),/no contracts expiring today/);
+ const base={ask:.2,bid:.19,side:'put',delta:-.1,delta_verified:true,quote_valid:true,tight_spread:true,volume:100,near_atm:true,direction_aligned:true,expiry_verified:true};
+ assert.match(contractExplanation({options:[base]}),/1 absolute delta below 0.25/);
+ assert(!contractExplanation({options:[base]}).includes('delta missing'));
+ assert.match(contractExplanation({options:[{...base,delta:null,delta_verified:false}]}),/1 delta missing/);
+ assert.match(contractExplanation({options:[{...base,ask:.8}]}),/None of the 1 returned/);
+ assert.equal(contractRank({chain_status:'NOT_SCANNED'}),0);
+ assert.equal(contractRank({chain_status:'SUCCESS',options:[base]}),1);
 });

@@ -1,6 +1,6 @@
 const REPO = 'Carooch62/0dte-options-command-center';
 const WORKFLOW = 'market-scan.yml';
-const VERSION = '2026-09-30.5-freshness';
+const VERSION = '2026-09-30.6-contract-reasons';
 const ORIGINS = new Set(['https://carooch62.github.io','https://0dte-options-command-center.h69htk56cq.workers.dev']);
 function response(body, status=200, request) {
   const origin=request?.headers.get('Origin');
@@ -24,8 +24,8 @@ export async function scheduledScan(env,now=new Date()) {
   if(!env.GITHUB_TOKEN)throw Error('Refresh service is not configured');
   const d=await api(`actions/workflows/${WORKFLOW}/runs?branch=main&per_page=30`,env);
   if(d.workflow_runs.some(r=>r.status!=='completed'))return 'already-running';
-  if(d.workflow_runs.some(r=>now-new Date(r.created_at)<4*60000))return 'recent-request';
   const id='scheduled-'+Math.floor(now.getTime()/300000);
+  if(d.workflow_runs.some(r=>r.display_title?.startsWith(`Scan ${id} (`)))return 'already-requested';
   await api(`actions/workflows/${WORKFLOW}/dispatches`,env,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ref:'main',inputs:{scan_mode:'manual',request_id:id}})});
   return 'dispatched';
 }
