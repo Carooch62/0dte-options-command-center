@@ -4,9 +4,17 @@ export function snapshotUsable(data,now=Date.now()) {
   const age=minutes(data?.generated_at,now),op=Date.parse(data?.session_open_at),cl=Date.parse(data?.session_close_at);
   return age!==null&&age>=-.5&&age<=8&&data?.market_session==='OPEN'&&now>=op&&now<cl;
 }
+export function dataStatus(row,data,now=Date.now()) {
+  const barAge=minutes(row?.bar_end,now),snapshotAge=minutes(data?.generated_at,now);
+  if(barAge===null||snapshotAge===null||barAge<-.5||snapshotAge<-.5)return {state:'DATA UNAVAILABLE',detail:'Missing or invalid timestamp, or the latest download failed.'};
+  if(barAge>8)return {state:'STALE PRICE DATA',detail:`Price bar is ${barAge.toFixed(1)} min old; freshness limit is 8 min.`};
+  if(snapshotAge>8)return {state:'STALE SCAN',detail:`Published scan is ${snapshotAge.toFixed(1)} min old; waiting for a newer scan.`};
+  if(!snapshotUsable(data,now))return {state:'MARKET CLOSED',detail:'Outside the regular session; showing the last research snapshot.'};
+  return null;
+}
 export function displayState(row,data,now=Date.now()) {
-  const a=minutes(row.bar_end,now);
-  if(!snapshotUsable(data,now)||a===null||a<-.5||a>8)return 'DATA UNAVAILABLE';
+  const status=dataStatus(row,data,now);
+  if(status)return status.state;
   if(row.execution_state==='CONFIRMED') {
     const valid=row.preferred_contracts?.some(o=>{const a=minutes(o.option_timestamp,now);return a!==null&&a>=-.5&&a+(o.minimum_delay_minutes||0)<=20;});
     return valid?'CONFIRMED DELAYED':'WATCH';

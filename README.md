@@ -28,7 +28,7 @@ Open `http://localhost:8765/dashboard_v2.html`. `pipeline.py` scans in a tempora
 
 ## Refresh and publishing
 
-The browser's auto-check downloads published results. Manual scans dispatch a UUID carried through GitHub's run title and `scan_id`; an unrelated scheduled run cannot satisfy the request. The browser keeps job status separate from data freshness and follows failures by request ID. GitHub schedules approximately every five minutes; queueing is possible. The refresh Worker exposes `/refresh` and `/health?request_id=...`, holds the GitHub token server-side, and proxies data separately from static assets. Credentials never enter the dashboard or diagnostic logs.
+The browser's auto-check downloads published results. Manual scans dispatch a UUID carried through GitHub's run title and `scan_id`; an unrelated scheduled run cannot satisfy the request. The browser keeps job status separate from data freshness and follows failures by request ID. Cloudflare requests a scan every five minutes during regular weekday hours; GitHub queueing is still possible. The refresh Worker exposes `/refresh` and `/health?request_id=...`, holds the GitHub token server-side, and proxies data separately from static assets. Credentials never enter the dashboard or diagnostic logs.
 
 Cloudflare deploy bundles only browser files under `public/`. The Worker and GitHub Pages UI read the current public repository data. Install secrets in GitHub/Cloudflare, not source files. Existing Cloudflare credentials and `GITHUB_TOKEN` are reused.
 
@@ -41,3 +41,9 @@ The journal stores entered fills, open/closed positions, quantity, and total fee
 ## Verified release checks
 
 Tests cover opening bars, null alignment, holidays/early closes, stale/future/unknown timestamps, crossed quotes, missing Greeks, relative spreads, signed momentum, second-wave baseline isolation, actual coverage counts, source failure vs no expiry, transient retries, preservation of last good data, immutable quote observations, browser aging, request correlation, and journal/risk calculations.
+
+
+### Freshness and scan scheduling
+Cloudflare dispatches the scanner every five minutes at minutes 1, 6, 11, etc. during New York regular weekday hours. It skips dispatch while a GitHub run is active or a request was created within four minutes. GitHub still executes the job and can queue it; the pipeline enforces exchange holidays. The browser's auto-check only downloads published results.
+
+Cards distinguish stale price bars, stale snapshots, missing/failed downloads, and a closed session. The eight-minute freshness limit remains unchanged. When Yahoo returns stale completed bars, the scanner attempts the configured Alpaca feed and uses it only if its completed bar is newer; provider failure preserves the stale label.
