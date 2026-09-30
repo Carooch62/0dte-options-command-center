@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from execution_engine import enrich, update_history
 from outcomes import update as update_outcomes
+from status_memory import attach_last_status
 
 DASHBOARD = Path("data/market-dashboard.json")
 HISTORY = Path("data/scan-history.json")
@@ -30,6 +31,11 @@ def main():
     data = json.loads(DASHBOARD.read_text())
     previous = load_previous()
     data = enrich(data, previous)
+    try:
+        history = json.loads(HISTORY.read_text())
+    except (OSError, ValueError):
+        history = []
+    data = attach_last_status(data, history if isinstance(history, list) else [])
     data = update_outcomes(data)
 
     priority = {"CONFIRMED": 6, "TRIGGERED": 5, "DECAYING": 4, "SECOND-WAVE": 3, "WATCH": 2, "PASS": 1}

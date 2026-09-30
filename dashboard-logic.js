@@ -13,10 +13,11 @@ export function dataStatus(row,data,now=Date.now()) {
   return null;
 }
 export function recordedState(row) {
-  return row.execution_state==='CONFIRMED'?'CONFIRMED DELAYED':row.execution_state||'WATCH';
+  const state=row.last_status?.state||row.execution_state;
+  return state==='CONFIRMED'?'CONFIRMED DELAYED':['PASS','WATCH','SECOND-WAVE','TRIGGERED','DECAYING'].includes(state)?state:'NO RECORDED STATUS';
 }
 export function matchesState(row,data,selected,now=Date.now()) {
-  return selected==='ALL'||recordedState(row)===selected||dataStatus(row,data,now)?.state===selected;
+  return selected==='ALL'||recordedState(row)===selected;
 }
 export function robinhoodStockUrl(ticker) {
   const symbol=String(ticker||'').trim().toUpperCase();

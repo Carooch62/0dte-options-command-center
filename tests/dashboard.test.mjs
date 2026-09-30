@@ -84,7 +84,7 @@ test('stale data retains recorded status without making it current',()=>{
  assert.equal(recordedState(row),'TRIGGERED');
  assert.equal(displayState(row,data,later),'STALE PRICE DATA');
  assert(matchesState(row,data,'TRIGGERED',later));
- assert(matchesState(row,data,'STALE PRICE DATA',later));
+ assert(!matchesState(row,data,'STALE PRICE DATA',later));
  assert(!snapshotUsable(data,later));
 });
 test('Robinhood links target a stock page and reject invalid symbols',()=>{
@@ -92,4 +92,12 @@ test('Robinhood links target a stock page and reject invalid symbols',()=>{
  assert.equal(robinhoodStockUrl('BRK.B'),'https://robinhood.com/stocks/BRK.B');
  assert.equal(robinhoodStockUrl('SPY?order=buy'),null);
  assert.equal(robinhoodStockUrl(''),null);
+});
+
+test('recorded setup survives unavailable execution data without becoming a live signal',()=>{
+ const row={execution_state:'DATA UNAVAILABLE',bar_end:data.generated_at,last_status:{state:'TRIGGERED',observed_at:data.generated_at}};
+ assert.equal(recordedState(row),'TRIGGERED');
+ assert(matchesState(row,data,'TRIGGERED',now+10*60000));
+ assert.equal(displayState(row,data,now+10*60000),'STALE PRICE DATA');
+ assert.equal(recordedState({execution_state:'DATA UNAVAILABLE'}),'NO RECORDED STATUS');
 });
