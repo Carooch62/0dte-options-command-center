@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 import json
+from quality import number, parse_time, verified_delta, valid_quote, ET
 
 CORE_TICKERS = ("SPY", "QQQ", "IWM", "SMH", "GLD", "XLF")
 
@@ -18,7 +19,7 @@ def f(value, default=0.0):
     try:
         if value is None or value == "":
             return default
-        return float(value)
+        return number(value, default)
     except (TypeError, ValueError):
         return default
 
@@ -48,6 +49,8 @@ def crossing(x, previous):
     if not previous:
         return False
     direction = x.get("direction", "")
+    if previous.get("direction") and previous["direction"] != direction:
+        return False
     price = f(x.get("price"))
     old_price = f(previous.get("price"))
     old_trigger = f(previous.get("trigger_price"))
@@ -67,8 +70,8 @@ def momentum_state(x, previous):
     old5 = abs(f(previous.get("move_5m")))
     cur_acc = f(x.get("volume_acceleration"))
     old_acc = f(previous.get("volume_acceleration"))
-    favorable_now = sign(f(x.get("move_5m"))) == sign(f(x.get("day_move"))) and sign(f(x.get("move_5m"))) != 0
-    favorable_old = sign(f(previous.get("move_5m"))) == sign(f(previous.get("day_move"))) and sign(f(previous.get("move_5m"))) != 0
+    favorable_now = sign(f(x.get("move_5m"))) == (1 if x.get("direction")=="UP" else -1 if x.get("direction")=="DOWN" else sign(f(x.get("day_move")))) and sign(f(x.get("move_5m"))) != 0
+    favorable_old = sign(f(previous.get("move_5m"))) == (1 if previous.get("direction")=="UP" else -1 if previous.get("direction")=="DOWN" else sign(f(previous.get("day_move")))) and sign(f(previous.get("move_5m"))) != 0
     if favorable_now and (cur5 - old5 >= 0.20 or cur_acc - old_acc >= 0.20):
         return "ACCELERATING"
     if (old5 - cur5 >= 0.20 and old_acc - cur_acc >= 0.15) or (favorable_old and not favorable_now and cur5 < old5):
@@ -139,10 +142,13 @@ def classify_contract(o, stock_price):
     delta = abs(f(o.get("delta")))
     spread_pct = f(o.get("spread_pct"), 999.0)
     ask = f(o.get("ask"))
-    if dist <= 1.25 and (not o.get("greeks_verified") or delta >= 0.40) and spread_pct <= 18:
+    if not verified_delta(o):
+        role = "UNVERIFIED"
+        risk = "UNKNOWN"
+    elif dist <= 1.25 and delta >= 0.40 and spread_pct <= 18:
         role = "BALANCED"
-        risk = "LOW"
-    elif dist <= 3.0 and (not o.get("greeks_verified") or delta >= 0.25) and spread_pct <= 30:
+        risk = "STANDARD FIT"
+    elif dist <= 3.0 and delta >= 0.25 and spread_pct <= 30:
         role = "AGGRESSIVE"
         risk = "MODERATE"
     else:
@@ -173,18 +179,19 @@ def contract_selection(x):
     seen = set()
     selected = []
     for o in contracts:
-        key = (o.get("side"), f(o.get("strike")), f(o.get("ask")))
+        key = o.get("contract_id") or (o.get("expiry"),o.get("side"), f(o.get("strike")))
         if key in seen:
             continue
         seen.add(key)
-        selected.append(classify_contract(o, f(x.get("price"))))
+        if valid_quote(o) and verified_delta(o):
+            selected.append(classify_contract(o, f(x.get("price"))))
     def rank(o):
         role_weight = {"BALANCED": 3, "AGGRESSIVE": 2, "DEEP OTM": 1}.get(o.get("contract_role"), 0)
         return (role_weight, f(o.get("contract_score")), f(o.get("volume")))
     selected.sort(key=rank, reverse=True)
     for i, o in enumerate(selected[:8], 1):
         o["selection_rank"] = i
-    return selected[:8]
+    return selected
 
 
 def market_regime(rows):
@@ -220,31 +227,23 @@ def market_regime(rows):
 
 
 def execution_state(x, previous):
-    crossed = crossing(x, previous)
-    bucket = x.get("setup_bucket", "PASS")
-    strong = x.get("execution_readiness") == "VERIFIED_DELAYED"
-    confirmation = bool(x.get("momentum_confirmed") or x.get("acceleration_confirmed"))
-    momentum = x.get("momentum_state", "STABLE")
-    if bucket == "PASS" and not crossed:
-        state = "PASS"
-    elif crossed and strong and confirmation:
-        state = "CONFIRMED"
-    elif crossed:
-        state = "TRIGGERED"
-    elif bucket in ("CONFIRMED WATCH", "WATCH"):
-        state = "WATCH"
-    elif bucket == "SECOND-WAVE":
-        state = "SECOND-WAVE"
-    else:
-        state = "WATCH"
-    if state in ("TRIGGERED", "CONFIRMED") and momentum == "DECAYING":
-        state = "DECAYING"
-    return state, crossed
+    if x.get('price_freshness') not in (None,'RECENT'):
+        return 'DATA UNAVAILABLE',False
+    crossed=crossing(x,previous) and bool(x.get('direction_confirmed'))
+    confirmation=bool(x.get('momentum_confirmed') or x.get('acceleration_confirmed'))
+    strong=x.get('execution_readiness')=='VERIFIED_DELAYED'
+    state='CONFIRMED' if crossed and strong and confirmation else 'TRIGGERED' if crossed else 'SECOND-WAVE' if x.get('second_wave_event') else 'WATCH' if x.get('setup_bucket')!='PASS' else 'PASS'
+    if state in ('CONFIRMED','TRIGGERED') and x.get('momentum_state')=='DECAYING': state='DECAYING'
+    return state,crossed
+
+def comparable(data, previous):
+    a,b=parse_time(data.get('generated_at')),parse_time(previous.get('generated_at'))
+    return bool(a and b and a.astimezone(ET).date()==b.astimezone(ET).date() and 0<(a-b).total_seconds()<=900)
 
 
 def enrich(data, previous=None):
     rows = data.get("candidates", [])
-    previous = previous or {}
+    previous = previous if comparable(data, previous or {}) else {}
     prev_by = {x.get("ticker"): x for x in previous.get("candidates", [])}
     regime = market_regime(rows)
     transitions = []
@@ -262,6 +261,28 @@ def enrich(data, previous=None):
             else "COUNTERTREND" if regime["label"] in ("BULLISH", "BEARISH") else "NEUTRAL"
         )
         x["momentum_state"] = momentum_state(x, old)
+        fresh_bar=bool(old and x.get('bar_timestamp') and x.get('bar_timestamp')!=old.get('bar_timestamp'))
+        qualified=bool(x.get('setup_qualified'))
+        affordable=bool(x.get('preferred_contracts'))
+        reason=None
+        if old and fresh_bar and qualified:
+            if x.get('direction')!=old.get('direction'): reason='DIRECTION_CHANGE'
+            elif not old.get('setup_qualified'): reason='NEW_QUALIFICATION'
+            elif x['momentum_state']=='ACCELERATING' and old.get('momentum_state')!='ACCELERATING': reason='NEW_ACCELERATION'
+            elif crossing(x,old): reason='TRIGGER_BREAK'
+        if old and qualified and affordable and not old.get('had_preferred_contract'):
+            reason=reason or 'CONTRACT_NOW_IN_BUDGET'
+        x['second_wave_event']=reason
+        if reason: x['setup_bucket']='SECOND-WAVE'
+        same_direction=old and old.get('direction')==x.get('direction')
+        old_volumes=(old or {}).get('contract_volumes',{})
+        current_volumes={o['contract_id']:{'side':o['side'],'volume':o.get('volume',0)} for o in x.get('options',[]) if o.get('contract_id')}
+        same_source=old and old.get('option_source')==x.get('option_source')
+        pairs=[(v,old_volumes[k]) for k,v in current_volumes.items() if k in old_volumes] if same_source else []
+        valid_pairs=bool(pairs) and all(v['volume']>=p['volume'] for v,p in pairs)
+        for side in ('call','put'):
+            x['option_interval_'+side+'_volume']=sum(v['volume']-p['volume'] for v,p in pairs if v['side']==side) if valid_pairs else None
+        x['interval_volume_coverage']=len(pairs) if valid_pairs else 0
         x["chase_risk"] = chase_risk(x)
         levels = key_levels(x)
         x["key_levels"] = levels
@@ -284,7 +305,7 @@ def enrich(data, previous=None):
             decay.append(ticker)
         if x["chase_risk"] == "HIGH":
             chase.append(ticker)
-        if old and old.get("execution_state") in ("TRIGGERED", "CONFIRMED"):
+        if old and same_direction and old.get("execution_state") in ("TRIGGERED", "CONFIRMED"):
             move = favorable_move(x.get("direction"), old.get("price"), x.get("price"))
             feedback_events.append({
                 "ticker": ticker,
@@ -315,7 +336,7 @@ def enrich(data, previous=None):
             "Compare next-scan favorable movement by execution state to refine thresholds over time.",
         ],
     }
-    data["schema_version"] = 6
+    data["schema_version"] = 7
     return data
 
 
@@ -350,6 +371,15 @@ def update_history(data, path="data/scan-history.json", limit=200):
                 "day_move": x.get("day_move"),
                 "volume_acceleration": x.get("volume_acceleration"),
                 "execution_state": x.get("execution_state"),
+                "bar_timestamp": x.get("bar_timestamp"),
+                "setup_qualified": x.get("setup_qualified"),
+                "momentum_state": x.get("momentum_state"),
+                "had_preferred_contract": bool(x.get("preferred_contracts")),
+                "chain_status": x.get("chain_status"),
+                "option_source": x.get("option_source"),
+                "contract_volumes": {o['contract_id']:{'side':o['side'],'volume':o.get('volume',0)} for o in x.get('options',[]) if o.get('contract_id')},
+                "option_call_volume": x.get("option_call_volume"),
+                "option_put_volume": x.get("option_put_volume"),
             }
             for x in data.get("candidates", [])
         ],

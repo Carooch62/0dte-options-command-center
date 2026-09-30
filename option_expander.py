@@ -1,68 +1,19 @@
-#!/usr/bin/env python3
-"""Expand the options pass beyond the scanner's fast first wave.
-
-The base scanner keeps its first options pass small for speed. This second pass
-uses the same ranking rules to add the next 25 names without changing the
-underlying price/news scan.
-"""
+"""Enrich unattempted candidates, including a rolling revisit allocation."""
 import json
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-
 import scanner
 
-SRC = Path("data/market.json")
-MAX_OPTIONS = 60
-FIRST_WAVE = 35
-
-
-def rank_key(x):
-    return (
-        1 if x.get("catalyst") else 0,
-        1 if x.get("volume_acceleration", 0) >= 1.25 else 0,
-        abs(x.get("move_5m", 0)),
-        x.get("score", 0),
-    )
-
+MAX_OPTIONS=70
 
 def main():
-    data = json.loads(SRC.read_text())
-    rows = data.get("candidates", [])
-    ranked = sorted(rows, key=rank_key, reverse=True)
-    extra = ranked[FIRST_WAVE:MAX_OPTIONS]
+    path=Path('data/market.json');data=json.loads(path.read_text());rows=data['candidates']
+    remaining=sorted([x for x in rows if not x.get('chain_attempted')],key=scanner.rank_key,reverse=True)
+    budget=max(0,MAX_OPTIONS-sum(bool(x.get('chain_attempted')) for x in rows))
+    top=remaining[:max(0,budget-10)]; tail=remaining[len(top):]
+    offset=int(__import__('time').time()//300)%len(tail) if tail else 0
+    rotation=(tail[offset:]+tail[:offset])[:budget-len(top)]
+    extra=top+rotation;scanner.scan_options(extra)
+    data['option_expansion']={'additional_attempted':len(extra),'rotating_revisits':len(rotation),'target':MAX_OPTIONS}
+    scanner.coverage(data);path.write_text(json.dumps(data,separators=(',',':'),allow_nan=False))
 
-    if not extra:
-        data["option_chain_universe"] = min(len(ranked), MAX_OPTIONS)
-        SRC.write_text(json.dumps(data, separators=(",", ":")))
-        print("No additional option pass required")
-        return
-
-    scanned = 0
-    with ThreadPoolExecutor(max_workers=6) as pool:
-        futures = {pool.submit(scanner.options, x["ticker"]): x for x in extra}
-        for future in as_completed(futures):
-            x = futures[future]
-            try:
-                scanner.enrich_options(x, future.result())
-                scanned += 1
-            except Exception as exc:
-                x.setdefault("options", [])
-                x.setdefault("preferred_contracts", [])
-                x.setdefault("usable_contracts", [])
-                x.setdefault("cheap_contracts", [])
-                x["option_source"] = f"Expansion error: {type(exc).__name__}"
-
-    data["option_chain_universe"] = min(len(ranked), MAX_OPTIONS)
-    data["option_expansion"] = {
-        "enabled": True,
-        "first_wave": FIRST_WAVE,
-        "max_universe": MAX_OPTIONS,
-        "additional_attempted": len(extra),
-        "additional_completed": scanned,
-    }
-    SRC.write_text(json.dumps(data, separators=(",", ":")))
-    print(json.dumps(data["option_expansion"]))
-
-
-if __name__ == "__main__":
-    main()
+if __name__=='__main__':main()

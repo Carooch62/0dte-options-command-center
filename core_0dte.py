@@ -1,66 +1,16 @@
-#!/usr/bin/env python3
-"""Force-scan the core liquid 0DTE ETF universe.
-
-The main scanner ranks equities for speed. This pass guarantees that the
-most liquid index/sector ETFs with same-day options are never excluded just
-because their equity momentum score is lower than a single-stock mover.
-"""
+"""Always attempt core ETFs without duplicating price/chain requests."""
 import json
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-
 import scanner
-
-CORE_0DTE = ("SPY", "QQQ", "IWM", "SMH", "GLD", "XLF")
-
+CORE_0DTE=scanner.CORE_TICKERS
 
 def main():
-    path = Path("data/market.json")
-    data = json.loads(path.read_text())
-    rows = data.get("candidates", [])
-    existing = {x.get("ticker"): x for x in rows}
+    path=Path('data/market.json');data=json.loads(path.read_text());rows=data['candidates']
+    core=[x for x in rows if x['ticker'] in CORE_0DTE]
+    scanner.scan_options([x for x in core if not x.get('chain_attempted')])
+    data['core_0dte_universe']=list(CORE_0DTE)
+    data['core_0dte_scanned']=[x['ticker'] for x in core]
+    data['core_missing']=sorted(set(CORE_0DTE)-set(data['core_0dte_scanned']))
+    scanner.coverage(data);path.write_text(json.dumps(data,separators=(',',':'),allow_nan=False))
 
-    with ThreadPoolExecutor(max_workers=6) as pool:
-        futures = {pool.submit(scanner.scan_one, t): t for t in CORE_0DTE}
-        core = []
-        for fut in as_completed(futures):
-            x = fut.result()
-            if x:
-                core.append(x)
-
-    scanner.add_news(core)
-
-    with ThreadPoolExecutor(max_workers=6) as pool:
-        futures = {pool.submit(scanner.options, x["ticker"]): x for x in core}
-        for fut in as_completed(futures):
-            x = futures[fut]
-            try:
-                scanner.enrich_options(x, fut.result())
-            except Exception:
-                scanner.enrich_options(x, ([], "Core ETF scan error", None))
-
-    for x in core:
-        old = existing.get(x["ticker"])
-        if old:
-            old.clear()
-            old.update(x)
-        else:
-            rows.append(x)
-
-    data["core_0dte_universe"] = list(CORE_0DTE)
-    data["core_0dte_scanned"] = [x["ticker"] for x in core]
-    data["option_chain_universe"] = max(
-        int(data.get("option_chain_universe", 0) or 0),
-        len(set(data.get("core_0dte_scanned", [])) | {x.get("ticker") for x in rows}),
-    )
-    data["candidates"] = rows
-    path.write_text(json.dumps(data, separators=(",", ":")))
-    print(json.dumps({
-        "core_0dte_universe": list(CORE_0DTE),
-        "scanned": [x["ticker"] for x in core],
-        "with_zero_dte": [x["ticker"] for x in core if x.get("zero_dte")],
-    }))
-
-
-if __name__ == "__main__":
-    main()
+if __name__=='__main__':main()
