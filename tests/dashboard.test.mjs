@@ -77,3 +77,19 @@ test('contract messages distinguish coverage, missing delta and low delta',()=>{
  assert.equal(contractRank({chain_status:'NOT_SCANNED'}),0);
  assert.equal(contractRank({chain_status:'SUCCESS',options:[base]}),1);
 });
+
+import {recordedState,matchesState,robinhoodStockUrl,snapshotUsable} from '../dashboard-logic.js';
+test('stale data retains recorded status without making it current',()=>{
+ const row={execution_state:'TRIGGERED',bar_end:data.generated_at},later=now+10*60000;
+ assert.equal(recordedState(row),'TRIGGERED');
+ assert.equal(displayState(row,data,later),'STALE PRICE DATA');
+ assert(matchesState(row,data,'TRIGGERED',later));
+ assert(matchesState(row,data,'STALE PRICE DATA',later));
+ assert(!snapshotUsable(data,later));
+});
+test('Robinhood links target a stock page and reject invalid symbols',()=>{
+ assert.equal(robinhoodStockUrl('spy'),'https://robinhood.com/stocks/SPY');
+ assert.equal(robinhoodStockUrl('BRK.B'),'https://robinhood.com/stocks/BRK.B');
+ assert.equal(robinhoodStockUrl('SPY?order=buy'),null);
+ assert.equal(robinhoodStockUrl(''),null);
+});

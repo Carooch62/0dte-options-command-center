@@ -12,6 +12,16 @@ export function dataStatus(row,data,now=Date.now()) {
   if(!snapshotUsable(data,now))return {state:'MARKET CLOSED',detail:'Outside the regular session; showing the last research snapshot.'};
   return null;
 }
+export function recordedState(row) {
+  return row.execution_state==='CONFIRMED'?'CONFIRMED DELAYED':row.execution_state||'WATCH';
+}
+export function matchesState(row,data,selected,now=Date.now()) {
+  return selected==='ALL'||recordedState(row)===selected||dataStatus(row,data,now)?.state===selected;
+}
+export function robinhoodStockUrl(ticker) {
+  const symbol=String(ticker||'').trim().toUpperCase();
+  return /^[A-Z][A-Z0-9.-]{0,14}$/.test(symbol)?`https://robinhood.com/stocks/${encodeURIComponent(symbol)}`:null;
+}
 export function displayState(row,data,now=Date.now()) {
   const status=dataStatus(row,data,now);
   if(status)return status.state;
