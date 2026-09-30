@@ -15,8 +15,8 @@ on:
         description: Dashboard request ID
         required: false
         type: string
-  schedule:
-    - cron: '*/5 12-21 * * 1-5'
+  # Five-minute dispatch is handled by the Cloudflare Worker cron.
+  # The scanner still enforces the exchange holiday/session calendar.
 permissions:
   contents: write
 concurrency:

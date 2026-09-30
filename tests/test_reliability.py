@@ -149,6 +149,17 @@ class ReliabilityTests(unittest.TestCase):
                 self.assertEqual(pipeline.run(),1)
             self.assertEqual((root/'data/market.json').read_text(),'last-good')
             self.assertEqual(json.loads((root/'data/scan-health.json').read_text())['status'],'FAILED')
+    def test_stale_primary_uses_only_newer_fallback_bars(self):
+        primary=bars(2);backup=bars(6);backup['_source']='Alpaca iex bars'
+        with patch.dict(scanner.os.environ,{'APCA_API_KEY_ID':'test'}),patch.object(scanner,'chart',return_value=primary),patch.object(scanner,'alpaca_chart',return_value=backup):
+            result=scanner.scan_one('TEST',NOW)
+            self.assertEqual(result['price_source'],'Alpaca iex bars')
+            self.assertEqual(result['price_freshness'],'RECENT')
+        with patch.dict(scanner.os.environ,{'APCA_API_KEY_ID':'test'}),patch.object(scanner,'chart',return_value=primary),patch.object(scanner,'alpaca_chart',side_effect=RuntimeError('unavailable')):
+            result=scanner.scan_one('TEST',NOW)
+            self.assertEqual(result['price_freshness'],'STALE')
+            self.assertEqual(result['price_source'],'Yahoo 5m bars')
+
     def test_pipeline_receipt_is_written_only_after_validation(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);(root/'data').mkdir()

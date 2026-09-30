@@ -156,6 +156,16 @@ def scan_one(t, now=None, payload=None):
             if payload is None and os.getenv('APCA_API_KEY_ID') and not d.get('_source','').startswith('Alpaca'):
                 return scan_one(t,now,alpaca_chart(t))
             record_error(t, 'no_completed_session_bars', ValueError()); return None
+        # A successful HTTP response may contain old bars. Try the independent feed,
+        # but only replace the primary result when its completed bar is newer.
+        end = current[-1]['time']+timedelta(minutes=5)
+        if payload is None and freshness(end.isoformat(),now,max_age=8) == 'STALE' and os.getenv('APCA_API_KEY_ID') and not d.get('_source','').startswith('Alpaca'):
+            try:
+                alternate=scan_one(t,now,alpaca_chart(t))
+                if alternate and parse_time(alternate['bar_end']) > end:
+                    return alternate
+            except Exception as exc:
+                record_error(t,'stale_price_fallback',exc)
         price = current[-1]['close']; first = current[0]['open']
         prior = [b for b in bars if b['time'].astimezone(ET).date() < now.date()
                  and dtime(9,30) <= b['time'].astimezone(ET).time() < dtime(16)]

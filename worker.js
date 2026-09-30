@@ -1,6 +1,6 @@
 const REPO = 'Carooch62/0dte-options-command-center';
 const WORKFLOW = 'market-scan.yml';
-const VERSION = '2026-09-30.4-refresh-progress';
+const VERSION = '2026-09-30.5-freshness';
 const ORIGINS = new Set(['https://carooch62.github.io','https://0dte-options-command-center.h69htk56cq.workers.dev']);
 function response(body, status=200, request) {
   const origin=request?.headers.get('Origin');
@@ -14,7 +14,26 @@ async function api(path,env,options={}) {
   if(!r.ok)throw new Error(`GitHub HTTP ${r.status}`);
   return r.status===204?null:r.json();
 }
+export function regularWeekday(now) {
+  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(now).map(p=>[p.type,p.value]));
+  const minute=Number(parts.hour)*60+Number(parts.minute);
+  return !['Sat','Sun'].includes(parts.weekday)&&minute>=570&&minute<960;
+}
+export async function scheduledScan(env,now=new Date()) {
+  if(!regularWeekday(now))return 'outside-session';
+  if(!env.GITHUB_TOKEN)throw Error('Refresh service is not configured');
+  const d=await api(`actions/workflows/${WORKFLOW}/runs?branch=main&per_page=30`,env);
+  if(d.workflow_runs.some(r=>r.status!=='completed'))return 'already-running';
+  if(d.workflow_runs.some(r=>now-new Date(r.created_at)<4*60000))return 'recent-request';
+  const id='scheduled-'+Math.floor(now.getTime()/300000);
+  await api(`actions/workflows/${WORKFLOW}/dispatches`,env,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ref:'main',inputs:{scan_mode:'manual',request_id:id}})});
+  return 'dispatched';
+}
 export default {
+  async scheduled(controller,env) {
+    const result=await scheduledScan(env,new Date(controller.scheduledTime));
+    console.log(JSON.stringify({scheduler:result,scheduled_at:controller.scheduledTime}));
+  },
   async fetch(request,env) {
     const url=new URL(request.url);
     if(request.method==='OPTIONS')return response({},204,request);

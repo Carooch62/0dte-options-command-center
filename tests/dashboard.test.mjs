@@ -2,7 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {displayState,selectableContracts,requestPublished,tradePL,riskSummary,validTrade} from '../dashboard-logic.js';
 import worker from '../worker.js';
 const now=Date.parse('2026-09-30T14:00:00Z');const data={generated_at:'2026-09-30T13:59:00Z',market_session:'OPEN',session_open_at:'2026-09-30T13:30:00Z',session_close_at:'2026-09-30T20:00:00Z'};
-test('expired cards demote without new scan',()=>{const r={bar_end:data.generated_at,execution_state:'TRIGGERED'};assert.equal(displayState(r,data,now),'TRIGGERED');assert.equal(displayState(r,data,now+10*60000),'DATA UNAVAILABLE');});
+test('expired cards demote without new scan',()=>{const r={bar_end:data.generated_at,execution_state:'TRIGGERED'};assert.equal(displayState(r,data,now),'TRIGGERED');assert.equal(displayState(r,data,now+10*60000),'STALE PRICE DATA');});
 test('unknown quote time never shows confirmation',()=>{assert.equal(displayState({bar_end:data.generated_at,execution_state:'CONFIRMED',preferred_contracts:[{}]},data,now),'WATCH');});
 test('matching run required',()=>{assert.equal(requestPublished({scan_id:'other'},'requested'),false);assert.equal(requestPublished({scan_id:'requested'},'requested'),true);});
 test('price filters include retained higher-priced contracts',()=>{const r={eligible_contracts:[{ask:.4,quote_valid:true,delta_ok:true,tight_spread:true}]};assert.equal(selectableContracts(r).length,0);assert.equal(selectableContracts(r,.1,.5).length,1);});
@@ -33,4 +33,32 @@ test('uncertain dispatch remains pending; prior published requests remain verifi
  assert.equal(refreshProgress({requestStatus:'unknown'})[0].state,'active');
  assert.equal(publishedReceipt({scan_id:'newer'},[{scan_id:'mine',generated_at:'time'}],'mine').generated_at,'time');
  assert.equal(publishedReceipt({scan_id:'newer'},[],'mine'),null);
+});
+
+import {dataStatus} from '../dashboard-logic.js';
+import {scheduledScan,regularWeekday} from '../worker.js';
+test('stale bars, stale snapshots and missing downloads have distinct explanations',()=>{
+ assert.equal(dataStatus({bar_end:'2026-09-30T13:45:00Z'},data,now).state,'STALE PRICE DATA');
+ assert.match(dataStatus({bar_end:'2026-09-30T13:45:00Z'},data,now).detail,/15.0 min/);
+ assert.equal(dataStatus({bar_end:data.generated_at},{...data,generated_at:'2026-09-30T13:45:00Z'},now).state,'STALE SCAN');
+ assert.equal(dataStatus({bar_end:data.generated_at},{...data,generated_at:null},now).state,'DATA UNAVAILABLE');
+ assert.equal(dataStatus({bar_end:data.generated_at},data,now),null);
+});
+test('scheduler respects New York hours in winter and summer',()=>{
+ assert(regularWeekday(new Date('2026-09-30T13:31:00Z')));
+ assert(!regularWeekday(new Date('2026-09-30T20:01:00Z')));
+ assert(!regularWeekday(new Date('2026-12-01T14:01:00Z')));
+ assert(regularWeekday(new Date('2026-12-01T14:31:00Z')));
+ assert(!regularWeekday(new Date('2026-10-03T15:00:00Z')));
+});
+test('scheduler skips queued/recent runs and dispatches when overdue',async()=>{
+ const old=globalThis.fetch;let runs=[],sent=0;
+ globalThis.fetch=async(url,opts)=>{if(url.endsWith('/dispatches')){sent++;assert.match(JSON.parse(opts.body).inputs.request_id,/^scheduled-/);return new Response(null,{status:204});}return Response.json({workflow_runs:runs});};
+ try{
+ const env={GITHUB_TOKEN:'test'},clock=new Date(now);
+ assert.equal(await scheduledScan(env,clock),'dispatched');assert.equal(sent,1);
+ runs=[{status:'queued',created_at:'2026-09-30T13:00:00Z'}];assert.equal(await scheduledScan(env,clock),'already-running');
+ runs=[{status:'completed',created_at:'2026-09-30T13:58:00Z'}];assert.equal(await scheduledScan(env,clock),'recent-request');assert.equal(sent,1);
+ assert.equal(await scheduledScan(env,new Date('2026-09-30T22:00:00Z')),'outside-session');
+ }finally{globalThis.fetch=old;}
 });
