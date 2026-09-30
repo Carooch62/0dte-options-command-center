@@ -352,6 +352,8 @@ def update_history(data, path="data/scan-history.json", limit=200):
         "generated_at": data.get("generated_at"),
         "dashboard_generated_at": data.get("dashboard_generated_at"),
         "scan_mode": data.get("scan_mode"),
+        "market_session": data.get("market_session"),
+        "scan_id": data.get("scan_id"),
         "market_regime": data.get("market_regime"),
         "counts": {
             "candidates": len(data.get("candidates", [])),
@@ -372,6 +374,8 @@ def update_history(data, path="data/scan-history.json", limit=200):
                 "volume_acceleration": x.get("volume_acceleration"),
                 "execution_state": x.get("execution_state"),
                 "bar_timestamp": x.get("bar_timestamp"),
+                "bar_end": x.get("bar_end"),
+                "last_status": x.get("last_status"),
                 "setup_qualified": x.get("setup_qualified"),
                 "momentum_state": x.get("momentum_state"),
                 "had_preferred_contract": bool(x.get("preferred_contracts")),
