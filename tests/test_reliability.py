@@ -81,6 +81,12 @@ class ReliabilityTests(unittest.TestCase):
         rows=[{'expirygroup':'September 30, 2026'}, {'expiryDate':'Sep 30','strike':'100','c_Bid':'.23','c_Ask':'.25','c_Last':'.24','c_Volume':'100'}]
         contracts=scanner.parse_nasdaq_rows(rows,NOW.date())
         self.assertEqual(len(contracts),1);self.assertEqual(contracts[0]['expiry'],'2026-09-30')
+    def test_fallback_contract_ids_include_ticker(self):
+        rows=[{'expiryDate':datetime.now(scanner.ET).strftime('%m/%d/%Y'),'strike':'100','c_Bid':'.23','c_Ask':'.25','c_Last':'.24','c_Volume':'100'}]
+        with patch.object(scanner,'request_json',return_value={'data':{'table':{'rows':rows}}}):
+            a=scanner.nasdaq_options('AAA')['contracts'][0]
+            b=scanner.nasdaq_options('BBB')['contracts'][0]
+        self.assertNotEqual(a['contract_id'],b['contract_id'])
     def test_full_candidate_list_reaches_expansion(self):
         rows=[{'ticker':str(i),'score':i,'chain_attempted':False} for i in range(100)]
         with tempfile.TemporaryDirectory() as d:

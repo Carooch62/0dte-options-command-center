@@ -335,6 +335,8 @@ def nasdaq_options(t):
     rows = ((data.get('data') or {}).get('table') or {}).get('rows')
     if not isinstance(rows,list) or not rows: raise ValueError('empty Nasdaq chain')
     opts = parse_nasdaq_rows(rows,today)
+    for o in opts:
+        o['contract_id'] = f"{t}:{o['expiry']}:{o['side']}:{o['strike']}"
     # This fallback may be paginated/incomplete, so empty is not proof of no expiry.
     return {'contracts':opts,'source':'Nasdaq public chain','timestamp':None,
             'status':'SUCCESS' if opts else 'EMPTY_UNVERIFIED'}
