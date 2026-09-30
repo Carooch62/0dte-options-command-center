@@ -43,3 +43,23 @@ export function riskSummary(settings,trades,ask,qty,now=new Date()) {
   if(settings.timeStop>0&&trades.some(t=>t.exit===null&&(now-Date.parse(t.time))/60000>=settings.timeStop))alerts.push('A recorded open trade has reached your time-stop reminder.');
   return {cost,dayPL,exposure,alerts};
 }
+
+export function contractExplanation(row,min=.1,max=.3) {
+  const matches=selectableContracts(row,min,max);
+  if(matches.length)return `${matches.length} contracts pass your price and quality filters. Quotes remain delayed; verify current quotes separately.`;
+  if(row.chain_status==='NOT_SCANNED'||row.chain_attempted===false)return 'Option chain not scanned in this run. No contract assessment is available yet.';
+  if(row.chain_status==='SOURCE_FAILURE')return 'Option source failed. Contract availability and delta could not be checked.';
+  if(row.chain_status==='NO_EXPIRATION_TODAY')return 'The source returned no contracts expiring today.';
+  const all=row.options||[];
+  if(!all.length)return 'No option contracts returned. This does not establish that no suitable contracts exist.';
+  const range=`$${min.toFixed(2)}–$${max.toFixed(2)}`;
+  const priced=all.filter(o=>finite(o.ask)!==null&&o.ask>=min&&o.ask<=max);
+  if(!priced.length)return `None of the ${all.length} returned contracts has an ask in your ${range} range.`;
+  const checks=[['invalid bid/ask',o=>!o.quote_valid],['delta missing or unverified',o=>!((o.delta_verified??o.greeks_verified)&&finite(o.delta)!==null&&((o.side==='call'&&o.delta>0&&o.delta<=1)||(o.side==='put'&&o.delta<0&&o.delta>=-1)))],['absolute delta below 0.25',o=>(o.delta_verified??o.greeks_verified)&&finite(o.delta)!==null&&Math.abs(o.delta)<.25],['spread too wide',o=>!o.tight_spread],['volume below 20',o=>finite(o.volume)===null||o.volume<20],['strike beyond 3% of stock price',o=>!o.near_atm],['opposite or unresolved stock direction',o=>!o.direction_aligned],['today’s expiration unverified',o=>!o.expiry_verified]];
+  const reasons=checks.map(([label,check])=>[label,priced.filter(check).length]).filter(([,n])=>n).map(([label,n])=>`${n} ${label}`);
+  return `${priced.length} returned contracts have asks in ${range}, but none passes all filters. ${reasons.length?'Reasons (can overlap): '+reasons.join('; ')+'.':'Eligibility was not established by the scanner.'}`;
+}
+export function contractRank(row,min=.1,max=.3) {
+  if(selectableContracts(row,min,max).length)return 2;
+  return row.chain_status==='SUCCESS'&&row.options?.length?1:0;
+}

@@ -44,6 +44,8 @@ Tests cover opening bars, null alignment, holidays/early closes, stale/future/un
 
 
 ### Freshness and scan scheduling
-Cloudflare dispatches the scanner every five minutes at minutes 1, 6, 11, etc. during New York regular weekday hours. It skips dispatch while a GitHub run is active or a request was created within four minutes. GitHub still executes the job and can queue it; the pipeline enforces exchange holidays. The browser's auto-check only downloads published results.
+Cloudflare dispatches the scanner every five minutes at minutes 1, 6, 11, etc. during New York regular weekday hours. It skips dispatch while a GitHub run is active or the same scheduled time slot was already requested. GitHub still executes the job and can queue it; the pipeline enforces exchange holidays. The browser's auto-check only downloads published results.
 
 Cards distinguish stale price bars, stale snapshots, missing/failed downloads, and a closed session. The eight-minute freshness limit remains unchanged. When Yahoo returns stale completed bars, the scanner attempts the configured Alpaca feed and uses it only if its completed bar is newer; provider failure preserves the stale label.
+
+Empty contract panels explain chain coverage and overlapping exclusion reasons for contracts within the current price range. Default state sorting favors matching contracts, then scanned chains, within the same execution state. Completed manual scans no longer suppress the next scheduled time slot.
