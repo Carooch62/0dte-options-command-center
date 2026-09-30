@@ -1,6 +1,6 @@
 const REPO = 'Carooch62/0dte-options-command-center';
 const WORKFLOW = 'market-scan.yml';
-const VERSION = '2026-09-30.3-reliability';
+const VERSION = '2026-09-30.4-refresh-progress';
 const ORIGINS = new Set(['https://carooch62.github.io','https://0dte-options-command-center.h69htk56cq.workers.dev']);
 function response(body, status=200, request) {
   const origin=request?.headers.get('Origin');
@@ -25,7 +25,13 @@ export default {
         if(id&&!/^[a-zA-Z0-9-]{8,80}$/.test(id))return response({ok:false,error:'Invalid request ID'},400,request);
         const d=await api(`actions/workflows/${WORKFLOW}/runs?branch=main&per_page=30`,env);
         const run=id?d.workflow_runs.find(r=>r.display_title?.startsWith(`Scan ${id} (`)):d.workflow_runs[0];
-        const latestRun=run?{id:run.id,status:run.status,conclusion:run.conclusion,url:run.html_url,createdAt:run.created_at}:null;
+        const latestRun=run?{id:run.id,status:run.status,conclusion:run.conclusion,url:run.html_url,createdAt:run.created_at,steps:[]}:null;
+        if(run&&id){
+          try{
+            const jobs=await api(`actions/runs/${run.id}/jobs?filter=latest&per_page=10`,env);
+            latestRun.steps=(jobs.jobs?.find(j=>j.name==='scan')?.steps||[]).map(s=>({name:s.name,status:s.status,conclusion:s.conclusion,startedAt:s.started_at,completedAt:s.completed_at}));
+          }catch(e){latestRun.stepError=e.message;}
+        }
         return response({ok:true,version:VERSION,request_id:id,latestRun},200,request);
       }
       if(url.pathname==='/refresh') {
@@ -40,7 +46,7 @@ export default {
         return response({ok:true,status:'ACCEPTED',request_id:id},202,request);
       }
       // Data commits do not require redeploying the Worker asset bundle.
-      if(/^\/data\/(market-dashboard|market|scan-health|scan-history|feedback|option-observations)\.json$/.test(url.pathname)) {
+      if(/^\/data\/(market-dashboard|market|scan-health|scan-history|scan-receipts|feedback|option-observations)\.json$/.test(url.pathname)) {
         const r=await fetch(`https://raw.githubusercontent.com/${REPO}/main${url.pathname}?v=${Date.now()}`,{cf:{cacheTtl:0},signal:AbortSignal.timeout(15000)});
         return new Response(r.body,{status:r.status,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
       }

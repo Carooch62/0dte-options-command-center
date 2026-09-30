@@ -43,7 +43,16 @@ def run():
                 health['stage']=name
                 subprocess.run([sys.executable,str(ROOT/name)],cwd=stage,check=True,timeout=300 if name in ('scanner.py','option_expander.py') else 120)
             health.update(validate(stage))
+            snapshot=json.loads((stage/'data/market-dashboard.json').read_text())
+            receipt_path=dest/'scan-receipts.json'
+            try: receipts=json.loads(receipt_path.read_text())
+            except (OSError,ValueError): receipts=[]
+            if not isinstance(receipts,list): receipts=[]
+            receipts=[r for r in receipts if r.get('scan_id')!=snapshot['scan_id']]
+            receipts.append({'scan_id':snapshot['scan_id'],'run_id':health['run_id'],
+                             'generated_at':snapshot['generated_at'],'coverage':snapshot['coverage']})
             for name in FILES:shutil.copy2(stage/'data'/name,dest/name)
+            receipt_path.write_text(json.dumps(receipts[-100:],separators=(',',':')))
         health['stage']='VALIDATED'
         return 0
     except Exception as exc:

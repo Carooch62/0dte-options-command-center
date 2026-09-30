@@ -10,3 +10,27 @@ test('journal and risk use fees and open positions',()=>{const t={ticker:'TEST',
 test('worker rejects invalid requests before GitHub access',async()=>{const r=await worker.fetch(new Request('https://example.org/refresh',{method:'POST',headers:{Origin:'https://carooch62.github.io','Content-Type':'application/json'},body:JSON.stringify({request_id:'bad'})}),{GITHUB_TOKEN:'test'});assert.equal(r.status,400);});
 test('worker passes request id and filters run status',async()=>{const old=globalThis.fetch;let body;globalThis.fetch=async(url,opts)=>{if(url.endsWith('/dispatches')){body=JSON.parse(opts.body);return new Response(null,{status:204});}return Response.json({workflow_runs:[{id:1,display_title:'Scan other-run (manual)',status:'completed'},{id:2,display_title:'Scan wanted-id (manual)',status:'in_progress'}]});};try{const r=await worker.fetch(new Request('https://example.org/refresh',{method:'POST',headers:{Origin:'https://carooch62.github.io','Content-Type':'application/json'},body:JSON.stringify({request_id:'wanted-id'})}),{GITHUB_TOKEN:'test'});assert.equal(r.status,202);assert.equal(body.inputs.request_id,'wanted-id');const h=await worker.fetch(new Request('https://example.org/health?request_id=wanted-id'),{GITHUB_TOKEN:'test'});assert.equal((await h.json()).latestRun.id,2);}finally{globalThis.fetch=old;}});
 test('worker CORS preflight has empty 204 body',async()=>{const r=await worker.fetch(new Request('https://example.org/refresh',{method:'OPTIONS',headers:{Origin:'https://carooch62.github.io'}}),{});assert.equal(r.status,204);assert.equal(await r.text(),'');});
+
+import {refreshProgress,publishedReceipt} from '../refresh-progress.js';
+const step=(name,status,conclusion=null)=>({name,status,conclusion});
+test('refresh progress follows actual scan and publication steps',()=>{
+ const scan=step('Scan, enrich, and validate','in_progress');
+ let p=refreshProgress({run:{status:'in_progress',steps:[scan]}});
+ assert.equal(p[2].state,'done');assert.equal(p[3].state,'active');assert.equal(p[4].state,'waiting');
+ p=refreshProgress({run:{status:'completed',conclusion:'success',steps:[{...scan,status:'completed',conclusion:'success'},step('Publish validated data or failure health','completed','success')]}});
+ assert.equal(p[4].state,'done');assert.equal(p[5].state,'active');
+ assert(refreshProgress({published:true}).every(s=>s.state==='done'));
+});
+test('failed scan cannot appear published by failure-health commit',()=>{
+ const p=refreshProgress({run:{status:'completed',conclusion:'failure',steps:[step('Scan, enrich, and validate','completed','failure'),step('Publish validated data or failure health','completed','success')]}});
+ assert.equal(p[3].state,'failed');assert.equal(p[4].state,'waiting');assert.equal(p[5].state,'waiting');
+});
+test('missing job details do not invent a failed stage',()=>{
+ const p=refreshProgress({run:{status:'completed',conclusion:'success',steps:[]}});
+ assert(!p.some(s=>s.state==='failed'));assert.equal(p[5].state,'active');
+});
+test('uncertain dispatch remains pending; prior published requests remain verifiable',()=>{
+ assert.equal(refreshProgress({requestStatus:'unknown'})[0].state,'active');
+ assert.equal(publishedReceipt({scan_id:'newer'},[{scan_id:'mine',generated_at:'time'}],'mine').generated_at,'time');
+ assert.equal(publishedReceipt({scan_id:'newer'},[],'mine'),null);
+});

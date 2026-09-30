@@ -149,6 +149,22 @@ class ReliabilityTests(unittest.TestCase):
                 self.assertEqual(pipeline.run(),1)
             self.assertEqual((root/'data/market.json').read_text(),'last-good')
             self.assertEqual(json.loads((root/'data/scan-health.json').read_text())['status'],'FAILED')
+    def test_pipeline_receipt_is_written_only_after_validation(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);(root/'data').mkdir()
+            receipt=root/'data/scan-receipts.json';receipt.write_text('[{"scan_id":"previous"}]')
+            def build(*args,**kwargs):
+                stage=Path(kwargs['cwd'])/'data'
+                for name in pipeline.FILES:(stage/name).write_text('{}')
+                (stage/'market-dashboard.json').write_text(json.dumps({'scan_id':'requested','generated_at':'now','coverage':{'stocks_received':206}}))
+            with patch.object(pipeline,'ROOT',root),patch.object(pipeline,'session_info',return_value={'session':'OPEN'}),patch.object(pipeline.subprocess,'run',side_effect=build),patch.object(pipeline,'validate',return_value={'status':'SUCCESS'}):
+                self.assertEqual(pipeline.run(),0)
+                self.assertEqual([x['scan_id'] for x in json.loads(receipt.read_text())],['previous','requested'])
+                saved=receipt.read_text()
+                with patch.object(pipeline,'validate',side_effect=ValueError('bad snapshot')):
+                    self.assertEqual(pipeline.run(),1)
+                self.assertEqual(receipt.read_text(),saved)
+
     def test_observations_are_immutable_and_markouts_labeled(self):
         d=snapshot(row());x=d['candidates'][0];x['execution_state']='TRIGGERED';x['preferred_contracts']=[option(option_timestamp=None,payload_timestamp='first')]
         with tempfile.TemporaryDirectory() as t:
