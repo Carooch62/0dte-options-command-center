@@ -1,99 +1,80 @@
 name: Free Market Scanner
-
+run-name: "Scan ${{ inputs.request_id || github.run_id }} (${{ inputs.scan_mode || 'scheduled' }})"
 on:
   push:
-    paths:
-      - "scanner.py"
-      - "schema_normalizer.py"
-      - "execution_engine.py"
-      - "execution_normalizer.py"
-      - "option_expander.py"
-      - "core_0dte.py"
-      - "tests/**"
-      - ".github/workflows/market-scan.yml"
+    branches: [main]
+    paths: ['*.py', 'requirements.txt', 'tests/**', '.github/workflows/market-scan.yml']
   workflow_dispatch:
     inputs:
       scan_mode:
-        description: "Scan mode"
-        required: false
-        default: "manual"
+        description: Scan mode
+        default: manual
         type: choice
-        options:
-          - manual
-          - second-wave
+        options: [manual, second-wave]
+      request_id:
+        description: Dashboard request ID
+        required: false
+        type: string
   schedule:
-    - cron: "*/5 12-21 * * 1-5"
-
+    - cron: '*/5 12-21 * * 1-5'
 permissions:
   contents: write
-
 concurrency:
   group: market-scan
   cancel-in-progress: false
-
 jobs:
   scan:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 12
     env:
-      PYTHONUNBUFFERED: "1"
+      PYTHONUNBUFFERED: '1'
+      SCAN_MODE: ${{ inputs.scan_mode || 'scheduled' }}
+      SCAN_REQUEST_ID: ${{ inputs.request_id }}
+      APCA_API_KEY_ID: ${{ secrets.APCA_API_KEY_ID }}
+      APCA_API_SECRET_KEY: ${{ secrets.APCA_API_SECRET_KEY }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-      - run: pip install requests
+          python-version: '3.12'
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: pip install -r requirements.txt
       - name: Run regression tests
-        run: python -m unittest discover -s tests -p 'test_*.py' -v
-      - name: Run scanner
+        run: |
+          python -m unittest discover -s tests -p 'test_*.py' -v
+          node --test tests/*.test.mjs
+      - name: Scan, enrich, and validate
+        id: scan
+        run: python pipeline.py
+      - name: Record workflow failure
+        if: failure()
         env:
-          SCAN_MODE: ${{ github.event.inputs.scan_mode || 'scheduled' }}
-        run: python scanner.py
-      - name: Expand options pass
-        run: python option_expander.py
-      - name: Force core 0DTE ETF pass
-        run: python core_0dte.py
-      - name: Normalize dashboard data
-        env:
-          SCAN_MODE: ${{ github.event.inputs.scan_mode || 'scheduled' }}
-        run: python schema_normalizer.py
-      - name: Add execution layer and feedback loop
-        run: python execution_normalizer.py
-      - name: Validate market data
+          RUN_ID: ${{ github.run_id }}
         run: |
           python - <<'PY'
-          import json
+          import json,os
           from pathlib import Path
-          for name in ("data/market.json", "data/market-dashboard.json"):
-              path = Path(name)
-              if not path.exists():
-                  raise SystemExit(f"{name} was not created")
-              data = json.loads(path.read_text())
-              if not isinstance(data, dict):
-                  raise SystemExit(f"{name} must contain a JSON object")
-              if not isinstance(data.get("candidates"), list):
-                  raise SystemExit(f"{name} candidates must be a list")
-              if name.endswith("dashboard.json") and data.get("schema_version") != 6:
-                  raise SystemExit("dashboard schema version mismatch")
-              if name.endswith("market.json") and data.get("option_chain_universe", 0) < min(60, data.get("scanned_rows", 0)):
-                  raise SystemExit("options expansion did not reach the configured coverage target")
-              if name.endswith("market.json") and not set(("SPY", "QQQ", "IWM", "SMH", "GLD", "XLF")).issubset(set(data.get("core_0dte_scanned", []))):
-                  raise SystemExit("core 0DTE ETF pass did not scan the complete required universe")
-          dashboard = json.loads(Path("data/market-dashboard.json").read_text())
-          required = ("market_regime", "execution_counts", "session_feedback")
-          missing = [key for key in required if key not in dashboard]
-          if missing:
-              raise SystemExit(f"execution layer missing: {missing}")
-          for x in dashboard["candidates"][:20]:
-              for key in ("execution_state", "momentum_state", "chase_risk", "key_levels", "contract_selection"):
-                  if key not in x:
-                      raise SystemExit(f"candidate missing execution field: {key}")
-          print("market data validated")
+          from datetime import datetime,timezone
+          p=Path('data/scan-health.json')
+          try: d=json.loads(p.read_text())
+          except Exception: d={}
+          if str(d.get('run_id')) != os.environ['RUN_ID']:
+              d={'status':'FAILED','stage':'WORKFLOW','error':'Workflow failed before a validated snapshot was produced','run_id':os.environ['RUN_ID'],'request_id':os.getenv('SCAN_REQUEST_ID') or None,'updated_at':datetime.now(timezone.utc).isoformat()}
+              p.parent.mkdir(exist_ok=True);p.write_text(json.dumps(d))
           PY
-      - name: Commit market data and feedback
+      - name: Publish validated data or failure health
+        if: always() && !cancelled()
         run: |
-          git config user.name "0DTE Scanner"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/market.json data/market-dashboard.json data/scan-history.json data/feedback.json
-          git diff --cached --quiet || git commit -m "Update execution-layer market scan"
-          git push
+          git config user.name '0DTE Scanner'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Update validated scan and health'
+          git pull --rebase origin main
+          git push origin HEAD:main

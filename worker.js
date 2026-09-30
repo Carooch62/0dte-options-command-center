@@ -1,162 +1,50 @@
-const REPO = "Carooch62/0dte-options-command-center";
-const WORKFLOW = "market-scan.yml";
-const VERSION = "2026-09-29.2-execution-layer";
-
-const ALLOWED_ORIGINS = new Set([
-  "https://carooch62.github.io",
-  "https://0dte-options-command-center.h69htk56cq.workers.dev",
-]);
-
+const REPO = 'Carooch62/0dte-options-command-center';
+const WORKFLOW = 'market-scan.yml';
+const VERSION = '2026-09-30.3-reliability';
+const ORIGINS = new Set(['https://carooch62.github.io','https://0dte-options-command-center.h69htk56cq.workers.dev']);
+function response(body, status=200, request) {
+  const origin=request?.headers.get('Origin');
+  return new Response(status===204?null:JSON.stringify(body), {status,headers:{'Content-Type':'application/json','Cache-Control':'no-store',
+    ...(ORIGINS.has(origin)?{'Access-Control-Allow-Origin':origin,'Vary':'Origin'}:{}),
+    'Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type'}});
+}
+function headers(env) {return {Authorization:`Bearer ${env.GITHUB_TOKEN}`,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','User-Agent':'0DTE-Command-Center'};}
+async function api(path,env,options={}) {
+  const r=await fetch(`https://api.github.com/repos/${REPO}/${path}`,{...options,headers:{...headers(env),...options.headers},signal:AbortSignal.timeout(15000)});
+  if(!r.ok)throw new Error(`GitHub HTTP ${r.status}`);
+  return r.status===204?null:r.json();
+}
 export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
-    if (url.pathname === "/refresh") return handleRefresh(request, env);
-    if (url.pathname === "/health") return handleHealth(env);
-    return env.ASSETS.fetch(request);
-  },
-};
-
-async function githubHeaders(env) {
-  return {
-    Authorization: `Bearer ${env.GITHUB_TOKEN}`,
-    Accept: "application/vnd.github+json",
-    "X-GitHub-Api-Version": "2022-11-28",
-    "User-Agent": "0DTE-Options-Command-Center",
-  };
-}
-
-async function handleHealth(env) {
-  const tokenConfigured = Boolean(env.GITHUB_TOKEN);
-  const result = {
-    ok: true,
-    version: VERSION,
-    worker: "0dte-options-command-center",
-    workflow: WORKFLOW,
-    executionLayer: true,
-    tokenConfigured,
-    tokenType: typeof env.GITHUB_TOKEN,
-    githubRepo: { ok: false, status: null },
-    githubWorkflow: { ok: false, status: null },
-    latestRun: { status: null, conclusion: null, id: null, createdAt: null },
-  };
-
-  if (!tokenConfigured) return json(result);
-  const headers = await githubHeaders(env);
-
-  try {
-    const r = await fetch(`https://api.github.com/repos/${REPO}`, { headers });
-    result.githubRepo = { ok: r.ok, status: r.status };
-  } catch {
-    result.githubRepo = { ok: false, status: 0 };
-  }
-
-  try {
-    const r = await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/${WORKFLOW}`, { headers });
-    result.githubWorkflow = { ok: r.ok, status: r.status };
-  } catch {
-    result.githubWorkflow = { ok: false, status: 0 };
-  }
-
-  try {
-    const r = await fetch(
-      `https://api.github.com/repos/${REPO}/actions/workflows/${WORKFLOW}/runs?branch=main&per_page=1`,
-      { headers },
-    );
-    if (r.ok) {
-      const payload = await r.json();
-      const run = payload.workflow_runs?.[0];
-      if (run) {
-        result.latestRun = {
-          status: run.status ?? null,
-          conclusion: run.conclusion ?? null,
-          id: run.id ?? null,
-          createdAt: run.created_at ?? null,
-        };
+  async fetch(request,env) {
+    const url=new URL(request.url);
+    if(request.method==='OPTIONS')return response({},204,request);
+    try {
+      if(url.pathname==='/health') {
+        if(!env.GITHUB_TOKEN)return response({ok:false,error:'Refresh service is not configured'},503,request);
+        const id=url.searchParams.get('request_id');
+        if(id&&!/^[a-zA-Z0-9-]{8,80}$/.test(id))return response({ok:false,error:'Invalid request ID'},400,request);
+        const d=await api(`actions/workflows/${WORKFLOW}/runs?branch=main&per_page=30`,env);
+        const run=id?d.workflow_runs.find(r=>r.display_title?.startsWith(`Scan ${id} (`)):d.workflow_runs[0];
+        const latestRun=run?{id:run.id,status:run.status,conclusion:run.conclusion,url:run.html_url,createdAt:run.created_at}:null;
+        return response({ok:true,version:VERSION,request_id:id,latestRun},200,request);
       }
-    }
-  } catch {
-    // Health remains useful even if the latest-run lookup is unavailable.
+      if(url.pathname==='/refresh') {
+        if(request.method!=='POST')return response({ok:false,error:'POST required'},405,request);
+        if(!ORIGINS.has(request.headers.get('Origin')))return response({ok:false,error:'Forbidden origin'},403,request);
+        if(!env.GITHUB_TOKEN)return response({ok:false,error:'Refresh service is not configured'},503,request);
+        const body=await request.json().catch(()=>({}));
+        const id=body.request_id||crypto.randomUUID();
+        if(!/^[a-zA-Z0-9-]{8,80}$/.test(id))return response({ok:false,error:'Invalid request ID'},400,request);
+        const mode=body.scan_mode==='second-wave'?'second-wave':'manual';
+        await api(`actions/workflows/${WORKFLOW}/dispatches`,env,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ref:'main',inputs:{scan_mode:mode,request_id:id}})});
+        return response({ok:true,status:'ACCEPTED',request_id:id},202,request);
+      }
+      // Data commits do not require redeploying the Worker asset bundle.
+      if(/^\/data\/(market-dashboard|market|scan-health|scan-history|feedback|option-observations)\.json$/.test(url.pathname)) {
+        const r=await fetch(`https://raw.githubusercontent.com/${REPO}/main${url.pathname}?v=${Date.now()}`,{cf:{cacheTtl:0},signal:AbortSignal.timeout(15000)});
+        return new Response(r.body,{status:r.status,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
+      }
+      return env.ASSETS.fetch(request);
+    }catch(e){return response({ok:false,error:e.message},502,request);}
   }
-
-  return json(result);
-}
-
-async function handleRefresh(request, env) {
-  if (request.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders(request) });
-  }
-  if (request.method !== "POST") {
-    return json({ error: "Method not allowed" }, 405, { Allow: "OPTIONS, POST" }, request);
-  }
-
-  const origin = request.headers.get("Origin");
-  if (!origin || !ALLOWED_ORIGINS.has(origin)) {
-    return json({ error: "Forbidden origin" }, 403, {}, request);
-  }
-  if (!env.GITHUB_TOKEN) {
-    return json({ error: "GITHUB_TOKEN is not configured" }, 500, {}, request);
-  }
-
-  let mode = "manual";
-  try {
-    const body = await request.json();
-    if (body?.scan_mode === "second-wave") mode = "second-wave";
-  } catch {
-    // Empty body is valid and means a normal/manual scan.
-  }
-
-  const response = await fetch(
-    `https://api.github.com/repos/${REPO}/actions/workflows/${WORKFLOW}/dispatches`,
-    {
-      method: "POST",
-      headers: {
-        ...(await githubHeaders(env)),
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ ref: "main", inputs: { scan_mode: mode } }),
-    },
-  );
-
-  if (!response.ok) {
-    const detail = await response.text();
-    return json({
-      error: "GitHub workflow dispatch failed",
-      status: response.status,
-      detail: detail.slice(0, 500),
-    }, 502, {}, request);
-  }
-
-  return json({
-    ok: true,
-    message: mode === "second-wave" ? "Second-wave scan started" : "Market scan started",
-    workflow: WORKFLOW,
-    scan_mode: mode,
-    execution_layer: true,
-  }, 202, {}, request);
-}
-
-function corsHeaders(request) {
-  const origin = request?.headers?.get("Origin");
-  const allowedOrigin = origin && ALLOWED_ORIGINS.has(origin)
-    ? origin
-    : "https://carooch62.github.io";
-  return {
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Max-Age": "86400",
-    "Vary": "Origin",
-  };
-}
-
-function json(body, status = 200, extraHeaders = {}, request = null) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": "no-store",
-      ...corsHeaders(request),
-      ...extraHeaders,
-    },
-  });
-}
+};

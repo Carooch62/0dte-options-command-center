@@ -1,17 +1,11 @@
 name: Deploy Cloudflare Worker
-
 on:
   push:
     branches: [main]
-    paths:
-      - "worker.js"
-      - "wrangler.toml"
-      - ".github/workflows/deploy-worker.yml"
+    paths: ['worker.js', 'wrangler.toml', '*.html', 'dashboard-*.js', '.github/workflows/deploy-worker.yml']
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -21,8 +15,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Prepare browser assets
+        run: |
+          mkdir -p public
+          cp index.html dashboard.html dashboard_v2.html dashboard-app.js dashboard-logic.js public/
       - name: Deploy Worker
-        run: npx wrangler@latest deploy
+        run: npx wrangler@4 deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
