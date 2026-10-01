@@ -1,7 +1,8 @@
 // Shared status model: every completed stage comes from a response, job step, or published receipt.
-export function refreshProgress({requestStatus='accepted',run=null,published=false,closed=false}={}) {
+export function refreshProgress({requestStatus='accepted',run=null,published=false,closed=false,waiting=false}={}) {
   const steps=[['request','Request sent'],['queue','Queued'],['prepare','Preparing'],['scan','Scan & validate'],['publish','Publishing'],['complete','Published']].map(([id,label])=>({id,label,state:'waiting',detail:''}));
   const set=(id,state,detail='')=>Object.assign(steps.find(s=>s.id===id),{state,detail});
+  if(waiting){for(const s of steps)s.state='done';set('scan','skipped','First five-minute bar is not complete yet');set('publish','skipped','Last snapshot retained');steps[5].label='Waiting for first bar';steps[5].detail='Request finished without a new snapshot';return steps;}
   if(closed){for(const s of steps)s.state='done';set('scan','skipped','Market calendar is closed; no new scan');set('publish','skipped','Last snapshot retained');steps[5].label='Market closed';steps[5].detail='Request finished';return steps;}
   if(published){for(const s of steps)s.state='done';steps[5].detail='Verified in published data';return steps;}
   if(requestStatus==='sending'){set('request','active','Contacting refresh service');return steps;}
@@ -35,7 +36,7 @@ export function refreshProgress({requestStatus='accepted',run=null,published=fal
 export function publishedReceipt(data,receipts,id){
   if(!id)return null;
   if(data?.scan_id===id)return {scan_id:id,generated_at:data.generated_at,coverage:data.coverage};
-  return Array.isArray(receipts)?receipts.find(r=>r.scan_id===id&&r.status!=='CLOSED')||null:null;
+  return Array.isArray(receipts)?receipts.find(r=>r.scan_id===id&&!['CLOSED','WAITING_FOR_BAR'].includes(r.status))||null:null;
 }
 
 export function closedReceipt(receipts,health,id){
@@ -56,10 +57,11 @@ export function publicationCheckExpired(request,now=Date.now()){
 export function verifiedRefresh(request,data,receipts,health,now=Date.now()){
   if(!request?.id)return null;
   const closed=closedReceipt(receipts,health,request.id);
-  const receipt=closed?null:publishedReceipt(data,receipts,request.id);
-  if(!closed&&!receipt)return null;
-  const completed=Date.parse(closed?.completed_at);
-  return {...request,closed,receipt,unverified:false,failed:false,verificationStarted:null,
+  const waiting=(Array.isArray(receipts)?receipts.find(r=>r.scan_id===request.id&&r.status==='WAITING_FOR_BAR'):null)||(health?.status==='WAITING_FOR_BAR'&&health.request_id===request.id?{scan_id:request.id,status:health.status,completed_at:health.updated_at,retry_after:health.retry_after}:null);
+  const receipt=closed||waiting?null:publishedReceipt(data,receipts,request.id);
+  if(!closed&&!waiting&&!receipt)return null;
+  const completed=Date.parse((closed||waiting)?.completed_at);
+  return {...request,closed,waiting,receipt,unverified:false,failed:false,verificationStarted:null,
     finished:Number.isFinite(completed)?completed:request.finished||now,
-    message:closed?'Market closed · refresh finished.':'Refresh completed.'};
+    message:waiting?'Waiting for the first completed five-minute bar; last snapshot retained.':closed?'Market closed · refresh finished.':'Refresh completed.'};
 }

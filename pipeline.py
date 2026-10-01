@@ -6,7 +6,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from market_clock import session_info
 
 ROOT=Path(__file__).resolve().parent
@@ -32,8 +32,14 @@ def run():
     health={'updated_at':datetime.now(timezone.utc).isoformat(),'run_id':os.getenv('GITHUB_RUN_ID'),
             'request_id':os.getenv('SCAN_REQUEST_ID') or None,'status':'RUNNING'}
     try:
-        if session_info()['session']=='CLOSED':
-            health.update(status='CLOSED',stage='MARKET_CALENDAR')
+        now=datetime.now(timezone.utc)
+        info=session_info(now)
+        first_bar_at=datetime.fromisoformat(info['open_at'])+timedelta(minutes=5) if info.get('open_at') else None
+        waiting=info['session']=='OPEN' and first_bar_at is not None and now<first_bar_at
+        if info['session']=='CLOSED' or waiting:
+            status='WAITING_FOR_BAR' if waiting else 'CLOSED'
+            health.update(status=status,stage='MARKET_CALENDAR')
+            if waiting: health.update(retry_after=first_bar_at.isoformat(),message='Waiting for the first completed five-minute regular-session bar; last snapshot retained.')
             receipt_path=dest/'scan-receipts.json'
             try: receipts=json.loads(receipt_path.read_text())
             except (OSError,ValueError): receipts=[]
@@ -47,8 +53,9 @@ def run():
                                  'completed_at':prior.get('updated_at')})
             request_id=health['request_id'] or health['run_id']
             receipts=[r for r in receipts if r.get('scan_id')!=request_id]
-            receipts.append({'scan_id':request_id,'run_id':health['run_id'],'status':'CLOSED',
-                             'completed_at':datetime.now(timezone.utc).isoformat()})
+            receipts.append({'scan_id':request_id,'run_id':health['run_id'],'status':status,
+                             'completed_at':datetime.now(timezone.utc).isoformat(),
+                             **({'retry_after':health['retry_after']} if waiting else {})})
             receipt_path.write_text(json.dumps(receipts[-100:],separators=(',',':')))
             return 0
         with tempfile.TemporaryDirectory(prefix='scan-') as folder:

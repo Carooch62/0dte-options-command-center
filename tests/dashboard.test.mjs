@@ -161,3 +161,17 @@ test('shortlist rejects bad quotes and unverified delta and deduplicates contrac
  const row={direction:'UP',execution_state:'WATCH',bar_end:data.generated_at,eligible_contracts:[pickOption,pickOption,{...pickOption,contract_id:'X',delta_verified:false},{...pickOption,contract_id:'Y',bid:0}]};
  assert.equal(contractShortlist(row,data,.1,.3,now).length,1);
 });
+
+test('opening wait completes request without claiming published market data',()=>{
+ const now=Date.now(),request={id:'opening',started:now-10000,unverified:true};
+ const health={status:'WAITING_FOR_BAR',request_id:'opening',updated_at:new Date(now).toISOString(),retry_after:'2026-10-01T13:35:00Z'};
+ const result=verifiedRefresh(request,{},[],health,now);
+ assert.equal(result.waiting.status,'WAITING_FOR_BAR');assert.equal(result.receipt,null);assert.equal(result.failed,false);assert.equal(result.unverified,false);
+ const receipt={scan_id:request.id,status:health.status,completed_at:health.updated_at,retry_after:health.retry_after};
+ assert.equal(publishedReceipt({},[receipt],request.id),null);
+ assert.equal(verifiedRefresh(request,{},[receipt],{request_id:'later'},now).waiting.status,'WAITING_FOR_BAR');
+ assert.equal(verifiedRefresh(request,{},[],{...health,request_id:'other'},now),null);
+ const steps=refreshProgress({waiting:true});
+ assert.equal(steps.find(s=>s.id==='scan').state,'skipped');assert.equal(steps.at(-1).label,'Waiting for first bar');
+ assert.equal(refreshBlocksNewRequest({...result,run:{status:'completed'}},now),false);
+});
