@@ -114,3 +114,13 @@ test('closed request finishes without pretending a new snapshot was published',(
  assert.equal(steps.find(s=>s.id==='scan').state,'skipped');
  assert.equal(steps.at(-1).label,'Market closed');
 });
+
+import {refreshBlocksNewRequest,publicationCheckExpired} from '../refresh-progress.js';
+test('completed run never locks refresh buttons while publication is checked',()=>{
+ const request={started:now-10000,run:{status:'completed',conclusion:'success'},verificationStarted:now-90000};
+ assert.equal(refreshBlocksNewRequest(request,now),false);
+ assert.equal(publicationCheckExpired(request,now),true);
+ assert.equal(publicationCheckExpired({...request,verificationStarted:now-10000},now),false);
+ assert.equal(refreshBlocksNewRequest({...request,run:{status:'in_progress'}},now),true);
+ assert.equal(refreshBlocksNewRequest({...request,started:now-21*60000,run:{status:'queued'}},now),false);
+});
