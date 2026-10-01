@@ -52,3 +52,14 @@ export function refreshBlocksNewRequest(request,now=Date.now()){
 export function publicationCheckExpired(request,now=Date.now()){
   return request?.run?.status==='completed'&&request.run.conclusion==='success'&&Number.isFinite(request.verificationStarted)&&now-request.verificationStarted>=90000;
 }
+
+export function verifiedRefresh(request,data,receipts,health,now=Date.now()){
+  if(!request?.id)return null;
+  const closed=closedReceipt(receipts,health,request.id);
+  const receipt=closed?null:publishedReceipt(data,receipts,request.id);
+  if(!closed&&!receipt)return null;
+  const completed=Date.parse(closed?.completed_at);
+  return {...request,closed,receipt,unverified:false,failed:false,verificationStarted:null,
+    finished:Number.isFinite(completed)?completed:request.finished||now,
+    message:closed?'Market closed · refresh finished.':'Refresh completed.'};
+}

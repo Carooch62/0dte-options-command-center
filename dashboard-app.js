@@ -1,4 +1,4 @@
-import {refreshProgress,publishedReceipt,closedReceipt,refreshBlocksNewRequest,publicationCheckExpired} from './refresh-progress.js?v=20261001-refresh-unlock';
+import {refreshProgress,publishedReceipt,closedReceipt,refreshBlocksNewRequest,publicationCheckExpired,verifiedRefresh} from './refresh-progress.js?v=20261001-late-receipts';
 import {finite,minutes,snapshotUsable,dataStatus,recordedState,matchesState,robinhoodStockUrl,contractExplanation,contractRank,displayState,selectableContracts,tradePL,validTrade,riskSummary} from './dashboard-logic.js?v=20260930-last-status';
 const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const API='https://0dte-options-command-center.h69htk56cq.workers.dev';
@@ -53,16 +53,11 @@ function renderRefresh(){
  const current=steps.find(s=>s.state==='active'),title=r?.unverified?'Run finished · data not verified':r?.closed?'Market closed':r?.receipt?'Refresh complete':r?.failed?'Refresh interrupted':current?.label||'Scanner updates';
  $('scanProgress').innerHTML=`<div class="refresh-box ${r?.failed?'failed':r?.finished?'finished':''}" role="status" aria-live="polite"><div class="row"><b>${esc(title)}</b><small>${r?.finished?'Finished':active?'In progress':'Ready'}</small></div><p class="refresh-message">${esc(message)}</p>${steps.length?`<ol class="refresh-timeline">${steps.map(s=>`<li class="${s.state}" ${s.state==='active'?'aria-current="step"':''} title="${esc(s.detail)}"><span>${s.state==='done'?'✓':s.state==='failed'?'!':s.state==='skipped'?'—':s.state==='active'?'●':'○'}</span> ${esc(s.label)}${s.state==='skipped'?' (skipped)':''}</li>`).join('')}</ol>`:''}${current?.detail?`<p class="smallnote">${esc(current.detail)}</p>`:''}<div class="smallnote">${r?`Requested ${esc(time(r.started))} · ${Math.floor(elapsed/60)}m ${elapsed%60}s${r.run?.url?` · <a href="${esc(r.run.url)}" target="_blank" rel="noopener">View run</a>`:''}`:''}${reloadMessage?`<br>${esc(reloadMessage)}`:''}${backendHealth?`<br>Latest scanner result: ${esc(backendHealth.status)} · ${esc(time(backendHealth.updated_at))}${backendHealth.error?' · '+esc(backendHealth.error):''}`:''}</div></div>`;
 }
-function finishClosed(r,result){
- if(!active||active.id!==r.id)return;
- const completed=Date.parse(result.completed_at);
- rememberRefresh({...active,closed:result,finished:Number.isFinite(completed)?completed:Date.now()});
- active=null;save('0dteActiveScan',null);enableScan(true);renderRefresh();
-}
-function completeRefresh(r,receipt){
- if(!active||active.id!==r.id)return;
- rememberRefresh({...active,receipt,finished:Date.now(),message:'Refresh completed.'});
- active=null;save('0dteActiveScan',null);enableScan(true);renderRefresh();
+function applyVerifiedRefresh(request,result){
+ if(!result||(active?active.id!==request.id:lastRefresh?.id!==request.id))return;
+ rememberRefresh(result);
+ if(active?.id===request.id){active=null;save('0dteActiveScan',null);}
+ enableScan(!refreshBlocksNewRequest(active));renderRefresh();
 }
 async function load(manual=false){
  if(loadPromise)return loadPromise;
@@ -72,16 +67,15 @@ async function load(manual=false){
    if(manual)reloadMessage=`${oldId===d.scan_id?'No newer scan has published.':'Displayed data updated.'} Latest snapshot: ${time(d.generated_at)}.`;
    const health=await json(DATA+'scan-health.json?v='+Date.now()).catch(()=>null);
    if(health)backendHealth=health;
-   const r=active;
+   // A timed-out request remains eligible for late evidence, including after reopening.
+   const r=active||(lastRefresh?.unverified?lastRefresh:null);
    if(r){
-     let receipt=publishedReceipt(data,[],r.id),closed=closedReceipt([],health,r.id);
-     if(!receipt&&!closed&&r.run?.status==='completed'&&r.run?.conclusion==='success'){
+     let result=verifiedRefresh(r,data,[],health);
+     if(!result&&(r.unverified||(r.run?.status==='completed'&&r.run?.conclusion==='success'))){
        const receipts=await json(DATA+'scan-receipts.json?v='+Date.now()).catch(()=>[]);
-       receipt=publishedReceipt(data,receipts,r.id);
-       closed=closedReceipt(receipts,health,r.id);
+       result=verifiedRefresh(r,data,receipts,health);
      }
-     if(closed)finishClosed(r,closed);
-     else if(receipt)completeRefresh(r,receipt);
+     applyVerifiedRefresh(r,result);
    }
    renderRefresh();
  }catch(e){dataDownloadFailed=true;if(data)render();notice('freshness','Unable to download new results: '+e.message+'. Last displayed snapshot is retained for research.','bad');}
