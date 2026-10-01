@@ -124,3 +124,19 @@ test('completed run never locks refresh buttons while publication is checked',()
  assert.equal(refreshBlocksNewRequest({...request,run:{status:'in_progress'}},now),true);
  assert.equal(refreshBlocksNewRequest({...request,started:now-21*60000,run:{status:'queued'}},now),false);
 });
+
+import {verifiedRefresh} from '../refresh-progress.js';
+test('saved unverified refresh reconciles with matching late closed health',()=>{
+ const saved={id:'old-request',unverified:true,finished:now,started:now-120000};
+ const result=verifiedRefresh(saved,{},[],{status:'CLOSED',request_id:saved.id,updated_at:new Date(now-60000).toISOString()},now);
+ assert.equal(result.unverified,false);assert.equal(result.closed.status,'CLOSED');
+ assert.equal(result.finished,now-60000);assert.equal(result.receipt,null);
+ assert.equal(saved.unverified,true);
+ assert.equal(verifiedRefresh(saved,{},[],{status:'CLOSED',request_id:'unrelated'},now),null);
+});
+test('saved unverified refresh resolves from late receipt after newer scan replaces health',()=>{
+ const saved={id:'old-request',unverified:true,finished:now};
+ const result=verifiedRefresh(saved,{scan_id:'newer'},[{scan_id:saved.id,generated_at:new Date(now-60000).toISOString(),coverage:{stocks_received:200}}],{status:'CLOSED',request_id:'newer'},now);
+ assert.equal(result.unverified,false);assert.equal(result.receipt.scan_id,saved.id);assert.equal(result.closed,null);
+ assert.equal(verifiedRefresh(saved,{scan_id:'newer'},[],null,now),null);
+});
