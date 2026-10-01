@@ -34,6 +34,22 @@ def run():
     try:
         if session_info()['session']=='CLOSED':
             health.update(status='CLOSED',stage='MARKET_CALENDAR')
+            receipt_path=dest/'scan-receipts.json'
+            try: receipts=json.loads(receipt_path.read_text())
+            except (OSError,ValueError): receipts=[]
+            if not isinstance(receipts,list): receipts=[]
+            # Preserve a pre-upgrade closed result before the new health record replaces it.
+            try: prior=json.loads((dest/'scan-health.json').read_text())
+            except (OSError,ValueError): prior={}
+            prior_id=prior.get('request_id') or prior.get('run_id')
+            if prior.get('status')=='CLOSED' and prior_id and not any(r.get('scan_id')==prior_id for r in receipts):
+                receipts.append({'scan_id':prior_id,'run_id':prior.get('run_id'),'status':'CLOSED',
+                                 'completed_at':prior.get('updated_at')})
+            request_id=health['request_id'] or health['run_id']
+            receipts=[r for r in receipts if r.get('scan_id')!=request_id]
+            receipts.append({'scan_id':request_id,'run_id':health['run_id'],'status':'CLOSED',
+                             'completed_at':datetime.now(timezone.utc).isoformat()})
+            receipt_path.write_text(json.dumps(receipts[-100:],separators=(',',':')))
             return 0
         with tempfile.TemporaryDirectory(prefix='scan-') as folder:
             stage=Path(folder);(stage/'data').mkdir()
