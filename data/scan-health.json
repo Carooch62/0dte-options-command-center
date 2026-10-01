@@ -1,1 +1,1 @@
-{"updated_at":"2026-10-01T13:31:02.678993+00:00","run_id":"36869165643","request_id":"b28a5639-27e3-4af6-bb0f-f5db177e7b37","status":"FAILED","stage":"execution_normalizer.py","error":"ValueError: Insufficient price coverage: 0/208"}
+{"updated_at":"2026-10-01T13:32:37.054930+00:00","run_id":"36869395692","request_id":"scheduled-5969538","status":"FAILED","stage":"execution_normalizer.py","error":"ValueError: Insufficient price coverage: 0/190"}
