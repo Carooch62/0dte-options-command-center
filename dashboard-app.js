@@ -1,4 +1,4 @@
-import {refreshProgress,publishedReceipt,closedReceipt} from './refresh-progress.js?v=20261001-refresh-box';
+import {refreshProgress,publishedReceipt,closedReceipt,refreshBlocksNewRequest,publicationCheckExpired} from './refresh-progress.js?v=20261001-refresh-unlock';
 import {finite,minutes,snapshotUsable,dataStatus,recordedState,matchesState,robinhoodStockUrl,contractExplanation,contractRank,displayState,selectableContracts,tradePL,validTrade,riskSummary} from './dashboard-logic.js?v=20260930-last-status';
 const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const API='https://0dte-options-command-center.h69htk56cq.workers.dev';
@@ -43,12 +43,14 @@ function render(){if(!data)return;
 function rememberRefresh(r){lastRefresh=r;save('0dteLastRefresh',r);}
 function renderRefresh(){
  const r=active||lastRefresh;
+ enableScan(!refreshBlocksNewRequest(active));
  const steps=r?refreshProgress({requestStatus:r.requestStatus,run:r.run,published:!!r.receipt,closed:!!r.closed}):[];
+ if(r?.unverified){for(const step of steps)if(step.state==='active'||step.state==='waiting'){step.state='unverified';step.detail='Publication could not be verified';}steps.at(-1).label='Check ended';}
  const elapsed=r?Math.max(0,Math.floor(((r.finished||Date.now())-r.started)/1000)):0;
  let message=r?.message||'Ready to refresh. Live progress will appear here.';
  if(r?.receipt){const c=r.receipt.coverage||{};message=`Refresh completed. Published ${time(r.receipt.generated_at)} · ${c.stocks_received??'—'} stock rows · ${c.chains_attempted??'—'} chain checks.${data?.scan_id!==r.id?' Newer results are already displayed.':''}`;}
  if(r?.closed)message='Market closed · refresh finished. The last scan and its recorded statuses are retained.';
- const current=steps.find(s=>s.state==='active'),title=r?.closed?'Market closed':r?.receipt?'Refresh complete':r?.failed?'Refresh interrupted':current?.label||'Scanner updates';
+ const current=steps.find(s=>s.state==='active'),title=r?.unverified?'Run finished · data not verified':r?.closed?'Market closed':r?.receipt?'Refresh complete':r?.failed?'Refresh interrupted':current?.label||'Scanner updates';
  $('scanProgress').innerHTML=`<div class="refresh-box ${r?.failed?'failed':r?.finished?'finished':''}" role="status" aria-live="polite"><div class="row"><b>${esc(title)}</b><small>${r?.finished?'Finished':active?'In progress':'Ready'}</small></div><p class="refresh-message">${esc(message)}</p>${steps.length?`<ol class="refresh-timeline">${steps.map(s=>`<li class="${s.state}" ${s.state==='active'?'aria-current="step"':''} title="${esc(s.detail)}"><span>${s.state==='done'?'✓':s.state==='failed'?'!':s.state==='skipped'?'—':s.state==='active'?'●':'○'}</span> ${esc(s.label)}${s.state==='skipped'?' (skipped)':''}</li>`).join('')}</ol>`:''}${current?.detail?`<p class="smallnote">${esc(current.detail)}</p>`:''}<div class="smallnote">${r?`Requested ${esc(time(r.started))} · ${Math.floor(elapsed/60)}m ${elapsed%60}s${r.run?.url?` · <a href="${esc(r.run.url)}" target="_blank" rel="noopener">View run</a>`:''}`:''}${reloadMessage?`<br>${esc(reloadMessage)}`:''}${backendHealth?`<br>Latest scanner result: ${esc(backendHealth.status)} · ${esc(time(backendHealth.updated_at))}${backendHealth.error?' · '+esc(backendHealth.error):''}`:''}</div></div>`;
 }
 function finishClosed(r,result){
@@ -102,13 +104,21 @@ async function pollRun(){
      }
    }else active.message=active.requestStatus==='unknown'?'Checking whether GitHub received the request after a connection interruption.':'Request accepted; waiting for GitHub to register this run.';
    save('0dteActiveScan',active);rememberRefresh(active);renderRefresh();
-   if(r?.status==='completed'&&r.conclusion==='success')await load();
+   if(r?.status==='completed'&&r.conclusion==='success'){
+     active.verificationStarted??=Date.now();
+     save('0dteActiveScan',active);
+     await load();
+     if(active?.id===id&&publicationCheckExpired(active)){
+       rememberRefresh({...active,unverified:true,finished:Date.now(),message:'GitHub finished this run, but a new snapshot or completion receipt could not be verified. The last scan is retained. You can refresh again.'});
+       active=null;save('0dteActiveScan',null);enableScan(true);renderRefresh();
+     }
+   }
    if(active&&Date.now()-active.started>20*60000){active.message='This request is taking longer than expected. View its run for details; you can start another scan.';enableScan(true);renderRefresh();}
  }catch(e){if(active&&active.id===id){active.message='Status check interrupted: '+e.message+'. Tracking will retry.';renderRefresh();}}
  finally{polling=false;}
 }
 async function startScan(mode){
- if(active&&Date.now()-active.started<20*60000)return;
+ if(refreshBlocksNewRequest(active))return;
  active={id:crypto.randomUUID(),started:Date.now(),requestStatus:'sending',message:'Sending refresh request…'};
  const id=active.id;save('0dteActiveScan',active);rememberRefresh(active);enableScan(false);renderRefresh();
  let rejected=false;
@@ -135,7 +145,7 @@ $('scan').onclick=()=>startScan('manual');$('wave').onclick=()=>startScan('secon
 for(const id of ['state','direction','catalyst','askMin','askMax','onlyContracts','sort'])$(id).addEventListener('input',render);
 for(const id of ['perTrade','dailyLoss','maxExposure','timeStop','cutoff']){$(id).value=settings[id]??'';$(id).addEventListener('input',renderRisk);}
 for(const id of ['riskAsk','riskQty'])$(id).addEventListener('input',renderRisk);
-active=read('0dteActiveScan',null);lastRefresh=read('0dteLastRefresh',null);enableScan(!active);renderRefresh();renderJournal();await load();startTimer();if(active)pollRun();
+active=read('0dteActiveScan',null);lastRefresh=read('0dteLastRefresh',null);enableScan(!refreshBlocksNewRequest(active));renderRefresh();renderJournal();await load();startTimer();if(active)pollRun();
 setInterval(()=>{if(!document.hidden){$('clock').textContent=new Date().toLocaleString('en-US',{timeZone:'America/New_York'})+' ET';render();renderRisk();}},15000);
 setInterval(pollRun,5000);
 setInterval(()=>{if(!document.hidden&&active)renderRefresh();},1000);

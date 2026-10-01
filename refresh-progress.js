@@ -45,3 +45,10 @@ export function closedReceipt(receipts,health,id){
   if(health?.status==='CLOSED'&&health.request_id===id)return {scan_id:id,status:'CLOSED',completed_at:health.updated_at};
   return null;
 }
+
+export function refreshBlocksNewRequest(request,now=Date.now()){
+  return Boolean(request&&request.run?.status!=='completed'&&now-request.started<20*60000);
+}
+export function publicationCheckExpired(request,now=Date.now()){
+  return request?.run?.status==='completed'&&request.run.conclusion==='success'&&Number.isFinite(request.verificationStarted)&&now-request.verificationStarted>=90000;
+}
