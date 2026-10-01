@@ -34,6 +34,15 @@ def run():
     try:
         if session_info()['session']=='CLOSED':
             health.update(status='CLOSED',stage='MARKET_CALENDAR')
+            receipt_path=dest/'scan-receipts.json'
+            try: receipts=json.loads(receipt_path.read_text())
+            except (OSError,ValueError): receipts=[]
+            if not isinstance(receipts,list): receipts=[]
+            request_id=health['request_id'] or health['run_id']
+            receipts=[r for r in receipts if r.get('scan_id')!=request_id]
+            receipts.append({'scan_id':request_id,'run_id':health['run_id'],'status':'CLOSED',
+                             'completed_at':datetime.now(timezone.utc).isoformat()})
+            receipt_path.write_text(json.dumps(receipts[-100:],separators=(',',':')))
             return 0
         with tempfile.TemporaryDirectory(prefix='scan-') as folder:
             stage=Path(folder);(stage/'data').mkdir()

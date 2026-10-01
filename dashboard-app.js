@@ -1,9 +1,9 @@
-import {refreshProgress,publishedReceipt} from './refresh-progress.js';
+import {refreshProgress,publishedReceipt,closedReceipt} from './refresh-progress.js?v=20261001-refresh-box';
 import {finite,minutes,snapshotUsable,dataStatus,recordedState,matchesState,robinhoodStockUrl,contractExplanation,contractRank,displayState,selectableContracts,tradePL,validTrade,riskSummary} from './dashboard-logic.js?v=20260930-last-status';
 const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const API='https://0dte-options-command-center.h69htk56cq.workers.dev';
 const DATA=location.hostname==='localhost'||location.hostname==='127.0.0.1'?'./data/':'https://raw.githubusercontent.com/Carooch62/0dte-options-command-center/main/data/';
-let data=null,previous=null,auto=true,timer,loadPromise=null,active=null,polling=false,dataDownloadFailed=false,lastRefresh=null;
+let data=null,previous=null,auto=true,timer,loadPromise=null,active=null,polling=false,dataDownloadFailed=false,lastRefresh=null,backendHealth=null,reloadMessage='';
 function read(key,fallback){try{return JSON.parse(localStorage.getItem(key))??fallback;}catch{return fallback;}}
 function save(key,value){try{localStorage.setItem(key,JSON.stringify(value));return true;}catch{$('journalNotice').textContent='Browser storage unavailable. Export your backup before leaving.';return false;}}
 const oldTrades=read('0dteJournal',[]);
@@ -42,14 +42,20 @@ function render(){if(!data)return;
 }
 function rememberRefresh(r){lastRefresh=r;save('0dteLastRefresh',r);}
 function renderRefresh(){
- const r=active||lastRefresh;if(!r){$('scanProgress').innerHTML='<p class="smallnote">Press Refresh scanner to see each live step. Reload displayed data only checks for a newer published snapshot.</p>';return;}
- const steps=refreshProgress({requestStatus:r.requestStatus,run:r.run,published:!!r.receipt});
- const elapsed=Math.max(0,Math.floor(((r.finished||Date.now())-r.started)/1000));
- const label={waiting:'Waiting',active:'In progress',done:'Complete',failed:'Failed'};
- $('scanProgress').innerHTML=`<div class="refresh-steps">${steps.map((s,i)=>`<div class="refresh-step ${s.state}" aria-current="${s.state==='active'?'step':'false'}"><span class="step-status">${s.state==='done'?'✓':s.state==='failed'?'!':i+1} · ${label[s.state]}</span><b>${esc(s.label)}</b><small>${esc(s.detail)}</small></div>`).join('')}</div><div class="refresh-summary smallnote">Requested ${esc(time(r.started))} · ${Math.floor(elapsed/60)}m ${elapsed%60}s${r.run?.url?` · <a href="${esc(r.run.url)}" target="_blank" rel="noopener">View this run</a>`:''}</div>`;
- let message=r.message||'Tracking your refresh request.';
- if(r.receipt){const c=r.receipt.coverage||{};message=`Refresh completed. Published ${time(r.receipt.generated_at)} · ${c.stocks_received??'—'} stock rows · ${c.chains_attempted??'—'} chain checks.${data?.scan_id!==r.id?' Newer results are already displayed.':''}`;}
- notice('scanStatus',message,r.receipt?'ok':r.failed?'bad':'warn');
+ const r=active||lastRefresh;
+ const steps=r?refreshProgress({requestStatus:r.requestStatus,run:r.run,published:!!r.receipt,closed:!!r.closed}):[];
+ const elapsed=r?Math.max(0,Math.floor(((r.finished||Date.now())-r.started)/1000)):0;
+ let message=r?.message||'Ready to refresh. Live progress will appear here.';
+ if(r?.receipt){const c=r.receipt.coverage||{};message=`Refresh completed. Published ${time(r.receipt.generated_at)} · ${c.stocks_received??'—'} stock rows · ${c.chains_attempted??'—'} chain checks.${data?.scan_id!==r.id?' Newer results are already displayed.':''}`;}
+ if(r?.closed)message='Market closed · refresh finished. The last scan and its recorded statuses are retained.';
+ const current=steps.find(s=>s.state==='active'),title=r?.closed?'Market closed':r?.receipt?'Refresh complete':r?.failed?'Refresh interrupted':current?.label||'Scanner updates';
+ $('scanProgress').innerHTML=`<div class="refresh-box ${r?.failed?'failed':r?.finished?'finished':''}" role="status" aria-live="polite"><div class="row"><b>${esc(title)}</b><small>${r?.finished?'Finished':active?'In progress':'Ready'}</small></div><p class="refresh-message">${esc(message)}</p>${steps.length?`<ol class="refresh-timeline">${steps.map(s=>`<li class="${s.state}" ${s.state==='active'?'aria-current="step"':''} title="${esc(s.detail)}"><span>${s.state==='done'?'✓':s.state==='failed'?'!':s.state==='skipped'?'—':s.state==='active'?'●':'○'}</span> ${esc(s.label)}${s.state==='skipped'?' (skipped)':''}</li>`).join('')}</ol>`:''}${current?.detail?`<p class="smallnote">${esc(current.detail)}</p>`:''}<div class="smallnote">${r?`Requested ${esc(time(r.started))} · ${Math.floor(elapsed/60)}m ${elapsed%60}s${r.run?.url?` · <a href="${esc(r.run.url)}" target="_blank" rel="noopener">View run</a>`:''}`:''}${reloadMessage?`<br>${esc(reloadMessage)}`:''}${backendHealth?`<br>Latest scanner result: ${esc(backendHealth.status)} · ${esc(time(backendHealth.updated_at))}${backendHealth.error?' · '+esc(backendHealth.error):''}`:''}</div></div>`;
+}
+function finishClosed(r,result){
+ if(!active||active.id!==r.id)return;
+ const completed=Date.parse(result.completed_at);
+ rememberRefresh({...active,closed:result,finished:Number.isFinite(completed)?completed:Date.now()});
+ active=null;save('0dteActiveScan',null);enableScan(true);renderRefresh();
 }
 function completeRefresh(r,receipt){
  if(!active||active.id!==r.id)return;
@@ -61,17 +67,19 @@ async function load(manual=false){
  loadPromise=(async()=>{try{
    const oldId=data?.scan_id,d=await json(DATA+'market-dashboard.json?v='+Date.now());
    if(data&&d.scan_id!==oldId)previous=data;data=d;dataDownloadFailed=false;render();
-   if(manual)notice('dataStatus',`${oldId===d.scan_id?'No newer scan has published.':'Displayed data updated.'} Latest snapshot: ${time(d.generated_at)}.`,oldId===d.scan_id?'warn':'ok');
+   if(manual)reloadMessage=`${oldId===d.scan_id?'No newer scan has published.':'Displayed data updated.'} Latest snapshot: ${time(d.generated_at)}.`;
    const health=await json(DATA+'scan-health.json?v='+Date.now()).catch(()=>null);
-   if(health)notice('health',`Last backend result: ${health.status} · ${time(health.updated_at)}${health.error?' · '+health.error:''}`,health.status==='FAILED'?'bad':health.status==='SUCCESS'?'ok':'warn');
+   if(health)backendHealth=health;
    const r=active;
    if(r){
-     let receipt=publishedReceipt(data,[],r.id);
-     if(!receipt&&r.run?.status==='completed'&&r.run?.conclusion==='success'){
+     let receipt=publishedReceipt(data,[],r.id),closed=closedReceipt([],health,r.id);
+     if(!receipt&&!closed&&r.run?.status==='completed'&&r.run?.conclusion==='success'){
        const receipts=await json(DATA+'scan-receipts.json?v='+Date.now()).catch(()=>[]);
        receipt=publishedReceipt(data,receipts,r.id);
+       closed=closedReceipt(receipts,health,r.id);
      }
-     if(receipt)completeRefresh(r,receipt);
+     if(closed)finishClosed(r,closed);
+     else if(receipt)completeRefresh(r,receipt);
    }
    renderRefresh();
  }catch(e){dataDownloadFailed=true;if(data)render();notice('freshness','Unable to download new results: '+e.message+'. Last displayed snapshot is retained for research.','bad');}

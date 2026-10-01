@@ -1,7 +1,8 @@
 // Shared status model: every completed stage comes from a response, job step, or published receipt.
-export function refreshProgress({requestStatus='accepted',run=null,published=false}={}) {
+export function refreshProgress({requestStatus='accepted',run=null,published=false,closed=false}={}) {
   const steps=[['request','Request sent'],['queue','Queued'],['prepare','Preparing'],['scan','Scan & validate'],['publish','Publishing'],['complete','Published']].map(([id,label])=>({id,label,state:'waiting',detail:''}));
   const set=(id,state,detail='')=>Object.assign(steps.find(s=>s.id===id),{state,detail});
+  if(closed){for(const s of steps)s.state='done';set('scan','skipped','Market calendar is closed; no new scan');set('publish','skipped','Last snapshot retained');steps[5].label='Market closed';steps[5].detail='Request finished';return steps;}
   if(published){for(const s of steps)s.state='done';steps[5].detail='Verified in published data';return steps;}
   if(requestStatus==='sending'){set('request','active','Contacting refresh service');return steps;}
   if(requestStatus==='unknown'&&!run){set('request','active','Checking whether the request reached GitHub');return steps;}
@@ -34,5 +35,13 @@ export function refreshProgress({requestStatus='accepted',run=null,published=fal
 export function publishedReceipt(data,receipts,id){
   if(!id)return null;
   if(data?.scan_id===id)return {scan_id:id,generated_at:data.generated_at,coverage:data.coverage};
-  return Array.isArray(receipts)?receipts.find(r=>r.scan_id===id)||null:null;
+  return Array.isArray(receipts)?receipts.find(r=>r.scan_id===id&&r.status!=='CLOSED')||null:null;
+}
+
+export function closedReceipt(receipts,health,id){
+  if(!id)return null;
+  const receipt=Array.isArray(receipts)?receipts.find(r=>r.scan_id===id&&r.status==='CLOSED'):null;
+  if(receipt)return receipt;
+  if(health?.status==='CLOSED'&&health.request_id===id)return {scan_id:id,status:'CLOSED',completed_at:health.updated_at};
+  return null;
 }

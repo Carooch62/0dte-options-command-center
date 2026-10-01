@@ -101,3 +101,16 @@ test('recorded setup survives unavailable execution data without becoming a live
  assert.equal(displayState(row,data,now+10*60000),'STALE PRICE DATA');
  assert.equal(recordedState({execution_state:'DATA UNAVAILABLE'}),'NO RECORDED STATUS');
 });
+
+import {closedReceipt} from '../refresh-progress.js';
+test('closed request finishes without pretending a new snapshot was published',()=>{
+ const health={status:'CLOSED',request_id:'wanted',updated_at:'2026-10-01T00:57:00Z'};
+ assert.equal(closedReceipt([],health,'other'),null);
+ const receipt=closedReceipt([],health,'wanted');assert.equal(receipt.status,'CLOSED');
+ assert.equal(closedReceipt([{...receipt,scan_id:'wanted'}],{...health,request_id:'later'},'wanted').status,'CLOSED');
+ assert.equal(publishedReceipt({},[receipt],'wanted'),null);
+ const steps=refreshProgress({closed:true});
+ assert(!steps.some(s=>s.state==='active'));
+ assert.equal(steps.find(s=>s.id==='scan').state,'skipped');
+ assert.equal(steps.at(-1).label,'Market closed');
+});
