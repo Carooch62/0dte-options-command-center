@@ -140,3 +140,24 @@ test('saved unverified refresh resolves from late receipt after newer scan repla
  assert.equal(result.unverified,false);assert.equal(result.receipt.scan_id,saved.id);assert.equal(result.closed,null);
  assert.equal(verifiedRefresh(saved,{scan_id:'newer'},[],null,now),null);
 });
+
+import {contractShortlist} from '../dashboard-logic.js';
+const pickOption={contract_id:'A',side:'call',strike:100,expiry:'2026-09-30',ask:.25,bid:.23,spread:.02,spread_pct:8,delta:.3,delta_verified:true,quote_valid:true,delta_ok:true,tight_spread:true,expiry_verified:true,near_atm:true,volume:100,distance_pct:1};
+test('shortlist ranks preferred delta then spread and obeys budget and direction',()=>{
+ const row={direction:'UP',execution_state:'WATCH',bar_end:data.generated_at,eligible_contracts:[pickOption,{...pickOption,contract_id:'B',delta:.45,spread_pct:10},{...pickOption,contract_id:'C',delta:.4,spread_pct:5},{...pickOption,contract_id:'PUT',side:'put',delta:-.5},{...pickOption,contract_id:'COST',ask:.8,delta:.5}]};
+ const picks=contractShortlist(row,data,.1,.3,now);
+ assert.deepEqual(picks.map(p=>p.option.contract_id),['C','B','A']);assert.equal(picks[0].label,'PRIMARY WATCH');
+ assert(!contractShortlist({...row,direction:'NEUTRAL'},data,.1,.3,now).length);
+ assert.equal(contractShortlist({...row,direction:'DOWN'},data,.1,.3,now)[0].option.side,'put');
+ assert(!contractShortlist(row,data,.1,.2,now).length);
+});
+test('shortlist never marks stale expired or pass setup as primary watch',()=>{
+ const row={direction:'UP',execution_state:'PASS',bar_end:data.generated_at,eligible_contracts:[pickOption]};
+ assert.equal(contractShortlist(row,data,.1,.3,now)[0].label,'CONTRACT TO MONITOR');
+ assert.equal(contractShortlist({...row,execution_state:'TRIGGERED'},data,.1,.3,now+10*60000)[0].label,'HISTORICAL MATCH');
+ assert.equal(contractShortlist(row,data,.1,.3,now+86400000)[0].label,'EXPIRED · HISTORY ONLY');
+});
+test('shortlist rejects bad quotes and unverified delta and deduplicates contracts',()=>{
+ const row={direction:'UP',execution_state:'WATCH',bar_end:data.generated_at,eligible_contracts:[pickOption,pickOption,{...pickOption,contract_id:'X',delta_verified:false},{...pickOption,contract_id:'Y',bid:0}]};
+ assert.equal(contractShortlist(row,data,.1,.3,now).length,1);
+});

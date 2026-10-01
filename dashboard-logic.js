@@ -74,3 +74,24 @@ export function contractRank(row,min=.1,max=.3) {
   if(selectableContracts(row,min,max).length)return 2;
   return row.chain_status==='SUCCESS'&&row.options?.length?1:0;
 }
+
+// Rank only contracts already eligible under the scanner's quality and direction rules.
+export function contractShortlist(row,data,min=.1,max=.3,now=Date.now()) {
+  const side=row.direction==='UP'?'call':row.direction==='DOWN'?'put':null;
+  const day=new Date(now).toLocaleDateString('en-CA',{timeZone:'America/New_York'});
+  const seen=new Set();
+  const ranked=selectableContracts(row,min,max).filter(o=>{
+    const delta=finite(o.delta),bid=finite(o.bid),ask=finite(o.ask);
+    const key=o.contract_id||`${o.expiry}|${o.side}|${o.strike}`;
+    if(!side||o.side!==side||!o.expiry_verified||!o.near_atm||!(o.delta_verified??o.greeks_verified)||delta===null||Math.abs(delta)<.25||Math.abs(delta)>1||(side==='call'?delta<=0:delta>=0)||bid===null||ask===null||bid<=0||bid>ask||finite(o.volume)===null||o.volume<20||seen.has(key))return false;
+    seen.add(key);return true;
+  }).sort((a,b)=>(Number(Math.abs(b.delta)>=.4)-Number(Math.abs(a.delta)>=.4))||(finite(a.spread_pct)??Infinity)-(finite(b.spread_pct)??Infinity)||(finite(a.distance_pct)??Infinity)-(finite(b.distance_pct)??Infinity)||b.volume-a.volume||a.ask-b.ask||String(a.contract_id||a.strike).localeCompare(String(b.contract_id||b.strike)));
+  const historical=!!dataStatus(row,data,now);
+  const setupReady=['TRIGGERED','CONFIRMED','WATCH','SECOND-WAVE'].includes(row.execution_state);
+  return ranked.slice(0,3).map((option,i)=>{
+    const expired=option.expiry<day,wrongDate=option.expiry!==day;
+    const label=expired?'EXPIRED · HISTORY ONLY':historical||wrongDate?'HISTORICAL MATCH':!setupReady?'CONTRACT TO MONITOR':i===0?'PRIMARY WATCH':'BACKUP WATCH';
+    const guidance=expired?'This contract has expired. Wait for a new session scan.':historical||wrongDate?'Historical quote only. Wait for a fresh regular-session scan.':!setupReady?'The stock setup is not ready. Wait for a new qualifying setup.':'Watch candidate, not a buy signal. Verify the stock trigger and current option quote in Robinhood before considering an entry.';
+    return {option,label,guidance,rank:i+1,preferredDelta:Math.abs(option.delta)>=.4};
+  });
+}
