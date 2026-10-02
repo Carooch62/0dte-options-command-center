@@ -367,6 +367,13 @@ def update_history(data, path="data/scan-history.json", limit=200):
             {
                 "ticker": x.get("ticker"),
                 "price": x.get("price"),
+                "rank": rank,
+                "score": x.get("score"),
+                "previous_close": x.get("previous_close"),
+                "previous_close_source": x.get("previous_close_source"),
+                "volume_ratio": x.get("volume_ratio"),
+                "vwap": x.get("vwap"),
+                "price_freshness": x.get("price_freshness"),
                 "trigger_price": x.get("trigger_price"),
                 "direction": x.get("direction"),
                 "move_5m": x.get("move_5m"),
@@ -380,12 +387,19 @@ def update_history(data, path="data/scan-history.json", limit=200):
                 "momentum_state": x.get("momentum_state"),
                 "had_preferred_contract": bool(x.get("preferred_contracts")),
                 "chain_status": x.get("chain_status"),
+                "chain_attempted": x.get("chain_attempted"),
+                "contract_count": len(x.get("options", [])),
+                "eligible_contract_count": len(x.get("eligible_contracts", [])),
+                "preferred_contract_count": len(x.get("preferred_contracts", [])),
+                "default_price_rejection_count": sum(o.get("preferred_price") is False for o in x.get("options", [])),
+                "contract_rejections": {reason: sum(reason in o.get("rejection_reasons", []) for o in x.get("options", []))
+                                        for reason in sorted({reason for o in x.get("options", []) for reason in o.get("rejection_reasons", [])})},
                 "option_source": x.get("option_source"),
                 "contract_volumes": {o['contract_id']:{'side':o['side'],'volume':o.get('volume',0)} for o in x.get('options',[]) if o.get('contract_id')},
                 "option_call_volume": x.get("option_call_volume"),
                 "option_put_volume": x.get("option_put_volume"),
             }
-            for x in data.get("candidates", [])
+            for rank, x in enumerate(data.get("candidates", []), 1)
         ],
     })
     p.parent.mkdir(parents=True, exist_ok=True)

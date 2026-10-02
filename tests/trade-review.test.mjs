@@ -5,6 +5,7 @@ const data={generated_at:stamp,market_session:'OPEN',session_open_at:'2026-10-01
 test('quality does not turn WATCH into an entry signal; stale triggers stay historical',()=>{
  assert.match(entryReadiness({execution_state:'WATCH',bar_end:stamp},data,now),/WAITING/);
  assert.match(entryReadiness({execution_state:'TRIGGERED',bar_end:stamp},data,now),/VERIFY ENTRY/);
+ assert.match(entryReadiness({execution_state:'TRIGGERED',setup_qualified:false,bar_end:stamp},data,now),/SETUP NOT QUALIFIED/);
  assert.match(entryReadiness({execution_state:'TRIGGERED',bar_end:stamp},data,now+600000),/HISTORICAL/);
 });
 test('premium baseline survives reload, ignores older scans, and separates expirations',()=>{

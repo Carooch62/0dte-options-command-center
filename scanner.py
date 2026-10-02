@@ -9,7 +9,7 @@ import threading
 from pathlib import Path
 from datetime import timedelta
 from quality import number, parse_time, freshness, contract_checks, valid_quote
-from market_clock import session_info
+from market_clock import session_info, calendar
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, time as dtime
 from zoneinfo import ZoneInfo
@@ -130,6 +130,27 @@ def explicit_ticker(ticker, item):
     return bool(pat.search(title) or pat.search(link))
 
 
+def previous_session_close(data, bars, now):
+    # previousClose is the last session close; chartPreviousClose is the start
+    # of the requested range and may be several sessions old. A partial prior
+    # session in an intraday response must never override the daily baseline.
+    value = number(data.get('meta', {}).get('previousClose'))
+    if value is not None and value > 0:
+        return value, 'PROVIDER_PREVIOUS_CLOSE'
+    prior = [b for b in bars if b['time'].astimezone(ET).date() < now.date()
+             and dtime(9,30) <= b['time'].astimezone(ET).time() < dtime(16)]
+    if prior:
+        last = prior[-1]
+        cal = calendar()
+        expected = cal.date_to_session(now.date().isoformat(), direction='previous')
+        if cal.is_session(now.date().isoformat()):
+            expected = cal.previous_session(expected)
+        close = parse_time(session_info(last['time'])['close_at'])
+        if last['time'].astimezone(ET).date() == expected.date() and close and last['time'] + timedelta(minutes=5) == close:
+            return last['close'], 'COMPLETED_PRIOR_SESSION'
+    return None, 'UNAVAILABLE'
+
+
 def scan_one(t, now=None, payload=None):
     now = (now or datetime.now(ET)).astimezone(ET)
     try:
@@ -167,9 +188,7 @@ def scan_one(t, now=None, payload=None):
             except Exception as exc:
                 record_error(t,'stale_price_fallback',exc)
         price = current[-1]['close']; first = current[0]['open']
-        prior = [b for b in bars if b['time'].astimezone(ET).date() < now.date()
-                 and dtime(9,30) <= b['time'].astimezone(ET).time() < dtime(16)]
-        previous_close = prior[-1]['close'] if prior else number(d.get('meta',{}).get('previousClose') or d.get('meta',{}).get('chartPreviousClose'))
+        previous_close, previous_close_source = previous_session_close(d, bars, now)
         def move(minutes):
             target = current[-1]['time'] - timedelta(minutes=minutes)
             before = next((b for b in reversed(current) if b['time'] <= target), None)
@@ -193,6 +212,7 @@ def scan_one(t, now=None, payload=None):
         end = current[-1]['time']+timedelta(minutes=5)
         return {'ticker':t, 'price':round(price,4), 'day_move':round(day,2) if day is not None else None,
                 'open_move':round(pct(price,first),2), 'previous_close':previous_close,
+                'previous_close_source':previous_close_source,
                 'move_5m':m5, 'recent_move':m15, 'move_30m':m30, 'move_60m':m60,
                 'volume_ratio':round(vr,2) if vr is not None else None,
                 'volume_acceleration':round(accel,2) if accel is not None else None,
