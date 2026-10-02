@@ -374,6 +374,7 @@ def update_history(data, path="data/scan-history.json", limit=200):
                 "volume_ratio": x.get("volume_ratio"),
                 "vwap": x.get("vwap"),
                 "price_freshness": x.get("price_freshness"),
+                "trend_context": x.get("trend_context"),
                 "trigger_price": x.get("trigger_price"),
                 "direction": x.get("direction"),
                 "move_5m": x.get("move_5m"),

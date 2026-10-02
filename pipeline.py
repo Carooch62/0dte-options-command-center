@@ -10,7 +10,7 @@ from datetime import datetime, timezone, timedelta
 from market_clock import session_info
 
 ROOT=Path(__file__).resolve().parent
-FILES=('market.json','market-dashboard.json','scan-history.json','feedback.json','option-observations.json')
+FILES=('market.json','market-dashboard.json','scan-history.json','feedback.json','option-observations.json','trend-cache.json')
 
 def validate(stage):
     raw=json.loads((stage/'data/market.json').read_text())
@@ -60,11 +60,23 @@ def run():
             return 0
         with tempfile.TemporaryDirectory(prefix='scan-') as folder:
             stage=Path(folder);(stage/'data').mkdir()
-            for name in ('scan-history.json','option-observations.json'):
+            for name in ('scan-history.json','option-observations.json','trend-cache.json'):
                 if (dest/name).exists():shutil.copy2(dest/name,stage/'data'/name)
-            for name in ('scanner.py','option_expander.py','core_0dte.py','schema_normalizer.py','execution_normalizer.py'):
+            for name in ('scanner.py','trend_context.py','option_expander.py','core_0dte.py','schema_normalizer.py','execution_normalizer.py'):
                 health['stage']=name
-                subprocess.run([sys.executable,str(ROOT/name)],cwd=stage,check=True,timeout=300 if name in ('scanner.py','option_expander.py') else 120)
+                try:
+                    subprocess.run([sys.executable,str(ROOT/name)],cwd=stage,check=True,timeout=300 if name in ('scanner.py','option_expander.py') else 120)
+                except (subprocess.SubprocessError, OSError):
+                    if name != 'trend_context.py':
+                        raise
+                    # Daily context is optional; its failure cannot discard a valid
+                    # intraday scan. Preserve the existing cache and publish UNKNOWN.
+                    raw=json.loads((stage/'data/market.json').read_text())
+                    for row in raw.get('candidates', []):
+                        row['trend_context']={'status':'SOURCE_FAILURE','alignment':'UNKNOWN','periods':{}}
+                    (stage/'data/market.json').write_text(json.dumps(raw,separators=(',',':')))
+                    cache_path=stage/'data/trend-cache.json'
+                    if not cache_path.exists():cache_path.write_text('{}')
             health.update(validate(stage))
             snapshot=json.loads((stage/'data/market-dashboard.json').read_text())
             receipt_path=dest/'scan-receipts.json'

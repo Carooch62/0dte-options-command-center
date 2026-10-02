@@ -2,7 +2,7 @@ name: Deploy Cloudflare Worker
 on:
   push:
     branches: [main]
-    paths: ['worker.js', 'wrangler.toml', '*.html', 'dashboard-*.js', 'refresh-progress.js', '.github/workflows/deploy-worker.yml']
+    paths: ['worker.js', 'wrangler.toml', '*.html', 'dashboard-*.js', 'refresh-progress.js', 'trade-review.js', '.github/workflows/deploy-worker.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
       - name: Prepare browser assets
         run: |
           mkdir -p public
-          cp index.html dashboard.html dashboard_v2.html dashboard_glass.html dashboard-app.js dashboard-logic.js refresh-progress.js public/
+          cp index.html dashboard.html dashboard_v2.html dashboard_glass.html dashboard-app.js dashboard-logic.js refresh-progress.js trade-review.js public/
       - name: Deploy Worker
         run: npx wrangler@4 deploy
         env:
