@@ -1,4 +1,4 @@
-import {finite,dataStatus} from './dashboard-logic.js?v=20261002-trade-review';
+import {finite,dataStatus} from './dashboard-logic.js?v=20261002-trend-context';
 export function entryReadiness(row,data,now=Date.now()) {
  if(dataStatus(row,data,now))return 'HISTORICAL · WAIT FOR FRESH SCAN';
  if(['TRIGGERED','CONFIRMED'].includes(row.execution_state)&&row.setup_qualified===false)return 'PRICE TRIGGER · SETUP NOT QUALIFIED';
@@ -18,6 +18,18 @@ export function observePremiums(previous,rows,observedAt){
  return Object.fromEntries(Object.entries(result).sort((a,b)=>Date.parse(b[1].lastSeen)-Date.parse(a[1].lastSeen)).slice(0,2000));
 }
 export function premiumChange(o){return o?.firstAsk>0?(o.lastAsk/o.firstAsk-1)*100:null;}
+export function trendSummary(row){
+ const context=row.trend_context||{},periods=context.periods||{};
+ const alignment=['ALIGNED','AGAINST_TREND','MIXED','UNKNOWN'].includes(context.alignment)?context.alignment:'UNKNOWN';
+ return {status:context.status||'UNAVAILABLE',asOf:context.as_of||null,
+  alignment:context.status==='READY'?alignment:'UNKNOWN',
+  periods:[['week','1 week',5],['two_weeks','2 weeks',10],['month','1 month',21]].map(([key,label,sessions])=>{
+   const p=periods[key]||{};return {label,sessions,change:finite(p.change_pct),
+    direction:['UP','DOWN','MIXED'].includes(p.direction)?p.direction:'UNKNOWN',
+    highs:['RISING','FALLING','FLAT'].includes(p.highs)?p.highs:'UNKNOWN',
+    lows:['RISING','FALLING','FLAT'].includes(p.lows)?p.lows:'UNKNOWN'};
+  })};
+}
 export function positionEstimate(t,kind){const q=finite(t[kind]);return q===null?null:(q-t.entry)*t.qty*100-(t.fees||0);}
 export function reentryProblem(t,trades){
  const prior=trades.filter(p=>p.exit!==null&&p.ticker===t.ticker&&p.contract.trim().toUpperCase()===t.contract.trim().toUpperCase()&&Date.parse(p.closedAt||p.time)<=Date.parse(t.time)).sort((a,b)=>Date.parse(b.closedAt||b.time)-Date.parse(a.closedAt||a.time))[0];

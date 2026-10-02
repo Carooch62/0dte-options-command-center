@@ -50,3 +50,11 @@ Cloudflare dispatches the scanner every five minutes at minutes 1, 6, 11, etc. d
 Cards distinguish stale price bars, stale snapshots, missing/failed downloads, and a closed session. The eight-minute freshness limit remains unchanged. When Yahoo returns stale completed bars, the scanner attempts the configured Alpaca feed and uses it only if its completed bar is newer; provider failure preserves the stale label.
 
 Empty contract panels explain chain coverage and overlapping exclusion reasons for contracts within the current price range. Default state sorting favors matching contracts, then scanned chains, within the same execution state. Completed manual scans no longer suppress the next scheduled time slot.
+
+## Longer-term trend context
+
+`trend_context.py` adds completed adjusted daily-bar context over 5, 10 and 21 trading sessions (approximately one week, two weeks and one month). It uses Yahoo adjusted close and applies the close adjustment factor to daily highs/lows. Each horizon reports the adjusted price change and compares the high/low extremes of equal-sized early and recent blocks; the middle session is omitted from the structure comparison for odd-sized horizons. UP requires a positive change plus rising highs and lows; DOWN requires a negative change plus falling highs and lows; other complete horizons are MIXED. All three horizons must agree for overall UP/DOWN context.
+
+Daily bars are included only after their session close plus a conservative 20-minute completion allowance. Missing sessions, missing adjustment data, short histories and stale sources remain explicit. Cards show the daily as-of date and alignment with the current five-minute direction, independently of entry readiness. These fields never change score, ranking, setup qualification, option filters or entry thresholds.
+
+Daily context is cached in `data/trend-cache.json` until the next completed session. Fetches have a bounded time budget and failed sources retain historical context with UNKNOWN alignment and a retry delay. Scan history retains the context for prospective reviews. Cache and context additions are backward compatible with previous dashboard snapshots. Adjustment reference: https://in.help.yahoo.com/kb/adjusted-close-sln28256.html

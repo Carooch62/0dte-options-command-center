@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {entryReadiness,observePremiums,premiumChange,positionEstimate,reentryProblem,positionAlerts,validPlan} from '../trade-review.js';
+import {entryReadiness,trendSummary,observePremiums,premiumChange,positionEstimate,reentryProblem,positionAlerts,validPlan} from '../trade-review.js';
 const now=Date.parse('2026-10-01T18:00:00Z'),stamp='2026-10-01T17:59:00Z';
 const data={generated_at:stamp,market_session:'OPEN',session_open_at:'2026-10-01T13:30:00Z',session_close_at:'2026-10-01T20:00:00Z'};
 test('quality does not turn WATCH into an entry signal; stale triggers stay historical',()=>{
@@ -31,4 +31,10 @@ test('manual risk reminders are based on entered bid and expiration, closed trad
 });
 test('legacy backups remain valid, malformed optional values rejected',()=>{
  assert(validPlan({}));assert(!validPlan({bid:'oops'}));assert(!validPlan({expiry:'2026-02-30'}));assert(!validPlan({confirmationAt:'bad'}));
+});
+test('daily context handles old snapshots, missing horizons and historical source failures',()=>{
+ const old=trendSummary({});assert.equal(old.alignment,'UNKNOWN');assert(old.periods.every(p=>p.change===null));
+ const row={trend_context:{status:'READY',alignment:'AGAINST_TREND',as_of:'2026-10-01',periods:{week:{change_pct:-2,direction:'DOWN',highs:'FALLING',lows:'FALLING'}}}};
+ assert.equal(trendSummary(row).alignment,'AGAINST_TREND');assert.equal(trendSummary(row).periods[0].change,-2);
+ assert.equal(trendSummary({...row,trend_context:{...row.trend_context,status:'SOURCE_FAILURE'}}).alignment,'UNKNOWN');
 });
