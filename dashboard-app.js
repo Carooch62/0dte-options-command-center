@@ -1,6 +1,6 @@
-import {entryReadiness,quoteKey,observePremiums,premiumChange,positionEstimate,reentryProblem,positionAlerts,validPlan} from './trade-review.js?v=20261002-trade-review';
+import {entryReadiness,quoteKey,observePremiums,premiumChange,positionEstimate,reentryProblem,positionAlerts,validPlan} from './trade-review.js?v=20261002-closing-review';
 import {refreshProgress,publishedReceipt,closedReceipt,refreshBlocksNewRequest,publicationCheckExpired,verifiedRefresh} from './refresh-progress.js?v=20261001-opening-bar';
-import {finite,minutes,snapshotUsable,dataStatus,recordedState,matchesState,robinhoodStockUrl,contractExplanation,contractRank,contractShortlist,displayState,selectableContracts,tradePL,validTrade,riskSummary} from './dashboard-logic.js?v=20261002-trade-review';
+import {finite,minutes,snapshotUsable,dataStatus,recordedState,matchesState,robinhoodStockUrl,contractExplanation,contractRank,contractShortlist,displayState,selectableContracts,tradePL,validTrade,riskSummary} from './dashboard-logic.js?v=20261002-closing-review';
 const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const API='https://0dte-options-command-center.h69htk56cq.workers.dev';
 const DATA=location.hostname==='localhost'||location.hostname==='127.0.0.1'?'./data/':'https://raw.githubusercontent.com/Carooch62/0dte-options-command-center/main/data/';

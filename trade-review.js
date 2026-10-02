@@ -1,6 +1,7 @@
 import {finite,dataStatus} from './dashboard-logic.js?v=20261002-trade-review';
 export function entryReadiness(row,data,now=Date.now()) {
  if(dataStatus(row,data,now))return 'HISTORICAL · WAIT FOR FRESH SCAN';
+ if(['TRIGGERED','CONFIRMED'].includes(row.execution_state)&&row.setup_qualified===false)return 'PRICE TRIGGER · SETUP NOT QUALIFIED';
  if(['TRIGGERED','CONFIRMED'].includes(row.execution_state))return 'STOCK TRIGGER RECORDED · VERIFY ENTRY';
  return row.execution_state==='WATCH'?'WATCH · WAITING FOR CONFIRMATION':'WAIT · NO QUALIFYING STOCK SETUP';
 }
