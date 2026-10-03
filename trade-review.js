@@ -1,4 +1,4 @@
-import {finite,dataStatus} from './dashboard-logic.js?v=20261002-trend-context';
+import {finite,dataStatus} from './dashboard-logic.js?v=20261002-trend-filters';
 export function entryReadiness(row,data,now=Date.now()) {
  if(dataStatus(row,data,now))return 'HISTORICAL · WAIT FOR FRESH SCAN';
  if(['TRIGGERED','CONFIRMED'].includes(row.execution_state)&&row.setup_qualified===false)return 'PRICE TRIGGER · SETUP NOT QUALIFIED';
@@ -29,6 +29,26 @@ export function trendSummary(row){
     highs:['RISING','FALLING','FLAT'].includes(p.highs)?p.highs:'UNKNOWN',
     lows:['RISING','FALLING','FLAT'].includes(p.lows)?p.lows:'UNKNOWN'};
   })};
+}
+// These filters describe completed daily context, never live entry readiness.
+export function matchesTrend(row,period='overall',direction='ALL',alignment='ALL',data=null,now=Date.now()){
+ const summary=trendSummary(row);
+ let trend='UNKNOWN';
+ if(['intraday','five_minutes','fifteen_minutes'].includes(period)){
+  if(data&&!dataStatus(row,data,now)){
+   if(period==='intraday')trend=['UP','DOWN','NEUTRAL'].includes(row.direction)?(row.direction==='NEUTRAL'?'FLAT':row.direction):'UNKNOWN';
+   else{const change=finite(period==='five_minutes'?row.move_5m:row.recent_move);trend=change===null?'UNKNOWN':change>0?'UP':change<0?'DOWN':'FLAT';}
+  }
+ }else if(summary.status==='READY'){
+  if(period==='overall'){
+   const directions=summary.periods.map(p=>p.direction);
+   trend=directions.includes('UNKNOWN')?'UNKNOWN':directions.every(d=>d===directions[0])?directions[0]:'MIXED';
+  }else{
+   const index={week:0,two_weeks:1,month:2}[period];
+   trend=summary.periods[index]?.direction||'UNKNOWN';
+  }
+ }
+ return (direction==='ALL'||trend===direction)&&(alignment==='ALL'||summary.alignment===alignment);
 }
 export function positionEstimate(t,kind){const q=finite(t[kind]);return q===null?null:(q-t.entry)*t.qty*100-(t.fees||0);}
 export function reentryProblem(t,trades){
