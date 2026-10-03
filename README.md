@@ -72,3 +72,9 @@ User request recorded October 2, 2026: once enough reliable data has accumulated
 Readiness means enough distinct market sessions and usable, timestamped observations to support chronological training, validation and an untouched test period. Assess source freshness, missingness, contract coverage, spreads and fees, and avoid treating delayed quotes as fills or stock moves as option returns. Do not use an arbitrary trade-count target or assume two winning trades establish readiness.
 
 When ready, build and evaluate a model against the existing rules on unseen sessions, then run it in shadow mode before changing live rankings or entry qualification. Revisit readiness during future session reviews. The scanner remains rule-based until this phase is explicitly implemented and validated.
+
+### Compact Liquid Glass UI
+
+`dashboard_glass.html` shows compact stock cards with last recorded status/time, intraday moves, daily trend summaries and contract shortlist above expandable setup/source details. Candidate filters collapse, active filter chips clear individual controls, and Reset all restores defaults. Independent setup/contract disclosure states survive rerenders. Scanner progress and snapshot freshness share one console; coverage remains expandable.
+
+The prior layout is preserved at `dashboard_glass_previous.html` with its pinned `dashboard-app-previous.js`. It uses the same journal/star storage keys, so switching layouts does not reset recorded trades. Classic retains its existing layout. `dashboard_mobile_preview.html` provides a 390px phone frame for visual review. Scanner rules, ranking, refresh semantics and journal calculations are unchanged.

@@ -1,0 +1,61 @@
+/* Compact Liquid Glass layout; scanner and entry logic are shared. */
+.compact-glass .wrap{max-width:1220px;padding-top:18px}
+.compact-glass .theme-switch{margin-bottom:18px;border-radius:18px}
+.theme-links{display:flex;gap:8px;flex-wrap:wrap}
+.compact-glass .title{font-size:34px}
+.compact-glass .top{padding-bottom:6px}
+.compact-glass .sub{margin:8px 0}
+.section-heading,.board-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.section-heading h2,.board-heading h2{margin:0}
+.quiet-link{font-size:12px;color:#b6dbf7;text-decoration:none}
+.compact-glass .panel{padding:18px;margin:12px 0}
+.compact-glass .scan-panel .controls{margin-top:16px}
+.compact-glass .scan-panel>p{margin:12px 0;font-size:11px}
+.scan-console{border:1px solid #b9dbff35;border-radius:16px;background:#09223b40;margin-top:14px;overflow:hidden}
+.scan-console .refresh-box{border:0;border-radius:0;background:transparent;box-shadow:none;margin:0;padding:14px}
+.scan-console .refresh-message{margin:8px 0}
+.scan-console #freshness .notice{border:0;border-top:1px solid #ffffff20;border-radius:0;background:transparent;margin:0;padding:12px 14px;font-size:11px}
+.coverage-details{margin-top:14px}.coverage-details>summary{font-size:12px;color:#b7cde0;min-height:30px;padding:5px 0}
+.compact-glass .coverage-details .stats{margin:12px 0;grid-template-columns:repeat(3,minmax(0,1fr))}
+.compact-glass .coverage-details .stat{padding:12px;margin:0}
+.compact-glass .coverage-details .stat b{font-size:22px}
+.filter-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;list-style:none;min-height:44px;cursor:pointer}
+.filter-heading::-webkit-details-marker{display:none}
+.filter-heading b{display:block;font-size:16px}
+.filter-heading small{display:block;margin-top:4px;font-size:11px;color:var(--muted);font-weight:400}
+.filter-action{font-size:12px;color:#a9dfff;white-space:nowrap;background:#a6d9ff12;border:1px solid #b9e1ff26;border-radius:12px;padding:8px 10px}
+.filter-action:after{content:' +';font-weight:700}#filterPanel[open] .filter-action:after{content:' −'}
+.compact-glass #filterPanel .filters{margin-top:18px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.filter-chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}.filter-chips:empty{display:none}
+.filter-chip{display:flex;align-items:center;gap:9px;font-size:11px;min-height:36px;padding:7px 10px;border-radius:999px;background:#65bfff18;color:#d9eeff}
+.filter-chip span{font-size:16px;line-height:1;color:#a7d7f6}.filter-reset{min-height:36px;font-size:11px;background:transparent;border-color:transparent;padding:6px 8px;color:#aac9e0}
+.compact-glass .board-panel{background:transparent;border:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;padding:0;margin-top:20px}
+.compact-glass .board-heading{padding:0 2px 14px}
+.compact-glass .candidates{align-items:start;gap:14px}
+.compact-glass .compact-card{padding:17px;background:linear-gradient(140deg,#dcefff10,#0a142b65);border-radius:22px}
+.card-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.ticker-group{display:flex;align-items:center;gap:10px}
+.compact-card .star{width:40px;height:40px;min-height:40px;min-width:40px;padding:0;font-size:20px}
+.compact-card .ticker{font-size:25px}.compact-card .candidate-status{gap:4px}.compact-card .candidate-status>small{font-size:8px;letter-spacing:.1em}
+.status-time{display:flex;justify-content:space-between;gap:6px;flex-wrap:wrap;margin:9px 0 15px;font-size:10px;color:var(--muted)}
+.price-row{display:flex;align-items:center;justify-content:space-between;gap:10px}.compact-card .price{font-size:30px}.price-change{display:flex;flex-direction:column;align-items:flex-end;gap:4px}.price-change>b{font-size:10px;letter-spacing:.08em;color:#c2d8ed}.price-change>span{font-size:11px}
+.quick-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:14px 0}
+.quick-metrics>div{background:#05142632;border:1px solid #c9e8ff1c;border-radius:12px;padding:10px}.quick-metrics small{display:block;font-size:8px;letter-spacing:.08em;color:#a9c4da}.quick-metrics b{display:block;margin-top:5px;font-size:14px}
+.trend-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;padding:12px 0;border-top:1px solid #ffffff17;border-bottom:1px solid #ffffff17}
+.trend-strip>div{display:flex;flex-wrap:wrap;align-items:center;gap:5px 8px}.trend-strip small{font-size:9px;color:#a8c7df}.trend-strip b{font-size:12px}.trend-strip>div>span{display:block;width:100%;font-size:8px;letter-spacing:.07em;color:#bbcddd}
+.trend-caption{font-size:10px;line-height:1.5;color:#b2cde1;margin:8px 0 12px}
+.compact-card .details{border-top:1px solid #ffffff1a;margin-top:0;padding-top:0}
+.compact-card .details>summary{list-style:none;position:relative;padding:13px 22px 13px 0;font-size:12px;color:#e2effb;min-height:48px}
+.compact-card .details>summary::-webkit-details-marker{display:none}
+.compact-card .details>summary:after{content:'+';position:absolute;right:1px;top:14px;font-size:18px;color:#9bc5e7}
+.compact-card .details[open]>summary:after{content:'−'}
+.contract-details summary>small{font-size:8px;letter-spacing:.1em;color:#aec7dc}
+.contract-preview{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin:7px 0}.contract-preview>b{font-size:14px}.contract-preview>span:not(.tag){font-size:11px;color:#bfd1e2;line-height:1.6}
+.disclosure-hint{display:block;color:#96b7d3;font-size:10px;font-weight:400;margin-top:4px}
+.compact-card .setup-details .levels{grid-template-columns:repeat(3,minmax(0,1fr))}
+.compact-card .trend-context .metrics{grid-template-columns:repeat(3,minmax(0,1fr))}
+.compact-card .trend-context{padding:10px;margin:12px 0}
+.compact-card .trend-context .metric{padding:8px}
+.card-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:6px;border-top:1px solid #ffffff17}
+.card-footer .broker-link{font-size:12px;margin:7px 0 0;min-height:44px}.card-footer>small{font-size:9px;line-height:1.5;color:#96b7d3;max-width:100px}
+@media(max-width:900px){.compact-glass .candidates{grid-template-columns:1fr}}
+@media(max-width:650px){.compact-glass .wrap{padding:12px 12px 40px}.compact-glass .theme-switch{padding:9px 10px;margin-bottom:12px}.compact-glass .theme-switch span{font-size:10px}.theme-links{gap:6px}.compact-glass .theme-switch a{padding:5px 8px;min-height:32px;font-size:10px}.compact-glass .title{font-size:28px}.compact-glass .top{display:block}.compact-glass .clock{display:block;font-size:10px;padding:5px 0;border:0;background:transparent;margin:8px 0 0;text-align:left}.compact-glass .clock>b,.compact-glass .clock>div{display:inline}.compact-glass .clock>div:before{content:' · '}.compact-glass .panel{padding:14px;border-radius:18px}.compact-glass .compact-card{padding:14px;border-radius:19px}.compact-glass .sub{font-size:12px}.section-heading h2{font-size:16px}.compact-glass .scan-panel .controls{display:grid;grid-template-columns:1fr 1fr;gap:8px}.compact-glass .scan-panel .controls .primary{grid-row:1;grid-column:1}.compact-glass .scan-panel .controls .secondary{grid-row:1;grid-column:2}.compact-glass .controls button{font-size:11px;padding:9px 7px}.compact-glass .scan-panel .controls label{display:flex;align-items:center;gap:8px;grid-column:1;font-size:10px}.compact-glass .scan-panel .controls label select{min-height:36px;width:75px;padding:5px}.compact-glass .scan-panel .controls>a{text-align:right;font-size:10px}.compact-glass #filterPanel .filters{grid-template-columns:1fr 1fr;gap:10px}.compact-glass .filters label small{font-size:10px}.compact-glass .filters select{font-size:11px;padding:8px;min-width:0}.compact-glass .filter-heading small{font-size:10px}.compact-glass .filter-action{font-size:10px}.compact-glass .coverage-details .stats{gap:7px}.compact-glass .coverage-details .stat span{font-size:8px}.compact-glass .coverage-details .stat b{font-size:21px}.card-footer>small{max-width:90px}.compact-card .tag{font-size:9px;padding:5px 8px}.compact-glass .board-panel{padding:0}.compact-card .trend-context .row .tag{font-size:8px}.compact-card .trend-context .metric small{font-size:8px}.compact-card .trend-context .metric b{font-size:12px}.compact-card .trend-context .metrics{gap:4px}.compact-card .trend-context .metric{padding:6px}.compact-card .trend-context .row>b{font-size:12px}}
