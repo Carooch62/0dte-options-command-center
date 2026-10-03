@@ -64,3 +64,11 @@ Daily context is cached in `data/trend-cache.json` until the next completed sess
 Both dashboard themes support a trend timeframe (intraday direction, 5-/15-minute movement, or daily 5, 10 and 21 sessions), direction (rising, falling, flat, mixed or unavailable/stale), and all-horizon alignment with the scan direction. Filters combine with the existing state, direction, catalyst and contract filters. Defaults include every trend; stale or missing daily sources cannot pass directional/alignment filters. Filtering does not change scanner scores or entry qualification.
 
 Price and volume patterns are central research inputs: the current scanner measures signed 5/15-minute momentum, volume burst/acceleration, VWAP relationships, triggers, invalidation, chase risk and second-wave development. Longer-term adjusted high/low structure complements those inputs and is recorded prospectively. Evaluate alignment groups across multiple sessions using timestamped observations, source coverage and bid/ask costs before adding daily-trend score weights or hard gates. Stock moves, isolated winning trades and delayed marks do not establish executable option returns.
+
+### Planned machine-learning phase
+
+User request recorded October 2, 2026: once enough reliable data has accumulated, set up machine learning for the Command Center. This is an explicit project goal, not just an optional suggestion.
+
+Readiness means enough distinct market sessions and usable, timestamped observations to support chronological training, validation and an untouched test period. Assess source freshness, missingness, contract coverage, spreads and fees, and avoid treating delayed quotes as fills or stock moves as option returns. Do not use an arbitrary trade-count target or assume two winning trades establish readiness.
+
+When ready, build and evaluate a model against the existing rules on unseen sessions, then run it in shadow mode before changing live rankings or entry qualification. Revisit readiness during future session reviews. The scanner remains rule-based until this phase is explicitly implemented and validated.
