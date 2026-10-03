@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {entryReadiness,trendSummary,observePremiums,premiumChange,positionEstimate,reentryProblem,positionAlerts,validPlan} from '../trade-review.js';
+import {entryReadiness,trendSummary,matchesTrend,observePremiums,premiumChange,positionEstimate,reentryProblem,positionAlerts,validPlan} from '../trade-review.js';
 const now=Date.parse('2026-10-01T18:00:00Z'),stamp='2026-10-01T17:59:00Z';
 const data={generated_at:stamp,market_session:'OPEN',session_open_at:'2026-10-01T13:30:00Z',session_close_at:'2026-10-01T20:00:00Z'};
 test('quality does not turn WATCH into an entry signal; stale triggers stay historical',()=>{
@@ -37,4 +37,40 @@ test('daily context handles old snapshots, missing horizons and historical sourc
  const row={trend_context:{status:'READY',alignment:'AGAINST_TREND',as_of:'2026-10-01',periods:{week:{change_pct:-2,direction:'DOWN',highs:'FALLING',lows:'FALLING'}}}};
  assert.equal(trendSummary(row).alignment,'AGAINST_TREND');assert.equal(trendSummary(row).periods[0].change,-2);
  assert.equal(trendSummary({...row,trend_context:{...row.trend_context,status:'SOURCE_FAILURE'}}).alignment,'UNKNOWN');
+});
+
+test('trend filters separate horizon direction from all-horizon alignment',()=>{
+ const row={trend_context:{status:'READY',alignment:'MIXED',periods:{week:{direction:'UP'},two_weeks:{direction:'DOWN'},month:{direction:'DOWN'}}}};
+ assert(matchesTrend(row));
+ assert(matchesTrend(row,'week','UP','MIXED'));
+ assert(matchesTrend(row,'month','DOWN'));
+ assert(matchesTrend(row,'overall','MIXED'));
+ assert(!matchesTrend(row,'overall','DOWN'));
+ assert(!matchesTrend(row,'month','DOWN','ALIGNED'));
+ const aligned={trend_context:{status:'READY',alignment:'ALIGNED',periods:{week:{direction:'DOWN'},two_weeks:{direction:'DOWN'},month:{direction:'DOWN'}}}};
+ assert(matchesTrend(aligned,'overall','DOWN','ALIGNED'));
+ assert(!matchesTrend(aligned,'week','UP'));
+});
+test('stale, failed and partial daily context cannot pass directional or alignment filters',()=>{
+ for(const status of ['STALE','SOURCE_FAILURE','INSUFFICIENT_HISTORY']){
+  const row={trend_context:{status,alignment:'ALIGNED',periods:{week:{direction:'DOWN'},two_weeks:{direction:'DOWN'},month:{direction:'DOWN'}}}};
+  assert(matchesTrend(row,'week','UNKNOWN','UNKNOWN'));
+  assert(!matchesTrend(row,'week','DOWN'));
+  assert(!matchesTrend(row,'overall','ALL','ALIGNED'));
+ }
+ assert(matchesTrend({},'overall','UNKNOWN','UNKNOWN'));
+ assert(!matchesTrend({trend_context:{status:'READY',periods:{week:{direction:'UP'}}}},'overall','UP'));
+});
+
+test('intraday trend filters use signed movement and reject stale or missing data',()=>{
+ const row={direction:'DOWN',move_5m:-.2,recent_move:.1,bar_end:stamp};
+ assert(matchesTrend(row,'intraday','DOWN','ALL',data,now));
+ assert(matchesTrend(row,'five_minutes','DOWN','ALL',data,now));
+ assert(matchesTrend(row,'fifteen_minutes','UP','ALL',data,now));
+ assert(!matchesTrend(row,'five_minutes','UP','ALL',data,now));
+ assert(matchesTrend({...row,move_5m:0},'five_minutes','FLAT','ALL',data,now));
+ assert(matchesTrend({...row,move_5m:null},'five_minutes','UNKNOWN','ALL',data,now));
+ assert(matchesTrend(row,'intraday','UNKNOWN','ALL',data,now+600000));
+ assert(!matchesTrend(row,'intraday','DOWN','ALL',data,now+600000));
+ assert(!matchesTrend(row,'intraday','DOWN'));
 });
