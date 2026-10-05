@@ -37,6 +37,8 @@ Cloudflare deploy bundles only browser files under `public/`. The Worker and Git
 
 `data/option-observations.json` records immutable signal-time asks and inputs; later bids produce gross quoted markouts at approximately 5, 15 and 30 minutes, with observed elapsed time. Unknown quote timing stays explicitly unverified. Sampled best/worst exit bids cannot establish intrabar excursion. No fill, net simulated profit, or live edge is inferred. Last 2,000 observations and 200 state snapshots are retained.
 
+Prospective state snapshots also retain signed 15-/30-/60-minute movement (`recent_move` is the 15-minute field), invalidation price, chase risk and the second-wave event reason. Older snapshots without these fields remain unknown; do not reconstruct them from later scans. These reporting fields do not change eligibility or scores.
+
 The journal stores entered fills, open/closed positions, quantity, and total fees in browser storage. P/L uses entered fees; export/import JSON provides portable backup. Optional per-trade premium, daily loss, total open premium, time-stop, and broker close-out reminders are user-defined and initially unset. They act only on locally recorded positions and do not submit or close orders.
 
 ## Verified release checks

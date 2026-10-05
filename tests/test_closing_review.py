@@ -50,6 +50,9 @@ class ClosingReviewTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / 'history.json'
             data = {'candidates': [{'ticker': 'JD', 'score': 2.5, 'previous_close': 26.37,
+                    'recent_move': -.4, 'move_30m': -.7, 'move_60m': -1.2,
+                    'invalidation_price': 26.4, 'chase_risk': 'HIGH',
+                    'second_wave_event': 'DIRECTION_CHANGE',
                     'previous_close_source': 'PROVIDER_PREVIOUS_CLOSE', 'chain_attempted': True,
                     'options': [{'contract_id': 'JD-put', 'side': 'put', 'volume': 100,
                                  'preferred_price': False, 'rejection_reasons': ['WIDE_SPREAD']}]}]}
@@ -59,3 +62,7 @@ class ClosingReviewTests(unittest.TestCase):
             self.assertEqual(row['contract_count'], 1)
             self.assertEqual(row['default_price_rejection_count'], 1)
             self.assertEqual(row['contract_rejections'], {'WIDE_SPREAD': 1})
+            self.assertEqual([row[k] for k in ('recent_move', 'move_30m', 'move_60m')], [-.4, -.7, -1.2])
+            self.assertEqual(row['invalidation_price'], 26.4)
+            self.assertEqual(row['chase_risk'], 'HIGH')
+            self.assertEqual(row['second_wave_event'], 'DIRECTION_CHANGE')
