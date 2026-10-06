@@ -1,1 +1,1 @@
-{"updated_at":"2026-10-05T20:23:15.564940+00:00","run_id":"37367916293","request_id":null,"status":"DEGRADED","stage":"VALIDATED","coverage":{"stocks_configured":207,"stocks_received":205,"chains_attempted":76,"chain_status_counts":{"NO_EXPIRATION_TODAY":59,"SOURCE_FAILURE":4,"EMPTY_UNVERIFIED":5,"SUCCESS":8},"chains_with_contracts":8,"chains_not_attempted":129},"core_missing":[],"scan_id":"37367916293"}
+{"updated_at":"2026-10-06T01:37:51.331381+00:00","run_id":"37400104437","request_id":null,"status":"CLOSED","stage":"MARKET_CALENDAR"}
