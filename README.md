@@ -80,3 +80,39 @@ When ready, build and evaluate a model against the existing rules on unseen sess
 `dashboard_glass.html` shows compact stock cards with last recorded status/time, intraday moves, daily trend summaries and contract shortlist above expandable setup/source details. Candidate filters collapse, active filter chips clear individual controls, and Reset all restores defaults. Independent setup/contract disclosure states survive rerenders. Scanner progress and snapshot freshness share one console; coverage remains expandable.
 
 The prior layout is preserved at `dashboard_glass_previous.html` with its pinned `dashboard-app-previous.js`. It uses the same journal/star storage keys, so switching layouts does not reset recorded trades. Classic retains its existing layout. `dashboard_mobile_preview.html` provides a 390px phone frame for visual review. Scanner rules, ranking, refresh semantics and journal calculations are unchanged.
+# Daily research retention and entry plans (2026-10-05)
+
+`data/archive/YYYY-MM-DD/` uses America/New_York dates. Each retained scan is
+stored once as a compressed JSON file under `scans/`; daily compressed option
+observations retain events after they leave the rolling file and accept later
+markout updates. Per-run health and matching receipts are under `receipts/`.
+Python example: `json.loads(gzip.decompress(path.read_bytes()))`.
+
+The first upgraded run backfills only history and observations still retained;
+it cannot recover earlier missing scans. These archives are partial research
+records, not complete exchange data. Quote timing, spreads, fees and missing
+markouts retain their original limitations. No fills or browser-local journal
+data are uploaded. Distinct-session coverage and trustworthy timestamps must
+be audited before chronological model training, validation and an untouched
+test period; then compare a frozen model with the existing rules in shadow mode.
+
+After archival, successful scans retain the latest 50 snapshots in the live
+history file. Its previous 200-row file had reached approximately 81 MiB and
+generated GitHub large-file warnings. Daily archives have no automatic expiry;
+monitor total repository growth. Archives are written before pruning live data.
+
+The candidate footer now displays setup readiness, bar age, chase risk and
+invalidation beside the broker link. An optional device-local plan records
+contract, intended premium, maximum planned dollar loss and exit condition.
+Its quote-check acknowledgement expires when the scan changes. It does not
+place orders, create fills or promote WATCH into a qualified setup.
+
+Publication-gap investigation: [run 37363416403](https://github.com/Carooch62/0dte-options-command-center/actions/runs/37363416403)
+(19:26–19:41 UTC) and [run 37366654487](https://github.com/Carooch62/0dte-options-command-center/actions/runs/37366654487)
+(19:56–20:11 UTC) on October 5 ended with no runner name and no recorded steps.
+The successful intervening run started executing at 19:51:51 UTC and published
+at 19:52:36 UTC. This supports a runner-start/publication problem rather than a
+confirmed market-data fetch failure; the upstream cause is unknown. The Worker
+now exposes runner waiting/failure notes and logs the unfinished run blocking
+scheduled dispatch. No automatic cancellation, score or trading-filter changes
+are made in response to this one session.

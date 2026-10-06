@@ -166,7 +166,7 @@ class ReliabilityTests(unittest.TestCase):
             receipt=root/'data/scan-receipts.json';receipt.write_text('[{"scan_id":"previous"}]')
             def build(*args,**kwargs):
                 stage=Path(kwargs['cwd'])/'data'
-                for name in pipeline.FILES:(stage/name).write_text('{}')
+                for name in pipeline.FILES:(stage/name).write_text('[]' if name in ('scan-history.json','option-observations.json') else '{}')
                 (stage/'market-dashboard.json').write_text(json.dumps({'scan_id':'requested','generated_at':'now','coverage':{'stocks_received':206}}))
             with patch.object(pipeline,'ROOT',root),patch.object(pipeline,'session_info',return_value={'session':'OPEN'}),patch.object(pipeline.subprocess,'run',side_effect=build),patch.object(pipeline,'validate',return_value={'status':'SUCCESS'}):
                 self.assertEqual(pipeline.run(),0)

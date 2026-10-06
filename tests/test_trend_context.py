@@ -102,7 +102,7 @@ class TrendContextTests(unittest.TestCase):
                 stage = Path(cwd) / 'data'
                 if command[-1].endswith('scanner.py'):
                     for name in pipeline.FILES:
-                        (stage / name).write_text('{}')
+                        (stage / name).write_text('[]' if name in ('scan-history.json','option-observations.json') else '{}')
                     (stage / 'market.json').write_text(json.dumps({'candidates': [{'ticker': 'JD'}]}))
                     (stage / 'market-dashboard.json').write_text(json.dumps({'scan_id': 'test', 'coverage': {}, 'generated_at': NOW.isoformat()}))
                 if command[-1].endswith('trend_context.py'):
