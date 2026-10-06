@@ -35,7 +35,7 @@ Cloudflare deploy bundles only browser files under `public/`. The Worker and Git
 
 ## Feedback, limits, and backup
 
-`data/option-observations.json` records immutable signal-time asks and inputs; later bids produce gross quoted markouts at approximately 5, 15 and 30 minutes, with observed elapsed time. Unknown quote timing stays explicitly unverified. Sampled best/worst exit bids cannot establish intrabar excursion. No fill, net simulated profit, or live edge is inferred. Last 2,000 observations and 200 state snapshots are retained.
+`data/option-observations.json` records immutable signal-time asks and inputs; later bids produce gross quoted markouts at approximately 5, 15 and 30 minutes, with observed elapsed time. Unknown quote timing stays explicitly unverified. Sampled best/worst exit bids cannot establish intrabar excursion. No fill, net simulated profit, or live edge is inferred. The rolling files retain the latest 2,000 observations and 50 state snapshots; daily archives preserve previously archived records.
 
 Prospective state snapshots also retain signed 15-/30-/60-minute movement (`recent_move` is the 15-minute field), invalidation price, chase risk and the second-wave event reason. Older snapshots without these fields remain unknown; do not reconstruct them from later scans. These reporting fields do not change eligibility or scores.
 
@@ -116,3 +116,6 @@ confirmed market-data fetch failure; the upstream cause is unknown. The Worker
 now exposes runner waiting/failure notes and logs the unfinished run blocking
 scheduled dispatch. No automatic cancellation, score or trading-filter changes
 are made in response to this one session.
+
+### Observation context (2026-10-06)
+New option observations preserve signal-time qualification, execution readiness, chase risk, VWAP, signed 15-minute movement, volume ratio, invalidation, second-wave reason and daily trend context. A TRIGGERED observation is not necessarily a qualified setup. Missing fields in older observations remain unknown; no historical values are backfilled from later scans. This reporting change does not alter observation selection or trading rules.

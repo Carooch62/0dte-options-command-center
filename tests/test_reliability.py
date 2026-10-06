@@ -179,9 +179,17 @@ class ReliabilityTests(unittest.TestCase):
     def test_observations_are_immutable_and_markouts_labeled(self):
         d=snapshot(row());x=d['candidates'][0];x['execution_state']='TRIGGERED';x['preferred_contracts']=[option(option_timestamp=None,payload_timestamp='first')]
         with tempfile.TemporaryDirectory() as t:
+            x.update(setup_qualified=False, chase_risk='HIGH', vwap=101,
+                     trend_context={'overall_direction':'UP','alignment':'AGAINST_TREND'})
             p=str(Path(t)/'observations.json');update(d,p)
             later=copy.deepcopy(d);later['generated_at']=(NOW+timedelta(minutes=5)).isoformat();later['scan_id']='later'
+            later['candidates'][0].update(setup_qualified=True, chase_risk='LOW', vwap=102, trend_context={'overall_direction':'DOWN'})
             later['candidates'][0]['options']=[option(bid=.30,ask=.32,option_timestamp=None,payload_timestamp='second')]
             update(later,p);event=json.loads(Path(p).read_text())[0]
             self.assertEqual(event['entry_ask'],.25);self.assertEqual(event['markouts']['5']['gross_quote_change_per_contract'],5)
             self.assertFalse(event['markouts']['5']['timing_verified'])
+
+            self.assertFalse(event['signal_inputs']['setup_qualified'])
+            self.assertEqual(event['signal_inputs']['chase_risk'],'HIGH')
+            self.assertEqual(event['signal_inputs']['vwap'],101)
+            self.assertEqual(event['signal_inputs']['trend_context']['alignment'],'AGAINST_TREND')
