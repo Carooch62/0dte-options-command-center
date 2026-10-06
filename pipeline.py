@@ -8,6 +8,7 @@ import sys
 import tempfile
 from datetime import datetime, timezone, timedelta
 from market_clock import session_info
+from scan_archive import archive_research, archive_receipt
 
 ROOT=Path(__file__).resolve().parent
 FILES=('market.json','market-dashboard.json','scan-history.json','feedback.json','option-observations.json','trend-cache.json')
@@ -32,6 +33,9 @@ def run():
     health={'updated_at':datetime.now(timezone.utc).isoformat(),'run_id':os.getenv('GITHUB_RUN_ID'),
             'request_id':os.getenv('SCAN_REQUEST_ID') or None,'status':'RUNNING'}
     try:
+        if (dest/'scan-history.json').exists() and (dest/'option-observations.json').exists():
+            health['stage']='ARCHIVE_EXISTING'
+            archive_research(dest, dest/'archive')
         now=datetime.now(timezone.utc)
         info=session_info(now)
         first_bar_at=datetime.fromisoformat(info['open_at'])+timedelta(minutes=5) if info.get('open_at') else None
@@ -78,6 +82,11 @@ def run():
                     cache_path=stage/'data/trend-cache.json'
                     if not cache_path.exists():cache_path.write_text('{}')
             health.update(validate(stage))
+            health['stage']='ARCHIVE'
+            archive_research(stage/'data', dest/'archive')
+            # The complete retained history is archived before bounding the live file.
+            history_path=stage/'data/scan-history.json'
+            history_path.write_text(json.dumps(json.loads(history_path.read_text())[-50:],separators=(',',':')))
             snapshot=json.loads((stage/'data/market-dashboard.json').read_text())
             receipt_path=dest/'scan-receipts.json'
             try: receipts=json.loads(receipt_path.read_text())
@@ -95,6 +104,11 @@ def run():
         return 1
     finally:
         health['updated_at']=datetime.now(timezone.utc).isoformat()
+        try:
+            receipt_path=dest/'scan-receipts.json'
+            archive_receipt(dest/'archive', health, json.loads(receipt_path.read_text()) if receipt_path.exists() else [])
+        except Exception as exc:
+            health['archive_error']=f'{type(exc).__name__}: {str(exc)[:180]}'
         (dest/'scan-health.json').write_text(json.dumps(health,separators=(',',':')))
         print(json.dumps(health))
 

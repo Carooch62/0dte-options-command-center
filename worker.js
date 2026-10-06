@@ -23,7 +23,11 @@ export async function scheduledScan(env,now=new Date()) {
   if(!regularWeekday(now))return 'outside-session';
   if(!env.GITHUB_TOKEN)throw Error('Refresh service is not configured');
   const d=await api(`actions/workflows/${WORKFLOW}/runs?branch=main&per_page=30`,env);
-  if(d.workflow_runs.some(r=>r.status!=='completed'))return 'already-running';
+  const unfinished=d.workflow_runs.find(r=>r.status!=='completed');
+  if(unfinished){
+    console.log(JSON.stringify({scheduler:'blocked-by-unfinished-run',run_id:unfinished.id,status:unfinished.status,created_at:unfinished.created_at,age_minutes:(now-Date.parse(unfinished.created_at))/60000}));
+    return 'already-running';
+  }
   const id='scheduled-'+Math.floor(now.getTime()/300000);
   if(d.workflow_runs.some(r=>r.display_title?.startsWith(`Scan ${id} (`)))return 'already-requested';
   await api(`actions/workflows/${WORKFLOW}/dispatches`,env,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ref:'main',inputs:{scan_mode:'manual',request_id:id}})});
@@ -45,10 +49,15 @@ export default {
         const d=await api(`actions/workflows/${WORKFLOW}/runs?branch=main&per_page=30`,env);
         const run=id?d.workflow_runs.find(r=>r.display_title?.startsWith(`Scan ${id} (`)):d.workflow_runs[0];
         const latestRun=run?{id:run.id,status:run.status,conclusion:run.conclusion,url:run.html_url,createdAt:run.created_at,steps:[]}:null;
-        if(run&&id){
+        if(run){
           try{
             const jobs=await api(`actions/runs/${run.id}/jobs?filter=latest&per_page=10`,env);
-            latestRun.steps=(jobs.jobs?.find(j=>j.name==='scan')?.steps||[]).map(s=>({name:s.name,status:s.status,conclusion:s.conclusion,startedAt:s.started_at,completedAt:s.completed_at}));
+            const job=jobs.jobs?.find(j=>j.name==='scan');
+            latestRun.steps=(job?.steps||[]).map(s=>({name:s.name,status:s.status,conclusion:s.conclusion,startedAt:s.started_at,completedAt:s.completed_at}));
+            latestRun.runnerAssigned=!!job?.runner_name;
+            latestRun.waitingForRunner=run.status!=='completed'&&!job?.runner_name&&!latestRun.steps.length;
+            latestRun.ageMinutes=Math.max(0,(Date.now()-Date.parse(run.created_at))/60000);
+            latestRun.publicationNote=latestRun.waitingForRunner?'Waiting for a GitHub runner; scheduled requests are skipped while this run is unfinished.':run.status==='completed'&&!job?.runner_name&&!latestRun.steps.length?'Run ended without an assigned runner or recorded scan steps; no new snapshot was produced.':null;
           }catch(e){latestRun.stepError=e.message;}
         }
         return response({ok:true,version:VERSION,request_id:id,latestRun},200,request);
