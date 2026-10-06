@@ -101,11 +101,11 @@ function renderRefresh(){
  if(r?.unverified){for(const step of steps)if(step.state==='active'||step.state==='waiting'){step.state='unverified';step.detail='Publication could not be verified';}steps.at(-1).label='Check ended';}
  const elapsed=r?Math.max(0,Math.floor(((r.finished||Date.now())-r.started)/1000)):0;
  let message=r?.message||'Ready to refresh. Live progress will appear here.';
- if(!active&&schedulerRun?.publicationNote)message=schedulerRun.publicationNote;
- if(active?.run?.publicationNote)message=active.run.publicationNote;
  if(r?.receipt){const c=r.receipt.coverage||{};message=`Refresh completed. Published ${time(r.receipt.generated_at)} · ${c.stocks_received??'—'} stock rows · ${c.chains_attempted??'—'} chain checks.${data?.scan_id!==r.id?' Newer results are already displayed.':''}`;}
  if(r?.closed)message='Market closed · refresh finished. The last scan and its recorded statuses are retained.';
  if(r?.waiting)message=`Waiting for the first completed five-minute market bar${r.waiting.retry_after?' at '+time(r.waiting.retry_after):''}. This request finished without new market data. The next scheduled scan will try again; the last snapshot is retained.`;
+ if(!active&&schedulerRun?.publicationNote)message=schedulerRun.publicationNote;
+ if(active?.run?.publicationNote)message=active.run.publicationNote;
  const current=steps.find(s=>s.state==='active'),title=r?.unverified?'Run finished · data not verified':r?.waiting?'Waiting for first bar':r?.closed?'Market closed':r?.receipt?'Refresh complete':r?.failed?'Refresh interrupted':current?.label||'Scanner updates';
  $('scanProgress').innerHTML=`<div class="refresh-box ${r?.failed?'failed':r?.finished?'finished':''}" role="status" aria-live="polite"><div class="row"><b>${esc(title)}</b><small>${r?.finished?'Finished':active?'In progress':'Ready'}</small></div><p class="refresh-message">${esc(message)}</p>${steps.length?`<ol class="refresh-timeline">${steps.map(s=>`<li class="${s.state}" ${s.state==='active'?'aria-current="step"':''} title="${esc(s.detail)}"><span>${s.state==='done'?'✓':s.state==='failed'?'!':s.state==='skipped'?'—':s.state==='active'?'●':'○'}</span> ${esc(s.label)}${s.state==='skipped'?' (skipped)':''}</li>`).join('')}</ol>`:''}${current?.detail?`<p class="smallnote">${esc(current.detail)}</p>`:''}<div class="smallnote">${r?`Requested ${esc(time(r.started))} · ${Math.floor(elapsed/60)}m ${elapsed%60}s${r.run?.url?` · <a href="${esc(r.run.url)}" target="_blank" rel="noopener">View run</a>`:''}`:''}${reloadMessage?`<br>${esc(reloadMessage)}`:''}${backendHealth?`<br>Latest scanner result: ${esc(backendHealth.status)} · ${esc(time(backendHealth.updated_at))}${backendHealth.error?' · '+esc(backendHealth.error):''}`:''}</div></div>`;
 }
