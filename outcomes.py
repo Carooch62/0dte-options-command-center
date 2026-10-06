@@ -1,5 +1,6 @@
 """Prospective, immutable signal observations; quoted markouts are not fills."""
 import json
+from copy import deepcopy
 from pathlib import Path
 from datetime import datetime, timezone
 from quality import parse_time, valid_quote, ET
@@ -42,7 +43,14 @@ def update(data, path='data/option-observations.json'):
                 'quote_timestamp':o.get('option_timestamp'),'source_timestamp':o.get('payload_timestamp') or o.get('option_timestamp'),
                 'stock_price':x['price'],'trigger':x.get('trigger_price'),'state':x.get('execution_state'),
                 'signal_inputs':{'direction':x.get('direction'),'move_5m':x.get('move_5m'),'volume_acceleration':x.get('volume_acceleration'),
-                                 'catalyst':x.get('catalyst_level'),'quote_source':o.get('source')},'markouts':{}})
+                                 'catalyst':x.get('catalyst_level'),'quote_source':o.get('source'),
+                                 'setup_qualified':x.get('setup_qualified'),
+                                 'execution_readiness':x.get('execution_readiness'),
+                                 'chase_risk':x.get('chase_risk'),'vwap':x.get('vwap'),
+                                 'recent_move':x.get('recent_move'),'volume_ratio':x.get('volume_ratio'),
+                                 'invalidation_price':x.get('invalidation_price'),
+                                 'second_wave_event':x.get('second_wave_event'),
+                                 'trend_context':deepcopy(x.get('trend_context'))},'markouts':{}})
             active.add(cid)
     events=events[-2000:]
     p.write_text(json.dumps(events,separators=(',',':'),allow_nan=False))
