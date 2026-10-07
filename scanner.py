@@ -301,6 +301,7 @@ def fetch_cboe(t):
                     'greeks_verified':delta is not None and gamma is not None and delta != 0 and gamma >= 0,
                     'expiry':exp.isoformat(),'dte':(exp-today).days,'source':'CBOE delayed (15m)',
                     'option_timestamp':None, 'payload_timestamp':payload.get('timestamp'),
+                    'last_trade_time':row.get('last_trade_time'),
                     'received_at':datetime.now(timezone.utc).isoformat(), 'minimum_delay_minutes':15,
                     'timestamp_basis':'PAYLOAD_TIME_NOT_QUOTE_TIME'})
     if not expiries: raise ValueError('no parsable expirations')

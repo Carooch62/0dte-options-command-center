@@ -340,6 +340,23 @@ def enrich(data, previous=None):
     return data
 
 
+def contract_evidence(candidate):
+    """Bounded filter-selected sample, including candidates without entry signals."""
+    rows = []; seen = set()
+    for option in candidate.get('preferred_contracts', [])[:3] + candidate.get('options', [])[:3]:
+        cid = option.get('contract_id')
+        if not cid or cid in seen:
+            continue
+        seen.add(cid)
+        fields = ('contract_id', 'expiry', 'side', 'strike', 'bid', 'ask', 'spread', 'spread_pct',
+                  'delta', 'theta', 'theta_available', 'volume', 'source', 'option_timestamp',
+                  'payload_timestamp', 'received_at', 'last_trade_time', 'timestamp_basis',
+                  'minimum_delay_minutes', 'rejection_reasons')
+        rows.append({key: option.get(key) for key in fields})
+    return {'selection': 'Up to three preferred plus first three returned contracts; filter-selected, not full-chain coverage',
+            'contracts': rows}
+
+
 def update_history(data, path="data/scan-history.json", limit=200):
     p = Path(path)
     try:
@@ -390,6 +407,7 @@ def update_history(data, path="data/scan-history.json", limit=200):
                 "bar_timestamp": x.get("bar_timestamp"),
                 "bar_end": x.get("bar_end"),
                 "last_status": x.get("last_status"),
+                "contract_evidence": contract_evidence(x),
                 "setup_qualified": x.get("setup_qualified"),
                 "qualification_checks": x.get("qualification_checks"),
                 "qualification_reasons": x.get("qualification_reasons"),

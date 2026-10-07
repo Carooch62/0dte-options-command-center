@@ -176,6 +176,16 @@ class ReliabilityTests(unittest.TestCase):
                     self.assertEqual(pipeline.run(),1)
                 self.assertEqual(receipt.read_text(),saved)
 
+    def test_pass_contract_evidence_preserves_unknown_quote_time(self):
+        x=row(execution_state='PASS',preferred_contracts=[])
+        x['options'][0].update(option_timestamp=None,last_trade_time='2026-09-30T09:30:00',payload_timestamp='payload',theta=-.02)
+        sample=execution_engine.contract_evidence(x)
+        self.assertEqual(len(sample['contracts']),1)
+        self.assertIsNone(sample['contracts'][0]['option_timestamp'])
+        self.assertEqual(sample['contracts'][0]['theta'],-.02)
+        self.assertEqual(sample['contracts'][0]['last_trade_time'],'2026-09-30T09:30:00')
+        self.assertIn('filter-selected',sample['selection'])
+
     def test_qualification_reasons_explain_existing_gates(self):
         d=normalize(snapshot(row(news_items=[],move_5m=.01,volume_ratio=.5,volume_acceleration=.5)),NOW)
         x=d['candidates'][0]

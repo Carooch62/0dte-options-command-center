@@ -30,6 +30,8 @@ def update(data, path='data/option-observations.json'):
                 'exit_bid':quote['bid'],'exit_ask':quote.get('ask'),
                 'quote_timestamp':quote.get('option_timestamp'),'source_timestamp':quote.get('payload_timestamp'),
                 'spread':quote.get('spread'),'spread_pct':quote.get('spread_pct'),
+                'received_at':quote.get('received_at'),'last_trade_time':quote.get('last_trade_time'),
+                'timestamp_basis':quote.get('timestamp_basis'),
                 'gross_quote_change_per_contract':round((quote['bid']-event['entry_ask'])*100,2),
                 'timing_verified':verified,'interpretation':'QUOTED_MARKOUT_NOT_A_FILL' if verified else 'UNVERIFIED_QUOTE_TIMING',
                 'fees_included':False}
@@ -45,6 +47,8 @@ def update(data, path='data/option-observations.json'):
                 'entry_ask':o['ask'],'entry_bid':o['bid'],'volume':o.get('volume'),'delta':o.get('delta'),'theta':o.get('theta'),
                 'theta_available':o.get('theta_available'),'spread':o.get('spread'),'spread_pct':o.get('spread_pct'),
                 'quote_freshness':o.get('quote_freshness'),'minimum_delay_minutes':o.get('minimum_delay_minutes'),
+                'received_at':o.get('received_at'),'timestamp_basis':o.get('timestamp_basis'),
+                'last_trade_time':o.get('last_trade_time'),
                 'quote_timestamp':o.get('option_timestamp'),'source_timestamp':o.get('payload_timestamp') or o.get('option_timestamp'),
                 'stock_price':x['price'],'trigger':x.get('trigger_price'),'state':x.get('execution_state'),
                 'signal_inputs':{'direction':x.get('direction'),'move_5m':x.get('move_5m'),'volume_acceleration':x.get('volume_acceleration'),
