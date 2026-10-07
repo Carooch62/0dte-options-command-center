@@ -1,1 +1,1 @@
-{"updated_at":"2026-10-07T03:10:41.423173+00:00","run_id":"37565503682","request_id":null,"status":"CLOSED","stage":"MARKET_CALENDAR"}
+{"status": "FAILED", "stage": "WORKFLOW", "error": "Workflow failed before a validated snapshot was produced", "run_id": "37569734188", "request_id": null, "updated_at": "2026-10-07T04:05:12.562978+00:00"}
