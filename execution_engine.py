@@ -391,6 +391,8 @@ def update_history(data, path="data/scan-history.json", limit=200):
                 "bar_end": x.get("bar_end"),
                 "last_status": x.get("last_status"),
                 "setup_qualified": x.get("setup_qualified"),
+                "qualification_checks": x.get("qualification_checks"),
+                "qualification_reasons": x.get("qualification_reasons"),
                 "momentum_state": x.get("momentum_state"),
                 "had_preferred_contract": bool(x.get("preferred_contracts")),
                 "chain_status": x.get("chain_status"),

@@ -176,10 +176,19 @@ class ReliabilityTests(unittest.TestCase):
                     self.assertEqual(pipeline.run(),1)
                 self.assertEqual(receipt.read_text(),saved)
 
+    def test_qualification_reasons_explain_existing_gates(self):
+        d=normalize(snapshot(row(news_items=[],move_5m=.01,volume_ratio=.5,volume_acceleration=.5)),NOW)
+        x=d['candidates'][0]
+        self.assertFalse(x['setup_qualified'])
+        self.assertIn('Company-specific catalyst not confirmed',x['qualification_reasons'])
+        self.assertIn('Momentum and acceleration confirmation missing',x['qualification_reasons'])
+        self.assertTrue(x['qualification_checks']['current_session_data'])
+        self.assertFalse(x['qualification_checks']['momentum_confirmed'])
+
     def test_observations_are_immutable_and_markouts_labeled(self):
-        d=snapshot(row());x=d['candidates'][0];x['execution_state']='TRIGGERED';x['preferred_contracts']=[option(option_timestamp=None,payload_timestamp='first')]
+        d=snapshot(row());x=d['candidates'][0];x['execution_state']='TRIGGERED';x['preferred_contracts']=[option(option_timestamp=None,payload_timestamp='first',theta=-.03,theta_available=True,spread=.02,spread_pct=8)]
         with tempfile.TemporaryDirectory() as t:
-            x.update(setup_qualified=False, chase_risk='HIGH', vwap=101,
+            x.update(setup_qualified=False, qualification_reasons=['No catalyst'], chase_risk='HIGH', vwap=101,
                      trend_context={'overall_direction':'UP','alignment':'AGAINST_TREND'})
             p=str(Path(t)/'observations.json');update(d,p)
             later=copy.deepcopy(d);later['generated_at']=(NOW+timedelta(minutes=5)).isoformat();later['scan_id']='later'
@@ -189,6 +198,10 @@ class ReliabilityTests(unittest.TestCase):
             self.assertEqual(event['entry_ask'],.25);self.assertEqual(event['markouts']['5']['gross_quote_change_per_contract'],5)
             self.assertFalse(event['markouts']['5']['timing_verified'])
 
+            self.assertEqual(event['theta'],-.03)
+            self.assertEqual(event['spread'],.02)
+            self.assertIsNone(event['quote_timestamp'])
+            self.assertEqual(event['signal_inputs']['qualification_reasons'],['No catalyst'])
             self.assertFalse(event['signal_inputs']['setup_qualified'])
             self.assertEqual(event['signal_inputs']['chase_risk'],'HIGH')
             self.assertEqual(event['signal_inputs']['vwap'],101)
