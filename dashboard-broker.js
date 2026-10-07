@@ -1,8 +1,9 @@
-import {validatePack,researchDataset,plaidReviewPack} from './dashboard-broker-logic.js?v=20261007-reconcile';
+import {validatePack,researchDataset,plaidReviewPack} from './dashboard-broker-logic.js?v=20261007-cycles';
 const $=id=>document.getElementById(id),esc=x=>String(x??'Unknown').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=x=>x===null||x===undefined?'Unknown':new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(x);
 const key='0dteBrokerReviewV1';let syncedPack=null;let pack=null,history=[],historyError='';
 try{const r=await fetch('https://raw.githubusercontent.com/Carooch62/0dte-options-command-center/main/data/scan-history.json',{cache:'no-store'});if(!r.ok)throw Error();history=await r.json();if(!Array.isArray(history))throw Error();}catch{history=[];historyError='Scanner history could not be loaded. Comparisons are unavailable.';}
+try{const r=await fetch('https://raw.githubusercontent.com/Carooch62/0dte-options-command-center/main/data/scan-history-recovered.json',{cache:'no-store'});if(!r.ok)throw Error();const archived=await r.json();if(!Array.isArray(archived))throw Error();history.push(...archived);}catch{historyError+=' Recovered historical snapshots could not be loaded.';}
 function comparison(s){
  if(s.status!=='RESEARCH_COMPARISON')return `<p>${s.status==='NO_PRIOR_SNAPSHOT'?'No preceding same-session snapshot retained.':'Ticker absent from the latest preceding snapshot.'}</p>`;
  const tr=s.trend_context;
@@ -13,7 +14,7 @@ function render(){
  const d=researchDataset(pack,history),net=d.rows.length>0&&d.rows.every(t=>t.net!==null)?d.rows.reduce((a,t)=>a+t.net,0):null;
  $('status').textContent=`${pack.source||'Imported brokerage'} · retrieved ${pack.retrieved_at}\nCoverage: ${pack.coverage?.note||'Unknown completeness'}\nFreshness: ${pack.coverage?.freshness||'unknown'}. ${historyError}`;
  $('summary').textContent=`${d.rows.length} unambiguous round trips · combined P/L after reported fees ${money(net)}. Based on selected provider records only; this is not a complete account performance total.`;
- $('trades').innerHTML=d.rows.map(t=>`<details><summary>${esc(t.ticker)} ${esc(t.strike)} ${esc(t.side)} · expires ${esc(t.expiry)} · ${money(t.net)}</summary><p>${t.qty} contract(s) · ${money(t.entry)} → ${money(t.exit)} · fees ${money(t.fees)}<br>Provider transaction times: ${esc(t.time)} → ${esc(t.closedAt)}<br>${esc(t.timestamp_basis)}</p><b>Prior scanner evidence</b>${comparison(t.scanner)}</details>`).join('')||'No unambiguous option round trips.';
+ $('trades').innerHTML=d.rows.map(t=>`<details><summary>${esc(t.ticker)} ${esc(t.strike)} ${esc(t.side)} · expires ${esc(t.expiry)} · ${money(t.net)}</summary><p>${t.qty} contract(s) · ${money(t.entry)} → ${money(t.exit)} · fees ${money(t.fees)}<br>Provider times (not verified fills): ${esc(t.time)} → ${esc(t.closedAt)}<br>${esc(t.timestamp_basis)}</p><b>Prior scanner evidence</b>${comparison(t.scanner)}</details>`).join('')||'No unambiguous option round trips.';
  $('issues').innerHTML=d.issues.map(i=>`<p>${esc(i.symbol)}: ${esc(i.reason)}</p>`).join('')+`<p>${d.issues.length} flagged groups/records. Nonstandard option symbols and non-option records excluded from automatic matching.</p>`;
  $('holdings').innerHTML='<table><tr><th>Holding</th><th>Quantity</th><th>Reported value</th><th>Price as of</th></tr>'+pack.holdings.map(h=>`<tr><td>${esc(h.ticker_symbol||h.name)}</td><td>${esc(h.quantity)}</td><td>${money(h.institution_value)}</td><td>${esc(h.institution_price_datetime||h.institution_price_as_of)}</td></tr>`).join('')+'</table>';
  $('export').disabled=false;
@@ -57,4 +58,5 @@ $('plaid-connect').onclick=async()=>{
 $('plaid-sync').onclick=async()=>{try{plaidStatus.textContent='Collecting provider data…';await privateApi('sync',{});await loadPlaid();}catch(e){plaidStatus.textContent=`Sync failed: ${e.message}`;}};
 $('plaid-disconnect').onclick=async()=>{if(!confirm('Disconnect the Plaid account and erase its server snapshot?'))return;try{await privateApi('disconnect',{});await loadPlaid();}catch(e){plaidStatus.textContent=`Disconnect failed: ${e.message}`;}};
 await loadPlaid();
+
 

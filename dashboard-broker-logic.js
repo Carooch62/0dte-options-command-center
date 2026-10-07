@@ -30,11 +30,20 @@ export function reconcile(p){
   if(!groups.has(key))groups.set(key,{option,symbol:r.ticker_symbol,rows:[],invalid:false});
   groups.get(key).rows.push(r);
  }
- const trades=[];
+ const cycles=[];
  for(const [key,g] of groups){
+  const ordered=[...g.rows].sort((a,b)=>Date.parse(a.transaction_datetime)-Date.parse(b.transaction_datetime));
+  const pairQuantity=r=>Number(String(r.name||'').match(/^(?:buy|sell)\s+(\d+(?:\.\d+)?)\s/i)?.[1]);
+  const balanced=ordered.every((r,i)=>i%2!==0||(Number.isInteger(pairQuantity(r))&&pairQuantity(r)>0&&pairQuantity(r)===pairQuantity(ordered[i+1]||{})));
+  const sequential=balanced&&!g.invalid&&ordered.length%2===0&&ordered.every((r,i)=>iso(r.transaction_datetime)&&!r.cancel_transaction_id&&(i===0||Date.parse(r.transaction_datetime)>Date.parse(ordered[i-1].transaction_datetime))&&(i%2===0?r.type==='buy'&&/to open/i.test(r.name||''):r.type==='sell'&&/to close/i.test(r.name||'')));
+  if(sequential){for(let i=0;i<ordered.length;i+=2)cycles.push([key,{...g,rows:ordered.slice(i,i+2)}]);}
+  else cycles.push([key,{...g,invalid:true}]);
+ }
+ const trades=[];
+ for(const [key,g] of cycles){
   const rows=g.rows.sort((a,b)=>Date.parse(a.transaction_datetime)-Date.parse(b.transaction_datetime));
   // Only an unambiguous one-open/one-close round trip is automatically reconciled.
-  // Multiple lots, partial fills, cancellations and corporate actions need review.
+  // Repeated non-overlapping pairs are allowed; overlapping lots and lifecycle events need review.
   const buys=rows.filter(r=>r.type==='buy'&&/to open/i.test(r.name||''));
   const sells=rows.filter(r=>r.type==='sell'&&/to close/i.test(r.name||''));
   const b=buys[0],s=sells[0];
@@ -46,17 +55,17 @@ export function reconcile(p){
    issues.push({symbol:g.symbol,reason:'Quantity, price, amount or timestamp needs review'});continue;
   }
   const fees=bf!==null&&sf!==null&&bf>=0&&sf>=0?bf+sf:null,gross=(sp-bp)*q*100;
-  trades.push({id:`${key}|${b.investment_transaction_id}|${s.investment_transaction_id}`,symbol:g.symbol,...g.option,qty:q,entry:bp,exit:sp,fees,gross,net:fees===null?null:gross-fees,time:b.transaction_datetime,closedAt:s.transaction_datetime,timestamp_basis:'provider transaction time; may be order initiation, not fill',source_ids:[b.investment_transaction_id,s.investment_transaction_id]});
+  trades.push({id:`${key}|${b.investment_transaction_id}|${s.investment_transaction_id}`,symbol:g.symbol,...g.option,qty:q,entry:bp,exit:sp,fees,gross,net:fees===null?null:gross-fees,time:b.transaction_datetime,closedAt:s.transaction_datetime,execution_time_verified:false,entry_fill_at:null,exit_fill_at:null,timestamp_basis:'provider transaction time; may be order submission, not execution; fill timestamps are unverified',source_ids:[b.investment_transaction_id,s.investment_transaction_id]});
  }
  return {trades,issues,ignored_count:ignored.length};
 }
 export function scannerComparison(trade,history){
  const t=Date.parse(trade.time),day=new Date(t).toLocaleDateString('en-CA',{timeZone:'America/New_York'});
- const snapshots=history.filter(s=>{const published=Date.parse(s.dashboard_generated_at||s.generated_at);return published<=t&&new Date(published).toLocaleDateString('en-CA',{timeZone:'America/New_York'})===day;}).sort((a,b)=>Date.parse(b.dashboard_generated_at||b.generated_at)-Date.parse(a.dashboard_generated_at||a.generated_at));
+ const snapshots=history.filter(s=>{const published=Date.parse(s.dashboard_generated_at||s.generated_at),available=Date.parse(s.recovered_commit_at||s.dashboard_generated_at||s.generated_at);return available<=t&&published<=t&&new Date(published).toLocaleDateString('en-CA',{timeZone:'America/New_York'})===day;}).sort((a,b)=>Date.parse(b.dashboard_generated_at||b.generated_at)-Date.parse(a.dashboard_generated_at||a.generated_at));
  const scan=snapshots[0];if(!scan)return {status:'NO_PRIOR_SNAPSHOT'};
  const row=(scan.candidate_state||[]).find(x=>x.ticker===trade.ticker),age=(t-Date.parse(scan.dashboard_generated_at||scan.generated_at))/60000;
  if(!row)return {status:'NOT_IN_PRIOR_SNAPSHOT',scan_id:scan.scan_id,age_minutes:age};
- return {status:'RESEARCH_COMPARISON',scan_id:scan.scan_id,published_at:scan.dashboard_generated_at||scan.generated_at,age_minutes:age,rank:row.rank,direction_aligned:row.direction===(trade.side==='call'?'UP':'DOWN'),setup_qualified:row.setup_qualified??null,chase_risk:row.chase_risk??'UNKNOWN',vwap:row.vwap,price:row.price,trigger_price:row.trigger_price,volume_ratio:row.volume_ratio,volume_acceleration:row.volume_acceleration,trend_context:row.trend_context??null,contract_delta_at_entry:null,contract_theta_at_entry:null,limitation:'Provider transaction time may precede fill. Snapshot publication is approximate; quote Greeks at entry are unavailable.'};
+ return {status:'RESEARCH_COMPARISON',scan_id:scan.scan_id,recovered_from_commit:scan.recovered_from_commit||null,comparison_time_basis:'provider transaction timestamp, not verified fill',published_at:scan.dashboard_generated_at||scan.generated_at,age_minutes:age,rank:row.rank,direction_aligned:row.direction===(trade.side==='call'?'UP':'DOWN'),setup_qualified:row.setup_qualified??null,chase_risk:row.chase_risk??'UNKNOWN',vwap:row.vwap,price:row.price,trigger_price:row.trigger_price,volume_ratio:row.volume_ratio,volume_acceleration:row.volume_acceleration,trend_context:row.trend_context??null,contract_delta_at_entry:null,contract_theta_at_entry:null,limitation:'Provider transaction time may precede fill. Snapshot publication is approximate; quote Greeks at entry are unavailable.'};
 }
 export function researchDataset(pack,history){
  const r=reconcile(pack),rows=r.trades.map(t=>({...t,scanner:scannerComparison(t,history)}));
@@ -71,3 +80,4 @@ export function plaidReviewPack(snapshot){
  const holdings=(snapshot.holdings||[]).map(r=>({...securities.get(r.security_id),...r}));
  return validatePack({format:'broker-review-v1',source:'Plaid Investments (synced)',retrieved_at:snapshot.retrieved_at,transactions,holdings,coverage:{...snapshot.coverage,note:`${transactions.length} / ${snapshot.coverage?.total_transactions??'unknown'} provider records; ${snapshot.coverage?.complete?'complete':'incomplete'} for requested range ${snapshot.range?.start??'?'} through ${snapshot.range?.end??'?'}. Completeness does not establish fill timing.`,freshness:'Provider data may be delayed; collection time is not quote time.'}});
 }
+
