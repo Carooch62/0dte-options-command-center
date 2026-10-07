@@ -1,11 +1,12 @@
 // Private brokerage records are processed locally. No network calls in this module.
 const num=v=>v===null||v===undefined||v===''?null:Number.isFinite(Number(v))?Number(v):null;
-const iso=v=>typeof v==='string'&&/T.*(?:Z|[+-]\d\d:\d\d)$/.test(v)&&Number.isFinite(Date.parse(v));
+const timestamp=v=>Date.parse(typeof v==='string'?v.replace(/(\.\d{3})\d+(?=Z|[+-]\d\d:\d\d$)/,'$1'):v);
+const iso=v=>typeof v==='string'&&/T.*(?:Z|[+-]\d\d:\d\d)$/.test(v)&&Number.isFinite(timestamp(v));
 export function parseOption(symbol){
  const m=String(symbol||'').match(/^([A-Z]{1,6})(\d{2})(\d{2})(\d{2})([CP])(\d{8})$/);
  if(!m)return null;
  const expiry=`20${m[2]}-${m[3]}-${m[4]}`;
- if(!Number.isFinite(Date.parse(expiry))||new Date(expiry).toISOString().slice(0,10)!==expiry)return null;
+ if(!Number.isFinite(timestamp(expiry))||new Date(expiry).toISOString().slice(0,10)!==expiry)return null;
  return {ticker:m[1],expiry,side:m[5]==='C'?'call':'put',strike:Number(m[6])/1000};
 }
 export function validatePack(p){
@@ -32,16 +33,16 @@ export function reconcile(p){
  }
  const cycles=[];
  for(const [key,g] of groups){
-  const ordered=[...g.rows].sort((a,b)=>Date.parse(a.transaction_datetime)-Date.parse(b.transaction_datetime));
+  const ordered=[...g.rows].sort((a,b)=>timestamp(a.transaction_datetime)-timestamp(b.transaction_datetime));
   const pairQuantity=r=>Number(String(r.name||'').match(/^(?:buy|sell)\s+(\d+(?:\.\d+)?)\s/i)?.[1]);
   const balanced=ordered.every((r,i)=>i%2!==0||(Number.isInteger(pairQuantity(r))&&pairQuantity(r)>0&&pairQuantity(r)===pairQuantity(ordered[i+1]||{})));
-  const sequential=balanced&&!g.invalid&&ordered.length%2===0&&ordered.every((r,i)=>iso(r.transaction_datetime)&&!r.cancel_transaction_id&&(i===0||Date.parse(r.transaction_datetime)>Date.parse(ordered[i-1].transaction_datetime))&&(i%2===0?r.type==='buy'&&/to open/i.test(r.name||''):r.type==='sell'&&/to close/i.test(r.name||'')));
+  const sequential=balanced&&!g.invalid&&ordered.length%2===0&&ordered.every((r,i)=>iso(r.transaction_datetime)&&!r.cancel_transaction_id&&(i===0||timestamp(r.transaction_datetime)>timestamp(ordered[i-1].transaction_datetime))&&(i%2===0?r.type==='buy'&&/to open/i.test(r.name||''):r.type==='sell'&&/to close/i.test(r.name||'')));
   if(sequential){for(let i=0;i<ordered.length;i+=2)cycles.push([key,{...g,rows:ordered.slice(i,i+2)}]);}
   else cycles.push([key,{...g,invalid:true}]);
  }
  const trades=[];
  for(const [key,g] of cycles){
-  const rows=g.rows.sort((a,b)=>Date.parse(a.transaction_datetime)-Date.parse(b.transaction_datetime));
+  const rows=g.rows.sort((a,b)=>timestamp(a.transaction_datetime)-timestamp(b.transaction_datetime));
   // Only an unambiguous one-open/one-close round trip is automatically reconciled.
   // Repeated non-overlapping pairs are allowed; overlapping lots and lifecycle events need review.
   const buys=rows.filter(r=>r.type==='buy'&&/to open/i.test(r.name||''));
@@ -51,7 +52,7 @@ export function reconcile(p){
   const quantity=r=>{const m=String(r.name).match(/^(?:buy|sell)\s+(\d+(?:\.\d+)?)\s/i);return m?Number(m[1]):null;};
   const q=quantity(b),sq=quantity(s),bp=num(b.price),sp=num(s.price),bf=num(b.fees),sf=num(s.fees);
   const consistent=r=>(!r.iso_currency_code||r.iso_currency_code==='USD')&&!r.cancel_transaction_id&&(r.type==='buy'?r.quantity>0&&r.amount>0:r.quantity<0&&r.amount<=0)&&num(r.quantity)!==null&&Math.abs(r.quantity)===q*100&&num(r.amount)!==null&&Math.abs(Math.abs(r.amount)-q*100*r.price)<.011;
-  if(!Number.isInteger(q)||q<=0||sq!==q||bp===null||bp<=0||sp===null||sp<0||!consistent(b)||!consistent(s)||!iso(b.transaction_datetime)||!iso(s.transaction_datetime)||Date.parse(s.transaction_datetime)<Date.parse(b.transaction_datetime)){
+  if(!Number.isInteger(q)||q<=0||sq!==q||bp===null||bp<=0||sp===null||sp<0||!consistent(b)||!consistent(s)||!iso(b.transaction_datetime)||!iso(s.transaction_datetime)||timestamp(s.transaction_datetime)<timestamp(b.transaction_datetime)){
    issues.push({symbol:g.symbol,reason:'Quantity, price, amount or timestamp needs review'});continue;
   }
   const fees=bf!==null&&sf!==null&&bf>=0&&sf>=0?bf+sf:null,gross=(sp-bp)*q*100;
@@ -60,16 +61,16 @@ export function reconcile(p){
  return {trades,issues,ignored_count:ignored.length};
 }
 export function scannerComparison(trade,history){
- const t=Date.parse(trade.time),day=new Date(t).toLocaleDateString('en-CA',{timeZone:'America/New_York'});
- const snapshots=history.filter(s=>{const published=Date.parse(s.dashboard_generated_at||s.generated_at),available=Date.parse(s.recovered_commit_at||s.dashboard_generated_at||s.generated_at);return available<=t&&published<=t&&new Date(published).toLocaleDateString('en-CA',{timeZone:'America/New_York'})===day;}).sort((a,b)=>Date.parse(b.dashboard_generated_at||b.generated_at)-Date.parse(a.dashboard_generated_at||a.generated_at));
+ const t=timestamp(trade.time),day=new Date(t).toLocaleDateString('en-CA',{timeZone:'America/New_York'});
+ const snapshots=history.filter(s=>{const published=timestamp(s.dashboard_generated_at||s.generated_at),available=timestamp(s.recovered_commit_at||s.dashboard_generated_at||s.generated_at);return available<=t&&published<=t&&new Date(published).toLocaleDateString('en-CA',{timeZone:'America/New_York'})===day;}).sort((a,b)=>timestamp(b.dashboard_generated_at||b.generated_at)-timestamp(a.dashboard_generated_at||a.generated_at));
  const scan=snapshots[0];if(!scan)return {status:'NO_PRIOR_SNAPSHOT'};
- const row=(scan.candidate_state||[]).find(x=>x.ticker===trade.ticker),age=(t-Date.parse(scan.dashboard_generated_at||scan.generated_at))/60000;
+ const row=(scan.candidate_state||[]).find(x=>x.ticker===trade.ticker),age=(t-timestamp(scan.dashboard_generated_at||scan.generated_at))/60000;
  if(!row)return {status:'NOT_IN_PRIOR_SNAPSHOT',scan_id:scan.scan_id,age_minutes:age};
  return {status:'RESEARCH_COMPARISON',scan_id:scan.scan_id,recovered_from_commit:scan.recovered_from_commit||null,comparison_time_basis:'provider transaction timestamp, not verified fill',published_at:scan.dashboard_generated_at||scan.generated_at,age_minutes:age,rank:row.rank,direction_aligned:row.direction===(trade.side==='call'?'UP':'DOWN'),setup_qualified:row.setup_qualified??null,chase_risk:row.chase_risk??'UNKNOWN',vwap:row.vwap,price:row.price,trigger_price:row.trigger_price,volume_ratio:row.volume_ratio,volume_acceleration:row.volume_acceleration,trend_context:row.trend_context??null,contract_delta_at_entry:null,contract_theta_at_entry:null,limitation:'Provider transaction time may precede fill. Snapshot publication is approximate; quote Greeks at entry are unavailable.'};
 }
 export function researchDataset(pack,history){
  const r=reconcile(pack),rows=r.trades.map(t=>({...t,scanner:scannerComparison(t,history)}));
- return {version:1,source:pack.source,coverage:pack.coverage||null,retrieved_at:pack.retrieved_at,rows,issues:r.issues,provider_records:pack.transactions,ignored_count:r.ignored_count,ml_ready:false,ml_note:'Reconciled transactions are research evidence. Missing exact execution/quote timing and an audited chronological split prevent model-readiness claims.'};
+ return {version:1,scanner_history:{snapshots_loaded:history.length,recovered_snapshots:history.filter(s=>s.recovered_from_commit).length,invalid_timestamps:history.filter(s=>!Number.isFinite(timestamp(s.dashboard_generated_at||s.generated_at))).length,matched_comparisons:rows.filter(r=>r.scanner.status==='RESEARCH_COMPARISON').length},source:pack.source,coverage:pack.coverage||null,retrieved_at:pack.retrieved_at,rows,issues:r.issues,provider_records:pack.transactions,ignored_count:r.ignored_count,ml_ready:false,ml_note:'Reconciled transactions are research evidence. Missing exact execution/quote timing and an audited chronological split prevent model-readiness claims.'};
 }
 
 
