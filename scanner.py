@@ -288,7 +288,7 @@ def fetch_cboe(t):
         parsed = parse_osi(row.get('option'))
         if not parsed: continue
         exp,side,strike = parsed; expiries.add(exp.isoformat())
-        if exp != today: continue
+        if not 0 <= (exp-today).days <= 31: continue
         delta = number(row.get('delta')); gamma = number(row.get('gamma'))
         out.append({'contract_id':row['option'], 'side':side,'strike':strike,
                     'bid':number(row.get('bid')), 'ask':number(row.get('ask')),
@@ -298,17 +298,17 @@ def fetch_cboe(t):
                     'delta_verified':delta is not None and -1 <= delta <= 1 and delta != 0,
                     'gamma_verified':gamma is not None and gamma >= 0,
                     'greeks_verified':delta is not None and gamma is not None and delta != 0 and gamma >= 0,
-                    'expiry':exp.isoformat(),'dte':0,'source':'CBOE delayed (15m)',
+                    'expiry':exp.isoformat(),'dte':(exp-today).days,'source':'CBOE delayed (15m)',
                     'option_timestamp':None, 'payload_timestamp':payload.get('timestamp'),
                     'received_at':datetime.now(timezone.utc).isoformat(), 'minimum_delay_minutes':15,
                     'timestamp_basis':'PAYLOAD_TIME_NOT_QUOTE_TIME'})
     if not expiries: raise ValueError('no parsable expirations')
     return {'contracts':out,'source':'CBOE delayed (15m)', 'timestamp':None,
             'payload_timestamp':payload.get('timestamp'), 'expirations':sorted(expiries),
-            'status':'SUCCESS' if out else 'NO_EXPIRATION_TODAY'}
+            'status':'SUCCESS' if any(o['dte']==0 for o in out) else 'NO_EXPIRATION_TODAY'}
 
 
-def parse_nasdaq_rows(rows, today):
+def parse_nasdaq_rows(rows, today, max_days=0):
     out = []
     group_expiry = None
     for row in rows or []:
@@ -333,7 +333,7 @@ def parse_nasdaq_rows(rows, today):
                 short = datetime.strptime(str(exp_raw).strip(),'%b %d')
                 if (short.month,short.day)==(group_expiry.month,group_expiry.day): exp=group_expiry
             except ValueError: pass
-        if not exp or exp != today:
+        if not exp or not 0 <= (exp-today).days <= max_days:
             continue
         strike = num(row.get("strike") or row.get("strikePrice"))
         if not strike:
@@ -351,7 +351,7 @@ def parse_nasdaq_rows(rows, today):
                 "volume": int(num(row.get(prefix+"Volume") or row.get(prefix+"volume"))),
                 "oi": int(num(row.get(prefix+"Openinterest") or row.get(prefix+"OpenInterest") or row.get(prefix+"openInterest"))),
                 "iv": 0, "delta": 0, "gamma": 0, "theta": 0, "vega": 0,
-                "expiry": exp.isoformat(), "dte": 0, "source": "Nasdaq public chain", "contract_id": f"{exp.isoformat()}:{side}:{strike}",
+                "expiry": exp.isoformat(), "dte": (exp-today).days, "source": "Nasdaq public chain", "contract_id": f"{exp.isoformat()}:{side}:{strike}",
                 "option_timestamp": None, "greeks_verified": False,
             })
     return out
@@ -364,12 +364,12 @@ def nasdaq_options(t):
                         headers={**HEADERS,'Referer':'https://www.nasdaq.com/'})
     rows = ((data.get('data') or {}).get('table') or {}).get('rows')
     if not isinstance(rows,list) or not rows: raise ValueError('empty Nasdaq chain')
-    opts = parse_nasdaq_rows(rows,today)
+    opts = parse_nasdaq_rows(rows,today,max_days=31)
     for o in opts:
         o['contract_id'] = f"{t}:{o['expiry']}:{o['side']}:{o['strike']}"
     # This fallback may be paginated/incomplete, so empty is not proof of no expiry.
     return {'contracts':opts,'source':'Nasdaq public chain','timestamp':None,
-            'status':'SUCCESS' if opts else 'EMPTY_UNVERIFIED'}
+            'status':'SUCCESS' if any(o['dte']==0 for o in opts) else 'EMPTY_UNVERIFIED'}
 
 def options(t):
     failures=[]
@@ -396,9 +396,10 @@ def contract_score(o, stock):
 def enrich_options(x, result):
     if isinstance(result,tuple):
         opts,source,ts=result
-        result={'contracts':opts,'source':source,'timestamp':ts,'status':'SUCCESS' if opts else 'EMPTY_UNVERIFIED'}
-    zero=[dict(o) for o in result['contracts'] if o.get('dte')==0]
-    for o in zero:
+        result={'contracts':opts,'source':source,'timestamp':ts,'status':'SUCCESS' if any(o['dte']==0 for o in opts) else 'EMPTY_UNVERIFIED'}
+    retained=[dict(o) for o in result['contracts'] if isinstance(o.get('dte'),int) and 0<=o['dte']<=31]
+    zero=[o for o in retained if o['dte']==0]
+    for o in retained:
         o.update(contract_checks(o,x['price']))
         o['contract_id']=o.get('contract_id') or f"{x['ticker']}:{o.get('expiry')}:{o['side']}:{o['strike']}"
         o['contract_score']=contract_score(o,x)
@@ -408,6 +409,13 @@ def enrich_options(x, result):
         o['usable_price']=.10<=ask<=.75
         o['option_timestamp']=o.get('option_timestamp') or result.get('timestamp')
         o['quote_freshness']=freshness(o.get('option_timestamp'),delay=num(o.get('minimum_delay_minutes')),max_age=20)
+    x['expiry_groups']={}
+    for key,lo,hi in [('week',1,7),('two_weeks',8,14),('month',15,31)]:
+        group=[o for o in retained if lo<=o['dte']<=hi]
+        status=('SUCCESS' if group else 'NO_EXPIRATION_IN_WINDOW'
+                if result.get('source')=='CBOE delayed (15m)' and result.get('status')!='SOURCE_FAILURE'
+                else result.get('status') if result.get('status')=='SOURCE_FAILURE' else 'EMPTY_UNVERIFIED')
+        x['expiry_groups'][key]={'options':group,'chain_status':status}
     near=[o for o in zero if o['near_atm']]
     calls=sum(o['volume'] for o in near if o['side']=='call'); puts=sum(o['volume'] for o in near if o['side']=='put')
     ratio=round(calls/puts,2) if puts else (99 if calls else 0)
