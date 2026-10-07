@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "observations": 52,
+  "distinct_sessions": 6,
+  "sessions": {
+    "2026-09-30": {
+      "observations": 3,
+      "quote_timed": 0,
+      "theta_recorded": 0,
+      "spread_recorded": 0,
+      "timed_followup": 0
+    },
+    "2026-10-01": {
+      "observations": 4,
+      "quote_timed": 0,
+      "theta_recorded": 0,
+      "spread_recorded": 0,
+      "timed_followup": 0
+    },
+    "2026-10-02": {
+      "observations": 35,
+      "quote_timed": 0,
+      "theta_recorded": 0,
+      "spread_recorded": 0,
+      "timed_followup": 0
+    },
+    "2026-10-05": {
+      "observations": 7,
+      "quote_timed": 0,
+      "theta_recorded": 0,
+      "spread_recorded": 0,
+      "timed_followup": 0
+    },
+    "2026-10-06": {
+      "observations": 2,
+      "quote_timed": 0,
+      "theta_recorded": 0,
+      "spread_recorded": 0,
+      "timed_followup": 0
+    },
+    "2026-10-07": {
+      "observations": 1,
+      "quote_timed": 0,
+      "theta_recorded": 0,
+      "spread_recorded": 0,
+      "timed_followup": 0
+    }
+  },
+  "sessions_with_timed_entry_and_followup": [],
+  "source_failures": [],
+  "ml_ready": false,
+  "split_status": "NOT_ASSIGNED",
+  "blockers": [
+    "Chronological train/validation/test periods have not been audited and reserved.",
+    "Quote timing, missing features, overlapping horizons and source changes require validation.",
+    "Retained observations select qualifying signals; they do not represent all candidate decisions."
+  ],
+  "next_step": "Validate timestamped entry/follow-up pairs, retain candidate controls, then reserve whole sessions chronologically with a gap for overlapping horizons. Evaluate a simple baseline in shadow mode against existing rules.",
+  "interpretation": "Delayed quote research; execution, fees and tradable returns are not verified. No arbitrary observation count establishes readiness."
+}
