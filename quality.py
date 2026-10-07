@@ -49,6 +49,9 @@ def verified_delta(o):
     side = o.get('side')
     return bool(o.get('delta_verified', o.get('greeks_verified'))) and d is not None and ((side == 'call' and 0 < d <= 1) or (side == 'put' and -1 <= d < 0))
 
+def delta_bounds(o):
+    return (.70, .80) if number(o.get("dte"), 0) > 14 else (.30, .50)
+
 def contract_checks(o, price):
     valid = valid_quote(o)
     bid, ask = number(o.get('bid'), 0), number(o.get('ask'), 0)
@@ -56,16 +59,17 @@ def contract_checks(o, price):
     spread = ask - bid if valid else None
     relative = spread / mid * 100 if valid else None
     dist = abs(number(o.get('strike'), 0) - price) / price * 100 if price else None
-    delta_ok = verified_delta(o) and abs(number(o.get('delta'), 0)) >= .25
+    delta_min, delta_max = delta_bounds(o)
+    delta_ok = verified_delta(o) and delta_min <= abs(number(o.get('delta'), 0)) <= delta_max
     reasons = []
     if not valid: reasons.append('INVALID_QUOTE')
     if not verified_delta(o): reasons.append('DELTA_UNVERIFIED')
-    elif not delta_ok: reasons.append('LOW_DELTA')
+    elif not delta_ok: reasons.append('DELTA_OUTSIDE_RANGE')
     if dist is None or dist > 3: reasons.append('STRIKE_DISTANCE')
     if number(o.get('volume'), 0) < 20: reasons.append('LOW_VOLUME')
     if not valid or spread > .05 or relative > 20: reasons.append('WIDE_SPREAD')
     return dict(quote_valid=valid, mid=mid, spread=spread, spread_pct=relative, distance_pct=dist,
-                delta_ok=delta_ok, preferred_delta=verified_delta(o) and abs(number(o.get('delta'), 0)) >= .4,
+                delta_ok=delta_ok, delta_min=delta_min, delta_max=delta_max, preferred_delta=delta_ok and abs(number(o.get('delta'), 0)) >= (delta_min+delta_max)/2,
                 near_atm=dist is not None and dist <= 3,
                 tight_spread=valid and spread <= .05 and relative <= 20,
                 usable_spread=valid and spread <= .10 and relative <= 30,

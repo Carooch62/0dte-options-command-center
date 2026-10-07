@@ -42,9 +42,14 @@ export function passesTheta(o,limit) {
   const ceiling=finite(limit);
   return ceiling===null||(ceiling>=0&&thetaDecayPct(o)!==null&&thetaDecayPct(o)<=ceiling);
 }
+export function deltaRange(row) {return row.expiration_window==='month'?[.70,.80]:[.30,.50];}
+export function deltaMatches(o,row) {
+  const d=finite(o.delta),[lo,hi]=deltaRange(row);
+  return !!(o.delta_verified??o.greeks_verified)&&d!==null&&((o.side==='call'&&d>0)||(o.side==='put'&&d<0))&&Math.abs(d)>=lo&&Math.abs(d)<=hi;
+}
 export function selectableContracts(row,min=.1,max=.3) {
   if(!Number.isFinite(min)||!Number.isFinite(max)||min<0||max<min)return [];
-  return (row.eligible_contracts||[]).filter(o=>o.quote_valid&&o.delta_ok&&o.tight_spread&&o.ask>=min&&o.ask<=max&&passesTheta(o,row.theta_limit_pct));
+  return (row.eligible_contracts||[]).filter(o=>o.quote_valid&&o.delta_ok&&deltaMatches(o,row)&&o.tight_spread&&o.ask>=min&&o.ask<=max&&passesTheta(o,row.theta_limit_pct));
 }
 export function requestPublished(data,id) {return Boolean(id&&data?.scan_id===id);}
 export function tradePL(trade) {return (trade.exit-trade.entry)*trade.qty*100-(trade.fees||0);}
@@ -77,7 +82,7 @@ export function contractExplanation(row,min=.1,max=.3) {
   const range=`$${min.toFixed(2)}–$${max.toFixed(2)}`;
   const priced=all.filter(o=>finite(o.ask)!==null&&o.ask>=min&&o.ask<=max);
   if(!priced.length)return `None of the ${all.length} returned contracts has an ask in your ${range} range.`;
-  const checks=[['theta unavailable or above selected decay limit',o=>!passesTheta(o,row.theta_limit_pct)],['invalid bid/ask',o=>!o.quote_valid],['delta missing or unverified',o=>!((o.delta_verified??o.greeks_verified)&&finite(o.delta)!==null&&((o.side==='call'&&o.delta>0&&o.delta<=1)||(o.side==='put'&&o.delta<0&&o.delta>=-1)))],['absolute delta below 0.25',o=>(o.delta_verified??o.greeks_verified)&&finite(o.delta)!==null&&Math.abs(o.delta)<.25],['spread too wide',o=>!o.tight_spread],['volume below 20',o=>finite(o.volume)===null||o.volume<20],['strike beyond 3% of stock price',o=>!o.near_atm],['opposite or unresolved stock direction',o=>!o.direction_aligned],['selected expiration unverified',o=>!o.expiry_verified]];
+  const checks=[['theta unavailable or above selected decay limit',o=>!passesTheta(o,row.theta_limit_pct)],['invalid bid/ask',o=>!o.quote_valid],['delta missing or unverified',o=>!((o.delta_verified??o.greeks_verified)&&finite(o.delta)!==null&&((o.side==='call'&&o.delta>0&&o.delta<=1)||(o.side==='put'&&o.delta<0&&o.delta>=-1)))],[`absolute delta outside ${deltaRange(row).map(v=>v.toFixed(2)).join('–')}`,o=>(o.delta_verified??o.greeks_verified)&&finite(o.delta)!==null&&!deltaMatches(o,row)],['spread too wide',o=>!o.tight_spread],['volume below 20',o=>finite(o.volume)===null||o.volume<20],['strike beyond 3% of stock price',o=>!o.near_atm],['opposite or unresolved stock direction',o=>!o.direction_aligned],['selected expiration unverified',o=>!o.expiry_verified]];
   const reasons=checks.map(([label,check])=>[label,priced.filter(check).length]).filter(([,n])=>n).map(([label,n])=>`${n} ${label}`);
   return `${priced.length} returned contracts have asks in ${range}, but none passes all filters. ${reasons.length?'Reasons (can overlap): '+reasons.join('; ')+'.':'Eligibility was not established by the scanner.'}`;
 }
@@ -94,16 +99,16 @@ export function contractShortlist(row,data,min=.1,max=.3,now=Date.now()) {
   const ranked=selectableContracts(row,min,max).filter(o=>{
     const delta=finite(o.delta),bid=finite(o.bid),ask=finite(o.ask);
     const key=o.contract_id||`${o.expiry}|${o.side}|${o.strike}`;
-    if(!side||o.side!==side||!o.expiry_verified||!o.near_atm||!(o.delta_verified??o.greeks_verified)||delta===null||Math.abs(delta)<.25||Math.abs(delta)>1||(side==='call'?delta<=0:delta>=0)||bid===null||ask===null||bid<=0||bid>ask||finite(o.volume)===null||o.volume<20||seen.has(key))return false;
+    if(!side||o.side!==side||!o.expiry_verified||!o.near_atm||!(o.delta_verified??o.greeks_verified)||delta===null||!deltaMatches(o,row)||(side==='call'?delta<=0:delta>=0)||bid===null||ask===null||bid<=0||bid>ask||finite(o.volume)===null||o.volume<20||seen.has(key))return false;
     seen.add(key);return true;
-  }).sort((a,b)=>(Number(Math.abs(b.delta)>=.4)-Number(Math.abs(a.delta)>=.4))||(finite(a.spread_pct)??Infinity)-(finite(b.spread_pct)??Infinity)||(finite(a.distance_pct)??Infinity)-(finite(b.distance_pct)??Infinity)||b.volume-a.volume||(row.prefer_low_theta?(thetaDecayPct(a)??Infinity)-(thetaDecayPct(b)??Infinity):0)||a.ask-b.ask||String(a.contract_id||a.strike).localeCompare(String(b.contract_id||b.strike)));
+  }).sort((a,b)=>(Number(Math.abs(b.delta)>=(row.expiration_window==='month'?.75:.40))-Number(Math.abs(a.delta)>=(row.expiration_window==='month'?.75:.40)))||(finite(a.spread_pct)??Infinity)-(finite(b.spread_pct)??Infinity)||(finite(a.distance_pct)??Infinity)-(finite(b.distance_pct)??Infinity)||b.volume-a.volume||(row.prefer_low_theta?(thetaDecayPct(a)??Infinity)-(thetaDecayPct(b)??Infinity):0)||a.ask-b.ask||String(a.contract_id||a.strike).localeCompare(String(b.contract_id||b.strike)));
   const historical=!!dataStatus(row,data,now);
   const setupReady=['TRIGGERED','CONFIRMED','WATCH','SECOND-WAVE'].includes(row.execution_state);
   return ranked.slice(0,3).map((option,i)=>{
     const expired=option.expiry<day,wrongDate=row.expiration_window?false:option.expiry!==day;
     const label=expired?'EXPIRED · HISTORY ONLY':historical||wrongDate?'HISTORICAL MATCH':row.expiration_window?'LATER-EXPIRY RESEARCH':!setupReady?'CONTRACT TO MONITOR':i===0?'PRIMARY WATCH':'BACKUP WATCH';
     const guidance=expired?'This contract has expired. Wait for a new session scan.':historical||wrongDate?'Historical quote only. Wait for a fresh regular-session scan.':row.expiration_window?'Later-expiry research match, not an entry signal. Verify this contract and its holding-period thesis separately.':!setupReady?'The stock setup is not ready. Wait for a new qualifying setup.':'Watch candidate, not a buy signal. Verify the stock trigger and current option quote in Robinhood before considering an entry.';
-    return {option,label,guidance,rank:i+1,preferredDelta:Math.abs(option.delta)>=.4};
+    return {option,label,guidance,rank:i+1,preferredDelta:Math.abs(option.delta)>=(row.expiration_window==='month'?.75:.40)};
   });
 }
 
