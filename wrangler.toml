@@ -2,6 +2,9 @@ name = "0dte-options-command-center"
 main = "worker.js"
 compatibility_date = "2026-09-28"
 
+[build]
+command = "node scripts/build-assets.mjs"
+
 [assets]
 directory = "public"
 binding = "ASSETS"

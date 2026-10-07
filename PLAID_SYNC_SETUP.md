@@ -13,3 +13,9 @@ The feature **fails closed** until every setting below exists. Never add credent
 Cloudflare Access is required in front of both paths, and the Worker separately verifies its signed JWT, audience, issuer, expiry and email. The page's static assets contain no credentials. Its manual file import still lives only in the browser.
 
 References: [Plaid Investments](https://plaid.com/docs/api/products/investments/), [Plaid Link](https://plaid.com/docs/link/), [Cloudflare Access JWT validation](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/).
+
+## Building browser assets
+
+Cloudflare Workers Builds: set **Build command** to `node scripts/build-assets.mjs`; keep **Deploy command** as `npx wrangler deploy` and root directory as `/`. Use a new build of the latest main commit after changing settings. Workers Builds may not honor Wrangler custom builds, so keep the explicit build command there.
+
+The same allowlisted asset builder runs in GitHub Actions and through Wrangler's custom build hook for local deployments. It creates `public/` without copying server code, data, or secrets. GitHub Actions remains responsible for adding the optional KV binding described above; this asset fix does not configure Plaid access or storage.
