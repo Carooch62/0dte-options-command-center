@@ -2,7 +2,7 @@
 import json
 import re
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from quality import number, freshness, contract_checks, verified_delta, ET
 
 direct_terms = (
@@ -57,6 +57,20 @@ def normalize(data,now=None):
         x['usable_contracts']=[o for o in eligible if .10<=o['ask']<=.75]
         x['revisit_contracts']=[o for o in eligible if o['ask']>.30]
         x['option_data_freshness']='DELAYED_UNKNOWN_QUOTE_TIME' if x.get('zero_dte') else x.get('chain_status','NONE')
+        # Later-expiry research is isolated from 0DTE eligibility and state scoring.
+        for key,lo,hi in [('week',1,7),('two_weeks',8,14),('month',15,31)]:
+            group=x.get('expiry_groups',{}).get(key)
+            if group is None: continue
+            future=group.get('options',[])
+            for o in future:
+                o.update(contract_checks(o,number(x.get('price'),0)))
+                try: days=(date.fromisoformat(o.get('expiry',''))-now.astimezone(ET).date()).days
+                except (TypeError,ValueError): days=-1
+                o['expiry_verified']=lo<=days<=hi and o.get('dte')==days
+                o['direction_aligned']=o.get('side')==side
+                o['quote_freshness']=freshness(o.get('option_timestamp'),now,delay=number(o.get('minimum_delay_minutes'),0),max_age=20)
+            group['eligible_contracts']=[o for o in future if o['quote_valid'] and o['delta_ok'] and o['near_atm']
+                and o['expiry_verified'] and o['direction_aligned'] and number(o.get('volume'),0)>=20 and o['usable_spread']]
         strong=any(o['quote_freshness'] in ('RECENT','DELAYED') for o in x['preferred_contracts'])
         items=x.get('news_items',[])
         for n in items:

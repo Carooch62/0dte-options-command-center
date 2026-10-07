@@ -119,3 +119,8 @@ are made in response to this one session.
 
 ### Observation context (2026-10-06)
 New option observations preserve signal-time qualification, execution readiness, chase risk, VWAP, signed 15-minute movement, volume ratio, invalidation, second-wave reason and daily trend context. A TRIGGERED observation is not necessarily a qualified setup. Missing fields in older observations remain unknown; no historical values are backfilled from later scans. This reporting change does not alter observation selection or trading rules.
+
+## Expiration windows (2026-10-06)
+The dashboard adds Same day (0), 1 week (1–7), 2 weeks (8–14), and 1 month (15–31 calendar days from the scan date). These are nonoverlapping windows, not promises of an exact weekly date. Actual dates appear on each match. Existing trend, direction, catalyst and ask filters still apply; use Matching contracts only to hide unmatched stocks.
+
+The scanner retains returned contracts through 31 days from the same provider request. Later expirations are separately normalized in expiry_groups and never enter the existing 0DTE scoring, flow totals, observation selection or confirmation. Price, signed verified delta, volume, strike distance and spread requirements remain unchanged. A new successful scan is required to populate the windows; older snapshots show Not scanned. An incomplete fallback cannot prove no expiry exists. Missing Greeks remain ineligible. Later-expiry matches are research, not validated swing-trade entries. Same-day coverage statistics still refer to same-day chains.
