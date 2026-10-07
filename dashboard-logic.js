@@ -42,7 +42,7 @@ export function passesTheta(o,limit) {
   const ceiling=finite(limit);
   return ceiling===null||(ceiling>=0&&thetaDecayPct(o)!==null&&thetaDecayPct(o)<=ceiling);
 }
-export function deltaRange(row) {return row.expiration_window?[.70,.80]:[.30,.50];}
+export function deltaRange(row) {return row.expiration_window==='month'?[.70,.80]:[.30,.50];}
 export function deltaMatches(o,row) {
   const d=finite(o.delta),[lo,hi]=deltaRange(row);
   return !!(o.delta_verified??o.greeks_verified)&&d!==null&&((o.side==='call'&&d>0)||(o.side==='put'&&d<0))&&Math.abs(d)>=lo&&Math.abs(d)<=hi;
@@ -101,14 +101,14 @@ export function contractShortlist(row,data,min=.1,max=.3,now=Date.now()) {
     const key=o.contract_id||`${o.expiry}|${o.side}|${o.strike}`;
     if(!side||o.side!==side||!o.expiry_verified||!o.near_atm||!(o.delta_verified??o.greeks_verified)||delta===null||!deltaMatches(o,row)||(side==='call'?delta<=0:delta>=0)||bid===null||ask===null||bid<=0||bid>ask||finite(o.volume)===null||o.volume<20||seen.has(key))return false;
     seen.add(key);return true;
-  }).sort((a,b)=>(Number(Math.abs(b.delta)>=(row.expiration_window?.75:.40))-Number(Math.abs(a.delta)>=(row.expiration_window?.75:.40)))||(finite(a.spread_pct)??Infinity)-(finite(b.spread_pct)??Infinity)||(finite(a.distance_pct)??Infinity)-(finite(b.distance_pct)??Infinity)||b.volume-a.volume||(row.prefer_low_theta?(thetaDecayPct(a)??Infinity)-(thetaDecayPct(b)??Infinity):0)||a.ask-b.ask||String(a.contract_id||a.strike).localeCompare(String(b.contract_id||b.strike)));
+  }).sort((a,b)=>(Number(Math.abs(b.delta)>=(row.expiration_window==='month'?.75:.40))-Number(Math.abs(a.delta)>=(row.expiration_window==='month'?.75:.40)))||(finite(a.spread_pct)??Infinity)-(finite(b.spread_pct)??Infinity)||(finite(a.distance_pct)??Infinity)-(finite(b.distance_pct)??Infinity)||b.volume-a.volume||(row.prefer_low_theta?(thetaDecayPct(a)??Infinity)-(thetaDecayPct(b)??Infinity):0)||a.ask-b.ask||String(a.contract_id||a.strike).localeCompare(String(b.contract_id||b.strike)));
   const historical=!!dataStatus(row,data,now);
   const setupReady=['TRIGGERED','CONFIRMED','WATCH','SECOND-WAVE'].includes(row.execution_state);
   return ranked.slice(0,3).map((option,i)=>{
     const expired=option.expiry<day,wrongDate=row.expiration_window?false:option.expiry!==day;
     const label=expired?'EXPIRED · HISTORY ONLY':historical||wrongDate?'HISTORICAL MATCH':row.expiration_window?'LATER-EXPIRY RESEARCH':!setupReady?'CONTRACT TO MONITOR':i===0?'PRIMARY WATCH':'BACKUP WATCH';
     const guidance=expired?'This contract has expired. Wait for a new session scan.':historical||wrongDate?'Historical quote only. Wait for a fresh regular-session scan.':row.expiration_window?'Later-expiry research match, not an entry signal. Verify this contract and its holding-period thesis separately.':!setupReady?'The stock setup is not ready. Wait for a new qualifying setup.':'Watch candidate, not a buy signal. Verify the stock trigger and current option quote in Robinhood before considering an entry.';
-    return {option,label,guidance,rank:i+1,preferredDelta:Math.abs(option.delta)>=(row.expiration_window?.75:.40)};
+    return {option,label,guidance,rank:i+1,preferredDelta:Math.abs(option.delta)>=(row.expiration_window==='month'?.75:.40)};
   });
 }
 

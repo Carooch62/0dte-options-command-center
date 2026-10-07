@@ -496,7 +496,7 @@ def main():
          'data_quality':'DELAYED_RESEARCH','universe_size':len(universe),'scanned_rows':len(rows),
          'news_universe':min(50,len(rows)),'discovery':discovery,'price_errors':list(ERRORS),
          'candidates':rows,'contract_rules':{'preferred_ask_min':.10,'preferred_ask_max':.30,
-         'min_delta':.30,'max_delta':.50,'swing_min_delta':.70,'swing_max_delta':.80,'preferred_delta':.40,'preferred_spread_max':.05,'preferred_spread_pct_max':20}}
+         'min_delta':.30,'max_delta':.50,'trade_dte_max':14,'swing_dte_min':15,'swing_min_delta':.70,'swing_max_delta':.80,'preferred_delta':.40,'preferred_spread_max':.05,'preferred_spread_pct_max':20}}
     coverage(out);Path('data').mkdir(exist_ok=True)
     Path('data/market.json').write_text(json.dumps(out,separators=(',',':'),allow_nan=False))
     print(json.dumps(out['coverage']))

@@ -50,7 +50,7 @@ def verified_delta(o):
     return bool(o.get('delta_verified', o.get('greeks_verified'))) and d is not None and ((side == 'call' and 0 < d <= 1) or (side == 'put' and -1 <= d < 0))
 
 def delta_bounds(o):
-    return (.70, .80) if number(o.get("dte"), 0) > 0 else (.30, .50)
+    return (.70, .80) if number(o.get("dte"), 0) > 14 else (.30, .50)
 
 def contract_checks(o, price):
     valid = valid_quote(o)
