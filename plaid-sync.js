@@ -38,13 +38,14 @@ async function collect(env,connection){
   const token=connection.access_token;
   const holdings=await plaid('/investments/holdings/get',{access_token:token},env);
   const end=new Date().toISOString().slice(0,10),start=new Date(Date.now()-365*86400000).toISOString().slice(0,10);
-  const transactions=[];let offset=0,total=Infinity;
+  const transactions=[];const securities=new Map((holdings.securities||[]).map(s=>[s.security_id,s]));let offset=0,total=Infinity;
   while(offset<total){
     const page=await plaid('/investments/transactions/get',{access_token:token,start_date:start,end_date:end,options:{count:500,offset}},env);
+    for(const security of page.securities||[])securities.set(security.security_id,{...securities.get(security.security_id),...security});
     transactions.push(...(page.investment_transactions||[]));total=page.total_investment_transactions??transactions.length;offset=transactions.length;
     if(!page.investment_transactions?.length||offset>10000)break;
   }
-  return {source:'Plaid Investments',retrieved_at:new Date().toISOString(),range:{start,end},item_id:connection.item_id,accounts:holdings.accounts||[],holdings:holdings.holdings||[],securities:holdings.securities||[],transactions,coverage:{reported_transactions:transactions.length,total_transactions:total,complete:offset>=total}};
+  return {source:'Plaid Investments',retrieved_at:new Date().toISOString(),range:{start,end},item_id:connection.item_id,accounts:holdings.accounts||[],holdings:holdings.holdings||[],securities:[...securities.values()],transactions,coverage:{reported_transactions:transactions.length,total_transactions:total,complete:offset>=total}};
 }
 export async function scheduledPlaidSync(env){
   if(!required(env))return 'unconfigured';
@@ -87,3 +88,4 @@ export async function handlePlaid(request,env){
   }
   return reply({ok:false,error:'Not found'},404);
 }
+
