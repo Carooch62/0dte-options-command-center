@@ -1,0 +1,15 @@
+# Private Plaid brokerage sync
+
+The brokerage page adds a Plaid Investments connection and displays provider holdings and transactions. The Cloudflare Worker collects a fresh encrypted snapshot hourly during the regular session (9:31–15:31 ET) and on request. Plaid determines the underlying data freshness; this is not an option quote or fill feed.
+
+The feature **fails closed** until every setting below exists. Never add credentials, access tokens, account data, or a real KV ID to this public repository.
+
+1. In Cloudflare Workers KV, create a namespace for private Plaid data. Save its namespace ID as GitHub Actions secret `PLAID_KV_NAMESPACE_ID`; the deployment workflow appends a `PLAID_STORE` binding only when this secret exists.
+2. In Cloudflare Zero Trust, add an Access self-hosted application covering `https://0dte-options-command-center.h69htk56cq.workers.dev/brokerage.html` and `https://0dte-options-command-center.h69htk56cq.workers.dev/private/plaid/*`. Permit only your verified email. Copy its application audience (AUD) tag and team domain. You should also protect any alternate hosted URL for the brokerage page.
+3. Add these Cloudflare Worker **secrets** using its dashboard or `wrangler secret put`, never a GitHub commit: `PLAID_CLIENT_ID`, `PLAID_SECRET` (Production secret for real data), `PLAID_ENCRYPTION_KEY` (base64 encoding of 32 random bytes), `CF_ACCESS_TEAM_DOMAIN` (for example `team.cloudflareaccess.com`), `CF_ACCESS_AUD`, `CF_ACCESS_EMAIL` (the one permitted email), `PLAID_ENV` (`production`). Keep the encryption key safe; losing it makes saved snapshots and the access token unreadable.
+4. In the Plaid Dashboard, complete the app/company profile and select a Link use case that truthfully describes personal investment tracking. The Link token requests `investments` at initial consent, which is required for Robinhood. Open `/brokerage.html` in Safari, pass Cloudflare Access, and click Connect account. Choose Robinhood within Plaid Link. Plaid sends the temporary public token directly to the Worker, which exchanges and encrypts the permanent access token in KV.
+5. Check the displayed snapshot timestamp and provider transaction coverage. The first Investments transaction extraction can take a minute or two. A sync error leaves the previous snapshot visible with its actual timestamp. Disconnect calls Plaid `/item/remove` before erasing stored data; note that removing an Item does not restore a consumed Trial Item slot.
+
+Cloudflare Access is required in front of both paths, and the Worker separately verifies its signed JWT, audience, issuer, expiry and email. The page's static assets contain no credentials. Its manual file import still lives only in the browser.
+
+References: [Plaid Investments](https://plaid.com/docs/api/products/investments/), [Plaid Link](https://plaid.com/docs/link/), [Cloudflare Access JWT validation](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/).
