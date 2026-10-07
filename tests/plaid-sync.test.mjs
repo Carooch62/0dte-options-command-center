@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {handlePlaid,scheduledPlaidSync,verifyAccess} from './plaid-sync.js';
+import worker from './worker.js';
 
 const request=(path,method='GET',headers={})=>new Request(`https://example.workers.dev/private/plaid/${path}`,{method,headers});
 const configured={PLAID_CLIENT_ID:'id',PLAID_SECRET:'secret',PLAID_STORE:{},PLAID_ENCRYPTION_KEY:'test',CF_ACCESS_TEAM_DOMAIN:'test.cloudflareaccess.com',CF_ACCESS_AUD:'aud',CF_ACCESS_EMAIL:'me@example.com'};
@@ -18,4 +19,8 @@ test('rejects a missing Access assertion before reading storage',async()=>{
 test('rejects a forged or malformed assertion',async()=>{
  const r=request('snapshot','GET',{'Cf-Access-Jwt-Assertion':'not-a-jwt'});
  assert.equal(await verifyAccess(r,configured),false);
+});
+test('Worker routes private requests through the guarded handler',async()=>{
+ const r=await worker.fetch(request('snapshot'),{ASSETS:{fetch(){throw Error('Unprotected asset route')}}});
+ assert.equal(r.status,503);
 });
