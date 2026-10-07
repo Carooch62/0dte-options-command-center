@@ -18,7 +18,7 @@ jobs:
       - name: Prepare browser assets
         run: |
           mkdir -p public
-          cp index.html dashboard.html dashboard_v2.html dashboard_glass.html dashboard_glass_previous.html dashboard_mobile_preview.html dashboard-mobile.css dashboard-app-previous.js dashboard-app.js dashboard-logic.js refresh-progress.js trade-review.js public/
+          cp index.html dashboard.html dashboard_v2.html dashboard_glass.html dashboard_glass_previous.html dashboard_mobile_preview.html dashboard-mobile.css dashboard-app-previous.js dashboard-app.js dashboard-logic.js refresh-progress.js trade-review.js brokerage.html dashboard-broker.js dashboard-broker-logic.js public/
       - name: Deploy Worker
         run: npx wrangler@4 deploy
         env:
