@@ -11,7 +11,7 @@ class ExpirationWindowsTests(unittest.TestCase):
         rows=[]
         for days in [-1,0,1,7,8,14,15,31,32]:
             exp=(now+timedelta(days=days)).strftime('%y%m%d')
-            rows.append({'option':f'TEST{exp}C00100000','bid':.19,'ask':.21,'delta':.45,'gamma':.1,'volume':100})
+            rows.append({'option':f'TEST{exp}C00100000','bid':.19,'ask':.21,'delta':.45 if days==0 else .75,'gamma':.1,'volume':100})
         with patch.object(scanner,'request_json',return_value={'data':{'options':rows}}):
             result=scanner.fetch_cboe('TEST')
         self.assertEqual([o['dte'] for o in result['contracts']],[0,1,7,8,14,15,31])

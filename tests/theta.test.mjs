@@ -10,11 +10,11 @@ test('theta decay uses premium percentage and never treats missing as zero',()=>
  assert.equal(passesTheta({},10),false);
 });
 test('theta caps apply in every expiry window without bypassing quality gates',()=>{
- const good={ask:.2,theta:-.02,theta_available:true,quote_valid:true,delta_ok:true,tight_spread:true};
+ const good={side:'call',delta:.4,delta_verified:true,ask:.2,theta:-.02,theta_available:true,quote_valid:true,delta_ok:true,tight_spread:true};
  const opts=[good,{...good,theta:-.04},{...good,theta_available:false},{...good,delta_ok:false},{...good,tight_spread:false}];
- const row={eligible_contracts:opts,expiry_groups:Object.fromEntries(['week','two_weeks','month'].map(k=>[k,{eligible_contracts:opts}]))};
+ const row={eligible_contracts:opts,expiry_groups:Object.fromEntries(['week','two_weeks','month'].map(k=>[k,{eligible_contracts:opts.map(o=>({...o,delta:.75}))}]))};
  for(const window of ['today','week','two_weeks','month']) {
-  assert.deepEqual(selectableContracts({...expirationView(row,window),theta_limit_pct:10}),[good]);
+  assert.deepEqual(selectableContracts({...expirationView(row,window),theta_limit_pct:10}),[{...good,delta:window==='today'?.4:.75}]);
   assert.equal(selectableContracts({...expirationView(row,window),theta_limit_pct:null}).length,3);
  }
 });

@@ -127,3 +127,6 @@ The scanner retains returned contracts through 31 days from the same provider re
 
 ### Low-theta screening
 All expiration windows offer an optional daily-decay ceiling of 5%, 10%, or 20% of observed ask: `-reported theta / ask * 100`. Lower decay is the default tie-break after existing delta, spread, strike distance and volume priorities; no ceiling is applied by default. These are adjustable research settings, not backtested thresholds or a change to stock setup scores. Unknown/positive theta has no usable decay estimate; active caps exclude it. Explicitly reported zero is valid, but old snapshots without availability metadata and Nasdaq's missing Greeks are unavailable. Refresh with a new successful scan for theta metadata. Theta is a local model sensitivity, not a linear daily loss forecast, stop-loss, or guarantee of safety. Quote delays and fees still apply.
+
+### Delta ranges
+Contract eligibility requires verified signed delta and inclusive absolute delta 0.30–0.50 for same-day expiration; 0.70–0.80 for the 1-week, 2-week and 1-month swing research windows. Calls use positive delta and puts negative delta. Expiration windows serve as the holding-style proxy; later-expiry research still requires a separate swing thesis. Existing price, liquidity, spread, direction and theta filters also apply.

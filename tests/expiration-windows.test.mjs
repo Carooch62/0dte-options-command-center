@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {expirationView,selectableContracts,contractShortlist,contractExplanation} from '../dashboard-logic.js';
 test('expiration selection preserves all other contract filters and source row',()=>{
- const option={contract_id:'future',expiry:'2026-10-13',dte:7,side:'call',strike:100,ask:.21,bid:.19,volume:100,delta:.45,delta_verified:true,quote_valid:true,delta_ok:true,tight_spread:true,near_atm:true,expiry_verified:true};
+ const option={contract_id:'future',expiry:'2026-10-13',dte:7,side:'call',strike:100,ask:.21,bid:.19,volume:100,delta:.75,delta_verified:true,quote_valid:true,delta_ok:true,tight_spread:true,near_atm:true,expiry_verified:true};
  const row={direction:'UP',execution_state:'TRIGGERED',bar_end:'2026-10-06T15:00:00Z',options:[],eligible_contracts:[],expiry_groups:{week:{options:[option],eligible_contracts:[option],chain_status:'SUCCESS'}}};
  assert.equal(expirationView(row),row);
  const selected=expirationView(row,'week');
