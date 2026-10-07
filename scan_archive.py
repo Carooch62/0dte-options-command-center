@@ -51,7 +51,8 @@ def archive_receipt(destination, health, receipts):
                {'health': health, 'receipts': matching})
 
 
-BROKER_FIELDS = ('ticker', 'rank', 'direction', 'setup_qualified', 'chase_risk',
+BROKER_FIELDS = ('ticker', 'rank', 'direction', 'setup_qualified', 'qualification_checks',
+                 'qualification_reasons', 'bar_end', 'execution_state', 'chase_risk',
                  'vwap', 'price', 'trigger_price', 'volume_ratio', 'volume_acceleration', 'trend_context')
 
 def rebuild_brokerage_index(day_path):

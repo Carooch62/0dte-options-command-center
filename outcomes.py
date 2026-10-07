@@ -27,7 +27,10 @@ def update(data, path='data/option-observations.json'):
             if key in event['markouts'] or not horizon<=elapsed<=horizon+10:continue
             verified=bool(parse_time(quote.get('option_timestamp')) and parse_time(event.get('quote_timestamp')))
             event['markouts'][key]={'observed_at':now.isoformat(),'elapsed_minutes':round(elapsed,2),
-                'exit_bid':quote['bid'],'gross_quote_change_per_contract':round((quote['bid']-event['entry_ask'])*100,2),
+                'exit_bid':quote['bid'],'exit_ask':quote.get('ask'),
+                'quote_timestamp':quote.get('option_timestamp'),'source_timestamp':quote.get('payload_timestamp'),
+                'spread':quote.get('spread'),'spread_pct':quote.get('spread_pct'),
+                'gross_quote_change_per_contract':round((quote['bid']-event['entry_ask'])*100,2),
                 'timing_verified':verified,'interpretation':'QUOTED_MARKOUT_NOT_A_FILL' if verified else 'UNVERIFIED_QUOTE_TIMING',
                 'fees_included':False}
     seen={(e['scan_id'],e['contract_id']) for e in events}
@@ -39,12 +42,17 @@ def update(data, path='data/option-observations.json'):
             if cid in active or (data['scan_id'],cid) in seen:continue
             events.append({'scan_id':data['scan_id'],'market_date':today,'observed_at':now.isoformat(),
                 'ticker':x['ticker'],'contract_id':cid,'expiry':o.get('expiry'),'side':o['side'],'strike':o['strike'],
-                'entry_ask':o['ask'],'entry_bid':o['bid'],'volume':o.get('volume'),'delta':o.get('delta'),
+                'entry_ask':o['ask'],'entry_bid':o['bid'],'volume':o.get('volume'),'delta':o.get('delta'),'theta':o.get('theta'),
+                'theta_available':o.get('theta_available'),'spread':o.get('spread'),'spread_pct':o.get('spread_pct'),
+                'quote_freshness':o.get('quote_freshness'),'minimum_delay_minutes':o.get('minimum_delay_minutes'),
                 'quote_timestamp':o.get('option_timestamp'),'source_timestamp':o.get('payload_timestamp') or o.get('option_timestamp'),
                 'stock_price':x['price'],'trigger':x.get('trigger_price'),'state':x.get('execution_state'),
                 'signal_inputs':{'direction':x.get('direction'),'move_5m':x.get('move_5m'),'volume_acceleration':x.get('volume_acceleration'),
                                  'catalyst':x.get('catalyst_level'),'quote_source':o.get('source'),
                                  'setup_qualified':x.get('setup_qualified'),
+                                 'qualification_checks':deepcopy(x.get('qualification_checks')),
+                                 'qualification_reasons':deepcopy(x.get('qualification_reasons')),
+                                 'bar_end':x.get('bar_end'),
                                  'execution_readiness':x.get('execution_readiness'),
                                  'chase_risk':x.get('chase_risk'),'vwap':x.get('vwap'),
                                  'recent_move':x.get('recent_move'),'volume_ratio':x.get('volume_ratio'),

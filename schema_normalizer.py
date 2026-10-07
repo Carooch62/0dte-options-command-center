@@ -84,6 +84,13 @@ def normalize(data,now=None):
         x['catalyst']=x['catalyst_level']!='NONE'
         confirmation=x['momentum_confirmed'] or x['acceleration_confirmed']
         x['setup_qualified']=bool(x['catalyst'] and confirmation)
+        x['qualification_checks']={'current_session_data':bool(current),'direction_confirmed':bool(x['direction_confirmed']),
+                                   'momentum_confirmed':x['momentum_confirmed'],'acceleration_confirmed':x['acceleration_confirmed'],
+                                   'catalyst_confirmed':x['catalyst']}
+        x['qualification_reasons']=([ 'Current session data unavailable' ] if not current else []) + \
+            ([ 'Directional momentum not confirmed' ] if not directional else []) + \
+            ([ 'Momentum and acceleration confirmation missing' ] if not confirmation else []) + \
+            ([ 'Company-specific catalyst not confirmed' ] if not x['catalyst'] else [])
         x['flow_aligned']=False  # cumulative call/put volume is not verified buying flow
         x['volume_balance_aligned']=(x.get('volume_balance')=='CALL' and side=='call') or (x.get('volume_balance')=='PUT' and side=='put')
         x['execution_readiness']='VERIFIED_DELAYED' if strong and confirmation else 'WATCH_ONLY' if current else 'INSUFFICIENT_DATA'
