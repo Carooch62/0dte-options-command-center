@@ -1,3 +1,4 @@
+import {handlePlaid,scheduledPlaidSync} from './plaid-sync.js';
 const REPO = 'Carooch62/0dte-options-command-center';
 const WORKFLOW = 'market-scan.yml';
 const VERSION = '2026-09-30.6-contract-reasons';
@@ -37,9 +38,18 @@ export default {
   async scheduled(controller,env) {
     const result=await scheduledScan(env,new Date(controller.scheduledTime));
     console.log(JSON.stringify({scheduler:result,scheduled_at:controller.scheduledTime}));
+    // Existing five-minute trigger: collect a private brokerage snapshot hourly during the session.
+    const now=new Date(controller.scheduledTime);
+    if(regularWeekday(now)&&new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',minute:'2-digit'}).format(now)==='31') {
+      const status=await scheduledPlaidSync(env);
+      console.log(JSON.stringify({plaid_sync:status,scheduled_at:controller.scheduledTime}));
+    }
   },
   async fetch(request,env) {
     const url=new URL(request.url);
+    if(url.pathname.startsWith('/private/plaid/')) {
+      try{return await handlePlaid(request,env)}catch(e){return response({ok:false,error:e.message},502,request)}
+    }
     if(request.method==='OPTIONS')return response({},204,request);
     try {
       if(url.pathname==='/health') {

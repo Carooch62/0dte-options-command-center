@@ -22,3 +22,37 @@ $('file').onchange=async e=>{try{const f=e.target.files[0];if(!f)return;if(f.siz
 $('clear').onclick=()=>{localStorage.removeItem(key);pack=null;$('status').textContent='Saved brokerage data cleared.';for(const id of ['summary','trades','issues','holdings'])$(id).textContent='';$('export').disabled=true;};
 $('export').onclick=()=>{const u=URL.createObjectURL(new Blob([JSON.stringify(researchDataset(pack,history),null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=u;a.download='private-brokerage-research.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);};
 try{const saved=localStorage.getItem(key);if(saved){pack=validatePack(JSON.parse(saved));render();}}catch{$('status').textContent='Saved snapshot could not be read. Import a valid snapshot to replace it.';}
+
+const privateApi=async(path,body)=>{
+ const r=await fetch(`/private/plaid/${path}`,{method:body===undefined?'GET':'POST',credentials:'same-origin',headers:body===undefined?{}:{'Content-Type':'application/json','X-Requested-With':'BrokerageReview'},...(body===undefined?{}:{body:JSON.stringify(body)})});
+ const data=await r.json();if(!r.ok)throw Error(data.error||`HTTP ${r.status}`);return data;
+};
+const plaidStatus=$('plaid-status'),plaidView=$('plaid-snapshot');
+function plaidButtons(connected){$('plaid-connect').disabled=connected;$('plaid-sync').disabled=!connected;$('plaid-disconnect').disabled=!connected;}
+function renderPlaid(snapshot){
+ if(!snapshot){plaidView.textContent='No synced snapshot yet.';return;}
+ const securities=new Map((snapshot.securities||[]).map(x=>[x.security_id,x]));
+ const accounts=new Map((snapshot.accounts||[]).map(x=>[x.account_id,x]));
+ const row=(...cells)=>`<tr>${cells.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`;
+ const holdings=(snapshot.holdings||[]).map(h=>row(accounts.get(h.account_id)?.name||'Account',securities.get(h.security_id)?.ticker_symbol||securities.get(h.security_id)?.name||'Security',h.quantity,h.institution_value,h.institution_price_as_of||'Unknown')).join('');
+ const trades=(snapshot.transactions||[]).slice(0,100).map(t=>row(t.date,t.name||t.type,securities.get(t.security_id)?.ticker_symbol||'Security',t.quantity,t.amount,t.fees??'Unknown')).join('');
+ plaidView.innerHTML=`<p>Last collected: ${esc(snapshot.retrieved_at)} · Provider records ${esc(snapshot.transactions?.length)} / ${esc(snapshot.coverage?.total_transactions)} · ${snapshot.coverage?.complete?'complete for requested date range':'incomplete'}</p><h3>Holdings</h3><table><tr><th>Account</th><th>Security</th><th>Quantity</th><th>Reported value</th><th>Price date</th></tr>${holdings}</table><h3>Latest provider transactions (up to 100)</h3><table><tr><th>Date</th><th>Action</th><th>Security</th><th>Quantity</th><th>Amount</th><th>Fees</th></tr>${trades}</table>`;
+}
+async function loadPlaid(){
+ try{const s=await privateApi('status');plaidButtons(s.connected);plaidStatus.textContent=s.connected?`Connected. Last collected: ${s.last_updated||'waiting for first sync'}.${s.sync_error?` Latest error: ${s.sync_error.message}`:''}`:'Ready to connect through Plaid.';if(s.connected)renderPlaid((await privateApi('snapshot')).snapshot);else plaidView.textContent='';}
+ catch(e){plaidButtons(false);$('plaid-connect').disabled=true;plaidStatus.textContent=`Automatic sync unavailable: ${e.message}. Manual import still works.`;}
+}
+$('plaid-connect').onclick=async()=>{
+ try{
+  $('plaid-connect').disabled=true;plaidStatus.textContent='Opening Plaid…';
+  const {link_token}=await privateApi('link-token',{});
+  if(!window.Plaid)throw Error('Plaid Link could not load. Open this page in Safari and retry.');
+  const handler=window.Plaid.create({token:link_token,onSuccess:async public_token=>{
+   try{await privateApi('exchange',{public_token});plaidStatus.textContent='Connected. Collecting your first snapshot…';await privateApi('sync',{});await loadPlaid();}
+   catch(e){plaidStatus.textContent=`Connection completed, but sync needs attention: ${e.message}`;await loadPlaid();}
+  },onExit:()=>loadPlaid()});handler.open();
+ }catch(e){plaidStatus.textContent=`Could not open connection: ${e.message}`;await loadPlaid();}
+};
+$('plaid-sync').onclick=async()=>{try{plaidStatus.textContent='Collecting provider data…';await privateApi('sync',{});await loadPlaid();}catch(e){plaidStatus.textContent=`Sync failed: ${e.message}`;}};
+$('plaid-disconnect').onclick=async()=>{if(!confirm('Disconnect the Plaid account and erase its server snapshot?'))return;try{await privateApi('disconnect',{});await loadPlaid();}catch(e){plaidStatus.textContent=`Disconnect failed: ${e.message}`;}};
+await loadPlaid();
