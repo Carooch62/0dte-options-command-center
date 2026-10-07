@@ -18,12 +18,7 @@ jobs:
       - name: Prepare browser assets
         run: node scripts/build-assets.mjs
       - name: Deploy Worker
-        run: |
-          if [ -n "$PLAID_KV_NAMESPACE_ID" ]; then
-            printf '\n[[kv_namespaces]]\nbinding = "PLAID_STORE"\nid = "%s"\n' "$PLAID_KV_NAMESPACE_ID" >> wrangler.toml
-          fi
-          npx wrangler@4 deploy
+        run: npx wrangler@4 deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          PLAID_KV_NAMESPACE_ID: ${{ secrets.PLAID_KV_NAMESPACE_ID }}
