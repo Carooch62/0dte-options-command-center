@@ -52,6 +52,9 @@ jobs:
       - name: Scan, enrich, and validate
         id: scan
         run: python pipeline.py
+      - name: Audit research readiness
+        if: success()
+        run: python ml_readiness.py > data/ml-readiness.json
       - name: Record workflow failure
         if: failure()
         env:
