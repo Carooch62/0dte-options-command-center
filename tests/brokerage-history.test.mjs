@@ -1,0 +1,3 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {decodeArchive} from '../brokerage-history.js';
+test('shared archived trend context restores candidate evidence',()=>{const context={as_of:'2026-10-05',periods:{week:{direction:'UP'}}};const r=decodeArchive({version:1,trend_contexts:[context],snapshots:[{candidate_state:[{ticker:'ABC',trend_context_ref:0}]}]});assert.deepEqual(r[0].candidate_state[0],{ticker:'ABC',trend_context:context});});
+test('broken references cannot silently lose historical context',()=>assert.throws(()=>decodeArchive({version:1,trend_contexts:[],snapshots:[{candidate_state:[{trend_context_ref:0}]}]})));
