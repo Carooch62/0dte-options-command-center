@@ -295,6 +295,7 @@ def fetch_cboe(t):
                     'last':number(row.get('last_trade_price')), 'volume':int(num(row.get('volume'))),
                     'oi':int(num(row.get('open_interest'))),'delta':delta,'gamma':gamma,
                     'iv':number(row.get('iv')),'theta':number(row.get('theta')),
+                    'theta_available':number(row.get('theta')) is not None,
                     'delta_verified':delta is not None and -1 <= delta <= 1 and delta != 0,
                     'gamma_verified':gamma is not None and gamma >= 0,
                     'greeks_verified':delta is not None and gamma is not None and delta != 0 and gamma >= 0,
@@ -350,7 +351,7 @@ def parse_nasdaq_rows(rows, today, max_days=0):
                 "mid": round(mid, 2), "last": round(last, 2),
                 "volume": int(num(row.get(prefix+"Volume") or row.get(prefix+"volume"))),
                 "oi": int(num(row.get(prefix+"Openinterest") or row.get(prefix+"OpenInterest") or row.get(prefix+"openInterest"))),
-                "iv": 0, "delta": 0, "gamma": 0, "theta": 0, "vega": 0,
+                "iv": 0, "delta": 0, "gamma": 0, "theta": None, "theta_available": False, "vega": 0,
                 "expiry": exp.isoformat(), "dte": (exp-today).days, "source": "Nasdaq public chain", "contract_id": f"{exp.isoformat()}:{side}:{strike}",
                 "option_timestamp": None, "greeks_verified": False,
             })

@@ -32,9 +32,19 @@ export function displayState(row,data,now=Date.now()) {
   }
   return row.execution_state||'WATCH';
 }
+// Reported daily theta / observed ask. An instantaneous model estimate, not a forecast.
+export function thetaDecayPct(o) {
+  const theta=finite(o.theta),ask=finite(o.ask);
+  if(o.theta_available!==true||theta===null||theta>0||ask===null||ask<=0)return null;
+  return Math.max(0,-theta)/ask*100;
+}
+export function passesTheta(o,limit) {
+  const ceiling=finite(limit);
+  return ceiling===null||(ceiling>=0&&thetaDecayPct(o)!==null&&thetaDecayPct(o)<=ceiling);
+}
 export function selectableContracts(row,min=.1,max=.3) {
   if(!Number.isFinite(min)||!Number.isFinite(max)||min<0||max<min)return [];
-  return (row.eligible_contracts||[]).filter(o=>o.quote_valid&&o.delta_ok&&o.tight_spread&&o.ask>=min&&o.ask<=max);
+  return (row.eligible_contracts||[]).filter(o=>o.quote_valid&&o.delta_ok&&o.tight_spread&&o.ask>=min&&o.ask<=max&&passesTheta(o,row.theta_limit_pct));
 }
 export function requestPublished(data,id) {return Boolean(id&&data?.scan_id===id);}
 export function tradePL(trade) {return (trade.exit-trade.entry)*trade.qty*100-(trade.fees||0);}
@@ -67,7 +77,7 @@ export function contractExplanation(row,min=.1,max=.3) {
   const range=`$${min.toFixed(2)}–$${max.toFixed(2)}`;
   const priced=all.filter(o=>finite(o.ask)!==null&&o.ask>=min&&o.ask<=max);
   if(!priced.length)return `None of the ${all.length} returned contracts has an ask in your ${range} range.`;
-  const checks=[['invalid bid/ask',o=>!o.quote_valid],['delta missing or unverified',o=>!((o.delta_verified??o.greeks_verified)&&finite(o.delta)!==null&&((o.side==='call'&&o.delta>0&&o.delta<=1)||(o.side==='put'&&o.delta<0&&o.delta>=-1)))],['absolute delta below 0.25',o=>(o.delta_verified??o.greeks_verified)&&finite(o.delta)!==null&&Math.abs(o.delta)<.25],['spread too wide',o=>!o.tight_spread],['volume below 20',o=>finite(o.volume)===null||o.volume<20],['strike beyond 3% of stock price',o=>!o.near_atm],['opposite or unresolved stock direction',o=>!o.direction_aligned],['selected expiration unverified',o=>!o.expiry_verified]];
+  const checks=[['theta unavailable or above selected decay limit',o=>!passesTheta(o,row.theta_limit_pct)],['invalid bid/ask',o=>!o.quote_valid],['delta missing or unverified',o=>!((o.delta_verified??o.greeks_verified)&&finite(o.delta)!==null&&((o.side==='call'&&o.delta>0&&o.delta<=1)||(o.side==='put'&&o.delta<0&&o.delta>=-1)))],['absolute delta below 0.25',o=>(o.delta_verified??o.greeks_verified)&&finite(o.delta)!==null&&Math.abs(o.delta)<.25],['spread too wide',o=>!o.tight_spread],['volume below 20',o=>finite(o.volume)===null||o.volume<20],['strike beyond 3% of stock price',o=>!o.near_atm],['opposite or unresolved stock direction',o=>!o.direction_aligned],['selected expiration unverified',o=>!o.expiry_verified]];
   const reasons=checks.map(([label,check])=>[label,priced.filter(check).length]).filter(([,n])=>n).map(([label,n])=>`${n} ${label}`);
   return `${priced.length} returned contracts have asks in ${range}, but none passes all filters. ${reasons.length?'Reasons (can overlap): '+reasons.join('; ')+'.':'Eligibility was not established by the scanner.'}`;
 }
@@ -86,7 +96,7 @@ export function contractShortlist(row,data,min=.1,max=.3,now=Date.now()) {
     const key=o.contract_id||`${o.expiry}|${o.side}|${o.strike}`;
     if(!side||o.side!==side||!o.expiry_verified||!o.near_atm||!(o.delta_verified??o.greeks_verified)||delta===null||Math.abs(delta)<.25||Math.abs(delta)>1||(side==='call'?delta<=0:delta>=0)||bid===null||ask===null||bid<=0||bid>ask||finite(o.volume)===null||o.volume<20||seen.has(key))return false;
     seen.add(key);return true;
-  }).sort((a,b)=>(Number(Math.abs(b.delta)>=.4)-Number(Math.abs(a.delta)>=.4))||(finite(a.spread_pct)??Infinity)-(finite(b.spread_pct)??Infinity)||(finite(a.distance_pct)??Infinity)-(finite(b.distance_pct)??Infinity)||b.volume-a.volume||a.ask-b.ask||String(a.contract_id||a.strike).localeCompare(String(b.contract_id||b.strike)));
+  }).sort((a,b)=>(Number(Math.abs(b.delta)>=.4)-Number(Math.abs(a.delta)>=.4))||(finite(a.spread_pct)??Infinity)-(finite(b.spread_pct)??Infinity)||(finite(a.distance_pct)??Infinity)-(finite(b.distance_pct)??Infinity)||b.volume-a.volume||(row.prefer_low_theta?(thetaDecayPct(a)??Infinity)-(thetaDecayPct(b)??Infinity):0)||a.ask-b.ask||String(a.contract_id||a.strike).localeCompare(String(b.contract_id||b.strike)));
   const historical=!!dataStatus(row,data,now);
   const setupReady=['TRIGGERED','CONFIRMED','WATCH','SECOND-WAVE'].includes(row.execution_state);
   return ranked.slice(0,3).map((option,i)=>{
