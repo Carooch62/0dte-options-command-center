@@ -1,3 +1,4 @@
+import {applyExecutionEvidence} from './execution-evidence.js?v=20261007-evidence';
 // Private brokerage records are processed locally. No network calls in this module.
 const num=v=>v===null||v===undefined||v===''?null:Number.isFinite(Number(v))?Number(v):null;
 const timestamp=v=>Date.parse(typeof v==='string'?v.replace(/(\.\d{3})\d+(?=Z|[+-]\d\d:\d\d$)/,'$1'):v);
@@ -61,16 +62,16 @@ export function reconcile(p){
  return {trades,issues,ignored_count:ignored.length};
 }
 export function scannerComparison(trade,history){
- const t=timestamp(trade.time),day=new Date(t).toLocaleDateString('en-CA',{timeZone:'America/New_York'});
+ const t=timestamp(trade.comparison_at||trade.time),day=new Date(t).toLocaleDateString('en-CA',{timeZone:'America/New_York'});
  const snapshots=history.filter(s=>{const published=timestamp(s.dashboard_generated_at||s.generated_at),available=timestamp(s.recovered_commit_at||s.dashboard_generated_at||s.generated_at);return available<=t&&published<=t&&new Date(published).toLocaleDateString('en-CA',{timeZone:'America/New_York'})===day;}).sort((a,b)=>timestamp(b.dashboard_generated_at||b.generated_at)-timestamp(a.dashboard_generated_at||a.generated_at));
  const scan=snapshots[0];if(!scan)return {status:'NO_PRIOR_SNAPSHOT'};
  const row=(scan.candidate_state||[]).find(x=>x.ticker===trade.ticker),age=(t-timestamp(scan.dashboard_generated_at||scan.generated_at))/60000;
  if(!row)return {status:'NOT_IN_PRIOR_SNAPSHOT',scan_id:scan.scan_id,age_minutes:age};
- return {status:'RESEARCH_COMPARISON',scan_id:scan.scan_id,recovered_from_commit:scan.recovered_from_commit||null,comparison_time_basis:'provider transaction timestamp, not verified fill',published_at:scan.dashboard_generated_at||scan.generated_at,age_minutes:age,rank:row.rank,direction_aligned:row.direction===(trade.side==='call'?'UP':'DOWN'),setup_qualified:row.setup_qualified??null,chase_risk:row.chase_risk??'UNKNOWN',vwap:row.vwap,price:row.price,trigger_price:row.trigger_price,volume_ratio:row.volume_ratio,volume_acceleration:row.volume_acceleration,trend_context:row.trend_context??null,contract_delta_at_entry:null,contract_theta_at_entry:null,limitation:'Provider transaction time may precede fill. Snapshot publication is approximate; quote Greeks at entry are unavailable.'};
+ return {status:'RESEARCH_COMPARISON',scan_id:scan.scan_id,recovered_from_commit:scan.recovered_from_commit||null,comparison_time_basis:trade.comparison_time_basis||'provider transaction timestamp, not verified fill',published_at:scan.dashboard_generated_at||scan.generated_at,age_minutes:age,rank:row.rank,direction_aligned:row.direction===(trade.side==='call'?'UP':'DOWN'),setup_qualified:row.setup_qualified??null,chase_risk:row.chase_risk??'UNKNOWN',vwap:row.vwap,price:row.price,trigger_price:row.trigger_price,volume_ratio:row.volume_ratio,volume_acceleration:row.volume_acceleration,trend_context:row.trend_context??null,contract_delta_at_entry:null,contract_theta_at_entry:null,limitation:'Provider transaction time may precede fill. Snapshot publication is approximate; quote Greeks at entry are unavailable.'};
 }
-export function researchDataset(pack,history){
- const r=reconcile(pack),rows=r.trades.map(t=>({...t,scanner:scannerComparison(t,history)}));
- return {version:1,scanner_history:{snapshots_loaded:history.length,recovered_snapshots:history.filter(s=>s.recovered_from_commit).length,invalid_timestamps:history.filter(s=>!Number.isFinite(timestamp(s.dashboard_generated_at||s.generated_at))).length,matched_comparisons:rows.filter(r=>r.scanner.status==='RESEARCH_COMPARISON').length},source:pack.source,coverage:pack.coverage||null,retrieved_at:pack.retrieved_at,rows,issues:r.issues,provider_records:pack.transactions,ignored_count:r.ignored_count,ml_ready:false,ml_note:'Reconciled transactions are research evidence. Missing exact execution/quote timing and an audited chronological split prevent model-readiness claims.'};
+export function researchDataset(pack,history,evidence=[]){
+ const r=reconcile(pack),verified=applyExecutionEvidence(r.trades,evidence),rows=verified.rows.map(t=>({...t,scanner:scannerComparison(t,history)}));
+ return {version:1,scanner_history:{snapshots_loaded:history.length,recovered_snapshots:history.filter(s=>s.recovered_from_commit).length,invalid_timestamps:history.filter(s=>!Number.isFinite(timestamp(s.dashboard_generated_at||s.generated_at))).length,matched_comparisons:rows.filter(r=>r.scanner.status==='RESEARCH_COMPARISON').length},source:pack.source,coverage:pack.coverage||null,retrieved_at:pack.retrieved_at,rows,execution_records:evidence,issues:[...r.issues,...verified.issues],provider_records:pack.transactions,ignored_count:r.ignored_count,ml_ready:false,ml_note:'Reconciled transactions are research evidence. Missing exact execution/quote timing and an audited chronological split prevent model-readiness claims.'};
 }
 
 
