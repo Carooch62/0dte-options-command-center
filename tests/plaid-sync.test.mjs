@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {handlePlaid,scheduledPlaidSync,verifyAccess} from './plaid-sync.js';
-import worker from './worker.js';
+import {handlePlaid,scheduledPlaidSync,verifyAccess} from '../plaid-sync.js';
+import worker from '../worker.js';
 
 const request=(path,method='GET',headers={})=>new Request(`https://example.workers.dev/private/plaid/${path}`,{method,headers});
 const configured={PLAID_CLIENT_ID:'id',PLAID_SECRET:'secret',PLAID_STORE:{},PLAID_ENCRYPTION_KEY:'test',PLAID_ENV:'sandbox',CF_ACCESS_TEAM_DOMAIN:'test.cloudflareaccess.com',CF_ACCESS_AUD:'aud',CF_ACCESS_EMAIL:'me@example.com'};
