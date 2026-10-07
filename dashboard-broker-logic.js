@@ -26,7 +26,7 @@ export function reconcile(p){
   }
   seen.set(uid,r);
   const option=parseOption(r.ticker_symbol);
-  if(!option){ignored.push(r);continue;}
+  if(!option){if(/\b(call|put)\b.*\bstrike\b/i.test(r.name||''))issues.push({symbol:r.ticker_symbol||r.security_name||r.security_id||'Unknown option',source_id:id,reason:'Option description present but a standard contract symbol is missing; expiry and contract identity require review'});else ignored.push(r);continue;}
   if(!groups.has(key))groups.set(key,{option,symbol:r.ticker_symbol,rows:[],invalid:false});
   groups.get(key).rows.push(r);
  }
@@ -60,5 +60,14 @@ export function scannerComparison(trade,history){
 }
 export function researchDataset(pack,history){
  const r=reconcile(pack),rows=r.trades.map(t=>({...t,scanner:scannerComparison(t,history)}));
- return {version:1,source:pack.source,coverage:pack.coverage||null,retrieved_at:pack.retrieved_at,rows,issues:r.issues,ml_ready:false,ml_note:'Reconciled transactions are research evidence. Missing exact execution/quote timing and an audited chronological split prevent model-readiness claims.'};
+ return {version:1,source:pack.source,coverage:pack.coverage||null,retrieved_at:pack.retrieved_at,rows,issues:r.issues,provider_records:pack.transactions,ignored_count:r.ignored_count,ml_ready:false,ml_note:'Reconciled transactions are research evidence. Missing exact execution/quote timing and an audited chronological split prevent model-readiness claims.'};
+}
+
+
+// Keep provider fields intact. A calendar date is never promoted to an execution timestamp.
+export function plaidReviewPack(snapshot){
+ const securities=new Map((snapshot.securities||[]).map(s=>[s.security_id,s]));
+ const transactions=(snapshot.transactions||[]).map(r=>({...r,ticker_symbol:securities.get(r.security_id)?.ticker_symbol||null,security_name:securities.get(r.security_id)?.name||null,transaction_datetime:r.transaction_datetime||null}));
+ const holdings=(snapshot.holdings||[]).map(r=>({...securities.get(r.security_id),...r}));
+ return validatePack({format:'broker-review-v1',source:'Plaid Investments (synced)',retrieved_at:snapshot.retrieved_at,transactions,holdings,coverage:{...snapshot.coverage,note:`${transactions.length} / ${snapshot.coverage?.total_transactions??'unknown'} provider records; ${snapshot.coverage?.complete?'complete':'incomplete'} for requested range ${snapshot.range?.start??'?'} through ${snapshot.range?.end??'?'}. Completeness does not establish fill timing.`,freshness:'Provider data may be delayed; collection time is not quote time.'}});
 }
