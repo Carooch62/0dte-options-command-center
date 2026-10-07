@@ -1,6 +1,6 @@
-import { copyFileSync, mkdirSync, rmSync, statSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { join } from 'node:path';
+import { dirname, join, normalize } from 'node:path';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 // Explicit allowlist: never publish server code, credentials, or brokerage data.
@@ -19,10 +19,20 @@ const assets = [
   "trade-review.js",
   "brokerage.html",
   "dashboard-broker.js",
-  "dashboard-broker-logic.js"
+  "dashboard-broker-logic.js",
+  "brokerage-history.js",
+  "execution-evidence.js"
 ];
 for (const file of assets) {
   if (!statSync(join(root, file)).isFile()) throw new Error('Missing browser asset: ' + file);
+}
+// A missing imported module prevents the whole page from initializing.
+for (const file of assets.filter(file => file.endsWith('.js'))) {
+  const source = readFileSync(join(root, file), 'utf8');
+  for (const match of source.matchAll(/(?:from\s*|import\s*)['"](\.[^'"]+)['"]/g)) {
+    const dependency = normalize(join(dirname(file), match[1].split(/[?#]/)[0]));
+    if (!assets.includes(dependency)) throw new Error(`Unpublished browser dependency: ${file} -> ${dependency}`);
+  }
 }
 const output = join(root, 'public');
 rmSync(output, { recursive: true, force: true });
