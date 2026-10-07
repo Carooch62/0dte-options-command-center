@@ -130,3 +130,8 @@ All expiration windows offer an optional daily-decay ceiling of 5%, 10%, or 20% 
 
 ### Delta ranges
 Contract eligibility requires verified signed delta and inclusive absolute delta 0.30–0.50 for same-day and 1–14 day expirations; 0.70–0.80 for the 15–31 day swing research window. Calls use positive delta and puts negative delta. Expiration windows serve as the holding-style proxy; later-expiry research still requires a separate swing thesis. Existing price, liquidity, spread, direction and theta filters also apply.
+
+### Private brokerage review
+Open the dashboard's Private brokerage review link and import a `broker-review-v1` JSON snapshot prepared from connected Finance records. The hosted page has no account credentials or direct Finance API access. Personal records remain in browser localStorage and downloadable private exports, never in public repository data. Retrieval time is not quote freshness.
+
+Automatic matching is deliberately limited to one explicit buy-to-open and one sell-to-close of the same standard OSI option and account, with matching described contract quantities, 100-share quantity conversion and gross cash amounts. Multiple lots, partials, missing data, cancellations and unknown lifecycle events require review; incomplete records never create invented returns. Missing fees leave net P/L unknown. Provider transaction timestamps may be order-initiation times, not fills. A preceding same-session published scanner snapshot is attached as research context; missing entry Greeks remain null. Exports are not a trained model or proof of ML readiness. The existing manual journal remains separate to avoid duplicate fills and silent overwrites.
