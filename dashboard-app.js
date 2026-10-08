@@ -4,6 +4,7 @@ import {thetaDecayPct,expirationView,finite,minutes,snapshotUsable,dataStatus,re
 const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const API='https://0dte-options-command-center.h69htk56cq.workers.dev';
 const DATA=location.hostname==='localhost'||location.hostname==='127.0.0.1'?'./data/':'https://raw.githubusercontent.com/Carooch62/0dte-options-command-center/main/data/';
+let lastChecked=null,checkChanged=false;
 let data=null,previous=null,auto=true,timer,loadPromise=null,active=null,polling=false,dataDownloadFailed=false,lastRefresh=null,backendHealth=null,reloadMessage='',schedulerRun=null;
 function read(key,fallback){try{return JSON.parse(localStorage.getItem(key))??fallback;}catch{return fallback;}}
 function save(key,value){try{localStorage.setItem(key,JSON.stringify(value));return true;}catch{$('journalNotice').textContent='Browser storage unavailable. Export your backup before leaving.';return false;}}
@@ -58,7 +59,7 @@ function compactCard(x){
  return `<article class="candidate compact-card ${freshness?'stale':''}">
  <div class="card-heading"><div class="ticker-group"><button class="star" data-star="${esc(x.ticker)}" aria-label="Star ${esc(x.ticker)}">${stars.includes(x.ticker)?'★':'☆'}</button><b class="ticker">${esc(x.ticker)}</b></div><div class="candidate-status"><small>LAST SCAN STATUS</small><span class="tag ${stateColor(state)}">${esc(state)}</span></div></div>
  <div class="status-time">Updated ${esc(updated)}${freshness?'<span class="historical-note">Historical · not a live signal</span>':''}</div>
- ${readinessPanel(x)}<div class="price-row"><strong class="price">${money(x.price)}</strong><div class="price-change"><b>${esc(x.direction)}</b><span>Day ${movePercent(x.day_move)} · open ${movePercent(x.open_move)}</span></div></div>
+ ${freshnessStrip(x,first)}<div class="catalyst-preview"><b>${esc(x.catalyst_level||'Unknown')} catalyst</b> · ${links||'No company-specific headline confirmed.'}</div><div class="price-row"><strong class="price">${money(x.price)}</strong><div class="price-change"><b>${esc(x.direction)}</b><span>Day ${movePercent(x.day_move)} · open ${movePercent(x.open_move)}</span></div></div>
  <div class="quick-metrics"><div><small>5 MIN</small><b>${movePercent(x.move_5m)}</b></div><div><small>15 MIN</small><b>${movePercent(x.recent_move)}</b></div><div><small>VOLUME BURST</small><b>${value(x.volume_ratio)}×</b></div></div>
  <div class="trend-strip" aria-label="Daily trend summary">${t.periods.map((p,i)=>`<div><small>${['1W','2W','1M'][i]}</small><b>${movePercent(p.change)}</b><span>${esc(p.direction)}</span></div>`).join('')}</div><p class="trend-caption">${esc(alignment[t.alignment])} · ${t.asOf?'daily bars '+esc(t.asOf):'daily data unavailable'}${t.status!=='READY'?' · '+esc(t.status):''}</p>
  <details class="details contract-details" data-ticker="${esc(x.ticker)}" data-section="contracts"><summary><small>CONTRACT SHORTLIST</small><div class="contract-preview">${contractPreview}</div><span class="disclosure-hint">View contracts &amp; quote details</span></summary>${contractPicks(x,picks)}${opts.length>3?`<p class="smallnote">Top 3 of ${opts.length} matching contracts.</p>`:''}<p class="smallnote">${(x.revisit_contracts||[]).length} eligible contracts above $0.30 retained for revisits. ${esc(x.option_source||'Chain not attempted')} · ${esc(x.option_data_freshness||'UNKNOWN')}.</p></details>
@@ -67,6 +68,30 @@ function compactCard(x){
 }
 function card(x){return document.body.classList.contains('compact-glass')?compactCard(x):classicCard(x);}
 const filterDefaults={thetaMax:'prefer',expiration:'today',state:'ALL',direction:'ALL',trendPeriod:'overall',trendDirection:'ALL',trendAlignment:'ALL',catalyst:'ALL',askMin:'0.10',askMax:'0.30',onlyContracts:'all',sort:'state'};
+function ageLabel(ts){const age=minutes(ts);return age===null||age<-.5?'Unknown time':`${Math.max(0,age).toFixed(1)} min old · ${time(ts)}`;}
+function freshnessStrip(x,first){
+ const news=(x.news_items||[])[0],headlineAge=news?.published_at?ageLabel(news.published_at):finite(news?.age_hours)!==null?`About ${news.age_hours} hours old at scan time; publication timestamp unavailable`:'Unknown time';
+ const q=first?.option,problem=dataStatus(x,dataDownloadFailed?{...data,generated_at:null}:data);
+ return `<div class="source-ages"><b>${problem?'RESEARCH ONLY · '+esc(problem.state):'Delayed research · verify current quotes'}</b><span>Stock bar: ${esc(ageLabel(x.bar_end))}</span><span>Shortlisted option: ${q?esc(ageLabel(q.option_timestamp)):'No qualifying contract'}${q?' · '+esc(q.source||'Source unknown')+' · reported delay '+esc(q.minimum_delay_minutes??'unknown')+' min':''}</span><span>Headline: ${esc(headlineAge)}</span></div>`;
+}
+function renderChanges(){
+ const prefix=lastChecked?`Checked ${time(lastChecked)} · ${checkChanged?'New published scan loaded.':'No newer scan published.'}`:'Waiting for first successful check.';
+ if(!previous||String(previous.session_open_at)!==String(data.session_open_at)||!data.session_open_at){$('changes').textContent=prefix+' Comparison starts after the next distinct scan in this session.';return;}
+ const prior=new Map((previous.candidates||[]).map(x=>[x.ticker,x])),items=[];
+ for(const row of data.candidates||[]){const old=prior.get(row.ticker);if(!old){items.push(`${row.ticker}: new to scanned results`);continue;}
+ const details=[];if(recordedState(old)!==recordedState(row))details.push(`${recordedState(old)} → ${recordedState(row)}`);
+ const a=finite(old.price),b=finite(row.price);if(a!==null&&a>0&&b!==null&&old.bar_end!==row.bar_end&&Math.abs((b/a-1)*100)>=.5)details.push(`stock ${(b/a*100-100).toFixed(2)}%`);
+ const v=finite(old.volume_ratio),w=finite(row.volume_ratio);if(v!==null&&w!==null&&old.bar_end!==row.bar_end&&Math.abs(w-v)>=1)details.push(`volume burst ${v.toFixed(1)}× → ${w.toFixed(1)}×`);
+ if(details.length)items.push(`${row.ticker}: ${details.join(' · ')}`);}
+ $('changes').innerHTML=`<p class="smallnote">${esc(prefix)}<br>Compared ${esc(time(previous.generated_at))} → ${esc(time(data.generated_at))}. Stock threshold 0.5%; volume burst change 1×. Missing rows can reflect coverage changes.</p>`+(items.length?items.slice(0,30).map(t=>`<div class="change-item">${esc(t)}</div>`).join('')+(items.length>30?`<p>${items.length-30} additional changes.</p>`:''):'No state changes, new candidates, or moves above these thresholds.');
+}
+function persistFilters(){save('0dteDashboardFilters',Object.fromEntries(Object.keys(filterDefaults).map(id=>[id,$(id).value])));}
+function restoreFilters(values){if(!values||typeof values!=='object')return;for(const id of Object.keys(filterDefaults)){const el=$(id),v=values[id];if(typeof v!=='string')continue;if(el.tagName==='SELECT'&&![...el.options].some(o=>o.value===v))continue;if(el.type==='number'&&(finite(v)===null||Number(v)<0))continue;el.value=v;}}
+restoreFilters(read('0dteDashboardFilters',{}));
+const shortcuts=document.createElement('div');shortcuts.className='controls';shortcuts.setAttribute('aria-label','Saved dashboard views');
+shortcuts.innerHTML='<button data-view="starred">★ Watchlist</button><button data-view="calls">Calls</button><button data-view="puts">Puts</button><button data-view="preferred">$0.10–$0.30</button><button data-view="save">Save this view</button><button data-view="restore">My saved view</button><span id="viewNotice" role="status" class="smallnote">Filters remembered on this device</span>';
+$('activeFilters')?.before(shortcuts);
+shortcuts.onclick=e=>{const view=e.target.dataset.view;if(!view)return;if(view==='save'){const ok=save('0dteSavedView',Object.fromEntries(Object.keys(filterDefaults).map(id=>[id,$(id).value])));$('viewNotice').textContent=ok?'View saved on this device':'Could not save view';return;}if(view==='restore'){const saved=read('0dteSavedView',null);if(!saved){$('viewNotice').textContent='Save a view first';return;}restoreFilters(saved);}else if(view==='starred')$('onlyContracts').value='starred';else if(view==='calls'||view==='puts')$('direction').value=view==='calls'?'UP':'DOWN';else if(view==='preferred'){ $('askMin').value='0.10';$('askMax').value='0.30';$('onlyContracts').value='contracts';}persistFilters();render();};
 function renderFilterChips(){
  if(!$('activeFilters'))return;
  const labels={thetaMax:'Time decay',expiration:'Expiration',state:'State',direction:'Direction',trendPeriod:'Timeframe',trendDirection:'Trend',trendAlignment:'Alignment',catalyst:'Catalyst',onlyContracts:'Display',sort:'Sort'};
@@ -94,7 +119,7 @@ function render(){if(!data)return;
  $('shown').textContent=rows.length+' candidates';$('board').innerHTML=rows.map(card).join('')||'<p class="empty">No candidates match these filters.</p>';
  for(const details of $('board').querySelectorAll('details'))details.open=opened.has(detailKey(details));
  renderFilterChips();
- const changes=data.execution_layer?.state_transitions||[];$('changes').innerHTML=changes.length?changes.map(x=>`<div class="change-item"><b>${esc(x.ticker)}</b> ${esc(x.from)} → ${esc(x.to)}</div>`).join(''):'No transitions from a comparable same-session snapshot.';
+ renderChanges();
  const f=data.option_feedback||{};$('feedback').innerHTML=`<p>${f.today_count||0} observations recorded today.</p>`+(f.recent||[]).slice(-5).reverse().map(x=>`<div class="change-item"><b>${esc(x.ticker)} ${esc(x.side)} ${money(x.strike)}</b> · observed ask ${money(x.entry_ask)} · ${esc(time(x.observed_at))}<br>${Object.entries(x.markouts||{}).map(([h,m])=>`${h}m: bid ${money(m.exit_bid)}, gross quote change ${money(m.gross_quote_change_per_contract)} / contract · ${esc(m.interpretation)}`).join('<br>')||'Waiting for a later, changed source snapshot.'}</div>`).join('');
 }
 function rememberRefresh(r){lastRefresh=r;save('0dteLastRefresh',r);}
@@ -111,7 +136,7 @@ function renderRefresh(){
  if(!active&&schedulerRun?.publicationNote)message=schedulerRun.publicationNote;
  if(active?.run?.publicationNote)message=active.run.publicationNote;
  const current=steps.find(s=>s.state==='active'),title=r?.unverified?'Run finished · data not verified':r?.waiting?'Waiting for first bar':r?.closed?'Market closed':r?.receipt?'Refresh complete':r?.failed?'Refresh interrupted':current?.label||'Scanner updates';
- $('scanProgress').innerHTML=`<div class="refresh-box ${r?.failed?'failed':r?.finished?'finished':''}" role="status" aria-live="polite"><div class="row"><b>${esc(title)}</b><small>${r?.finished?'Finished':active?'In progress':'Ready'}</small></div><p class="refresh-message">${esc(message)}</p>${steps.length?`<ol class="refresh-timeline">${steps.map(s=>`<li class="${s.state}" ${s.state==='active'?'aria-current="step"':''} title="${esc(s.detail)}"><span>${s.state==='done'?'✓':s.state==='failed'?'!':s.state==='skipped'?'—':s.state==='active'?'●':'○'}</span> ${esc(s.label)}${s.state==='skipped'?' (skipped)':''}</li>`).join('')}</ol>`:''}${current?.detail?`<p class="smallnote">${esc(current.detail)}</p>`:''}<div class="smallnote">${r?`Requested ${esc(time(r.started))} · ${Math.floor(elapsed/60)}m ${elapsed%60}s${r.run?.url?` · <a href="${esc(r.run.url)}" target="_blank" rel="noopener">View run</a>`:''}`:''}${reloadMessage?`<br>${esc(reloadMessage)}`:''}${backendHealth?`<br>Latest scanner result: ${esc(backendHealth.status)} · ${esc(time(backendHealth.updated_at))}${backendHealth.error?' · '+esc(backendHealth.error):''}`:''}</div></div>`;
+ $('scanProgress').innerHTML=`<div class="refresh-box ${r?.failed?'failed':r?.finished?'finished':''}" role="status" aria-live="polite"><div class="row"><b>${esc(title)}</b><small>${r?.finished?'Finished':active?'In progress':'Ready'}</small></div><p class="refresh-message">${esc(message)}</p><p class="smallnote">Displayed snapshot: ${esc(time(data?.generated_at))}${dataDownloadFailed?' · Download failed; prior snapshot retained.':backendHealth?.error?' · Latest scan reported an error; displayed data may be from an earlier run.':''}</p>${steps.length?`<ol class="refresh-timeline">${steps.map(s=>`<li class="${s.state}" ${s.state==='active'?'aria-current="step"':''} title="${esc(s.detail)}"><span>${s.state==='done'?'✓':s.state==='failed'?'!':s.state==='skipped'?'—':s.state==='active'?'●':'○'}</span> ${esc(s.label)}${s.state==='skipped'?' (skipped)':''}</li>`).join('')}</ol>`:''}${current?.detail?`<p class="smallnote">${esc(current.detail)}</p>`:''}<div class="smallnote">${r?`Requested ${esc(time(r.started))} · ${Math.floor(elapsed/60)}m ${elapsed%60}s${r.run?.url?` · <a href="${esc(r.run.url)}" target="_blank" rel="noopener">View run</a>`:''}`:''}${reloadMessage?`<br>${esc(reloadMessage)}`:''}${backendHealth?`<br>Latest scanner result: ${esc(backendHealth.status)} · ${esc(time(backendHealth.updated_at))}${backendHealth.error?' · '+esc(backendHealth.error):''}`:''}</div></div>`;
 }
 function applyVerifiedRefresh(request,result){
  if(!result||(active?active.id!==request.id:lastRefresh?.id!==request.id))return;
@@ -123,8 +148,8 @@ async function load(manual=false){
  if(loadPromise)return loadPromise;
  loadPromise=(async()=>{try{
    const oldId=data?.scan_id,d=await json(DATA+'market-dashboard.json?v='+Date.now());
-   if(data&&d.scan_id!==oldId)previous=data;data=d;dataDownloadFailed=false;premiumHistory=observePremiums(premiumHistory,d.candidates||[],d.generated_at);save('0dtePremiumHistory',premiumHistory);render();renderJournal();
-   if(manual)reloadMessage=`${oldId===d.scan_id?'No newer scan has published.':'Displayed data updated.'} Latest snapshot: ${time(d.generated_at)}.`;
+   checkChanged=!!data&&(d.scan_id||d.generated_at)!==(data.scan_id||data.generated_at);lastChecked=new Date().toISOString();if(checkChanged)previous=data;data=d;dataDownloadFailed=false;premiumHistory=observePremiums(premiumHistory,d.candidates||[],d.generated_at);save('0dtePremiumHistory',premiumHistory);render();renderJournal();
+   reloadMessage=`${oldId===d.scan_id?'No newer scan has published.':'Displayed data updated.'} Latest snapshot: ${time(d.generated_at)}.`;
    const health=await json(DATA+'scan-health.json?v='+Date.now()).catch(()=>null);
    if(health)backendHealth=health;
    schedulerRun=(await json(API+'/health').catch(()=>null))?.latestRun||null;
@@ -197,8 +222,8 @@ $('export').onclick=()=>{const blob=new Blob([JSON.stringify({version:1,exported
 $('import').onchange=async e=>{try{const f=e.target.files[0];if(!f)return;if(f.size>5_000_000)throw Error('Backup is too large');const b=JSON.parse(await f.text());if(b.version!==1||!Array.isArray(b.trades)||!b.trades.every(t=>validTrade(t)&&validPlan(t)))throw Error('Invalid backup');const ids=new Set(trades.map(t=>t.id));for(const t of b.trades)if(!ids.has(t.id)){trades.push({...t,id:t.id||crypto.randomUUID()});ids.add(t.id);}save('0dteJournal',trades);if(b.settings&&typeof b.settings==='object'){for(const id of ['perTrade','dailyLoss','maxExposure','timeStop','cutoff'])$(id).value=b.settings[id]??'';}stars=[...new Set([...stars,...(Array.isArray(b.stars)?b.stars.filter(x=>typeof x==='string'):[])])];save('0dteStars',stars);renderJournal();render();notice('journalNotice','Backup imported; existing trade IDs were preserved.','ok');}catch(err){notice('journalNotice','Import failed: '+err.message,'bad');}};
 $('board').onclick=e=>{const t=e.target.dataset.star;if(!t)return;stars=stars.includes(t)?stars.filter(x=>x!==t):[...stars,t];save('0dteStars',stars);render();};
 $('scan').onclick=()=>startScan('manual');$('wave').onclick=()=>startScan('second-wave');$('check').onclick=()=>load(true);$('auto').onclick=()=>{auto=!auto;startTimer();};$('interval').onchange=startTimer;
-if($('activeFilters'))$('activeFilters').onclick=e=>{const id=e.target.closest('button')?.dataset.clearFilter;if(!id)return;const reset=id==='all'?Object.keys(filterDefaults):id==='price'?['askMin','askMax']:[id];for(const key of reset)$(key).value=filterDefaults[key];render();};
-for(const id of ['thetaMax','expiration','state','direction','trendPeriod','trendDirection','trendAlignment','catalyst','askMin','askMax','onlyContracts','sort'])$(id).addEventListener('input',render);
+if($('activeFilters'))$('activeFilters').onclick=e=>{const id=e.target.closest('button')?.dataset.clearFilter;if(!id)return;const reset=id==='all'?Object.keys(filterDefaults):id==='price'?['askMin','askMax']:[id];for(const key of reset)$(key).value=filterDefaults[key];persistFilters();render();};
+for(const id of ['thetaMax','expiration','state','direction','trendPeriod','trendDirection','trendAlignment','catalyst','askMin','askMax','onlyContracts','sort'])$(id).addEventListener('input',()=>{persistFilters();render();});
 for(const id of ['perTrade','dailyLoss','maxExposure','timeStop','cutoff']){$(id).value=settings[id]??'';$(id).addEventListener('input',renderRisk);}
 for(const id of ['riskAsk','riskQty'])$(id).addEventListener('input',renderRisk);
 active=read('0dteActiveScan',null);lastRefresh=read('0dteLastRefresh',null);enableScan(!refreshBlocksNewRequest(active));renderRefresh();renderJournal();await load();startTimer();if(active)pollRun();
@@ -206,3 +231,4 @@ setInterval(()=>{if(!document.hidden){$('clock').textContent=new Date().toLocale
 setInterval(pollRun,5000);
 setInterval(()=>{if(!document.hidden&&active)renderRefresh();},1000);
 document.addEventListener('visibilitychange',()=>{startTimer();if(!document.hidden){load();pollRun();}});
+
