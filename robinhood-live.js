@@ -5,12 +5,12 @@ const ISSUER=MCP;
 const TOKEN='https://api.robinhood.com/oauth2/token/';
 const encoder=new TextEncoder(),decoder=new TextDecoder();
 const COOKIE='__Secure-rh-connect';
-const COOKIE_PATH='/private/robinhood/';
+const COOKIE_PATH='/private/plaid/robinhood/';
 const b64=bytes=>btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 const bytes=s=>Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
 const headers={'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'};
 const reply=(data,status=200,extra={})=>new Response(JSON.stringify(data),{status,headers:{...headers,...extra}});
-const configured=env=>env.ROBINHOOD_HOSTED_APPROVED==='true'&&env.ROBINHOOD_CLIENT_ID&&env.ROBINHOOD_REDIRECT_URI&&env.PLAID_STORE&&env.PLAID_ENCRYPTION_KEY&&env.CF_ACCESS_EMAIL&&env.CF_ACCESS_AUD&&env.CF_ACCESS_TEAM_DOMAIN;
+const configured=env=>env.ROBINHOOD_CONNECTION_ENABLED==='true'&&env.ROBINHOOD_CLIENT_ID&&env.ROBINHOOD_REDIRECT_URI&&env.PLAID_STORE&&env.PLAID_ENCRYPTION_KEY&&env.CF_ACCESS_EMAIL&&env.CF_ACCESS_AUD&&env.CF_ACCESS_TEAM_DOMAIN;
 const cookie=(value,maxAge)=>`${COOKIE}=${value}; Path=${COOKIE_PATH}; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`;
 async function key(env){const raw=bytes(env.PLAID_ENCRYPTION_KEY);if(raw.length!==32)throw Error('Invalid encryption configuration');return crypto.subtle.importKey('raw',raw,'AES-GCM',false,['encrypt','decrypt']);}
 async function seal(data,env){const iv=crypto.getRandomValues(new Uint8Array(12));const dataBytes=await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:encoder.encode('robinhood-live-v1')},await key(env),encoder.encode(JSON.stringify(data)));return `${b64(iv)}.${b64(new Uint8Array(dataBytes))}`;}
@@ -73,15 +73,15 @@ function quoteData(result){
 export async function handleRobinhood(request,env){
  const url=new URL(request.url),path=url.pathname;
  if(!await verifyAccess(request,env))return reply({ok:false,error:'Private sign in required'},401);
- if(!configured(env))return reply({ok:false,status:'SETUP_REQUIRED',error:'Robinhood connection is awaiting hosted-client approval and configuration'},503);
+ if(!configured(env))return reply({ok:false,status:'SETUP_REQUIRED',error:'Robinhood private quote connection is awaiting configuration'},503);
  const redirect=new URL(env.ROBINHOOD_REDIRECT_URI);
- if(redirect.protocol!=='https:'||redirect.origin!==url.origin||redirect.pathname!=='/private/robinhood/callback'||redirect.search||redirect.hash)return reply({ok:false,error:'Invalid Robinhood callback configuration'},503);
+ if(redirect.protocol!=='https:'||redirect.origin!==url.origin||redirect.pathname!=='/private/plaid/robinhood/callback'||redirect.search||redirect.hash)return reply({ok:false,error:'Invalid Robinhood callback configuration'},503);
  await key(env);
- if(path==='/private/robinhood/status'&&request.method==='GET'){
+ if(path==='/private/plaid/robinhood/status'&&request.method==='GET'){
   const saved=await connection(env),connected=!!saved&&saved.expires_at>Date.now();
   return reply({ok:true,connected,expires_at:saved?new Date(saved.expires_at).toISOString():null,status:connected?'CONNECTED_UNVERIFIED':saved?'RECONNECT_REQUIRED':'READY_TO_CONNECT',scanner_feed:'DELAYED_RESEARCH'});
  }
- if(path==='/private/robinhood/callback'&&request.method==='GET'){
+ if(path==='/private/plaid/robinhood/callback'&&request.method==='GET'){
   const clear={'Set-Cookie':cookie('',0)};
   try{
    const raw=request.headers.get('Cookie')?.split(';').map(x=>x.trim()).find(x=>x.startsWith(`${COOKIE}=`))?.slice(COOKIE.length+1);
@@ -96,18 +96,18 @@ export async function handleRobinhood(request,env){
  }
  if(request.method!=='POST')return reply({ok:false,error:'Not found'},404);
  if(request.headers.get('Origin')!==url.origin||request.headers.get('X-Requested-With')!=='RobinhoodQuotes')return reply({ok:false,error:'Invalid request origin'},403);
- if(path==='/private/robinhood/connect'){
+ if(path==='/private/plaid/robinhood/connect'){
   const verifier=b64(crypto.getRandomValues(new Uint8Array(32))),state=b64(crypto.getRandomValues(new Uint8Array(32)));
   const pending=await seal({verifier,state,email:env.CF_ACCESS_EMAIL.toLowerCase(),expires_at:Date.now()+600000},env);
   const auth=new URL('https://robinhood.com/oauth');
   for(const [k,v] of Object.entries({response_type:'code',client_id:env.ROBINHOOD_CLIENT_ID,redirect_uri:redirect.href,scope:'internal',resource:MCP,state,code_challenge:b64(new Uint8Array(await crypto.subtle.digest('SHA-256',encoder.encode(verifier)))),code_challenge_method:'S256'}))auth.searchParams.set(k,v);
   return reply({ok:true,authorization_url:auth.href},200,{'Set-Cookie':cookie(pending,600)});
  }
- if(path==='/private/robinhood/disconnect'){
+ if(path==='/private/plaid/robinhood/disconnect'){
   await env.PLAID_STORE.delete(storageKey(env));
   return reply({ok:true,connected:false,revocation_note:'Stored authorization erased. Remove this client in Robinhood to revoke its provider authorization.'},200,{'Set-Cookie':cookie('',0)});
  }
- if(path==='/private/robinhood/quotes'){
+ if(path==='/private/plaid/robinhood/quotes'){
   let operation;try{if(Number(request.headers.get('Content-Length'))>10000)throw Error();const raw=await request.text();if(raw.length>10000)throw Error();operation=quoteRequest(JSON.parse(raw));}catch{return reply({ok:false,error:'Invalid quote request'},400);}
   const saved=await connection(env);if(!saved||saved.expires_at<=Date.now()+15000)return reply({ok:false,error:'Reconnect Robinhood before collecting quotes'},409);
   try{
