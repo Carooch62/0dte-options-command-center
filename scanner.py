@@ -14,6 +14,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, time as dtime
 from zoneinfo import ZoneInfo
 from pattern_research import pattern_snapshot
+from relative_volume import same_time_rvol
 
 import requests
 
@@ -215,6 +216,7 @@ def scan_one(t, now=None, payload=None):
         end = current[-1]['time']+timedelta(minutes=5)
         return {'ticker':t, 'price':round(price,4), 'day_move':round(day,2) if day is not None else None,
                 'pattern_research':pattern_snapshot(current,direction),
+                'relative_volume_research':same_time_rvol(bars,now,d.get('_source','Yahoo 5m bars')),
                 'open_move':round(pct(price,first),2), 'previous_close':previous_close,
                 'previous_close_source':previous_close_source,
                 'previous_close_date':previous_session(now).date().isoformat() if previous_close else None,

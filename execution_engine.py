@@ -412,6 +412,7 @@ def update_history(data, path="data/scan-history.json", limit=200):
                 "setup_qualified": x.get("setup_qualified"),
                 "qualification_checks": x.get("qualification_checks"),
                 "pattern_research": x.get("pattern_research"),
+                "relative_volume_research": x.get("relative_volume_research"),
                 "early_watch": x.get("early_watch"),
                 "qualification_reasons": x.get("qualification_reasons"),
                 "momentum_state": x.get("momentum_state"),
