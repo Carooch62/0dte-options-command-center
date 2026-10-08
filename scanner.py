@@ -13,6 +13,7 @@ from market_clock import session_info, calendar
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, time as dtime
 from zoneinfo import ZoneInfo
+from pattern_research import pattern_snapshot
 
 import requests
 
@@ -213,6 +214,7 @@ def scan_one(t, now=None, payload=None):
         score = abs(day or 0)*1.2 + abs(m15 or 0)*1.8 + abs(m5 or 0)*2.2 + max(0,(vr or 0)-1)*2.2 + max(0,(accel or 0)-1)*1.5
         end = current[-1]['time']+timedelta(minutes=5)
         return {'ticker':t, 'price':round(price,4), 'day_move':round(day,2) if day is not None else None,
+                'pattern_research':pattern_snapshot(current,direction),
                 'open_move':round(pct(price,first),2), 'previous_close':previous_close,
                 'previous_close_source':previous_close_source,
                 'previous_close_date':previous_session(now).date().isoformat() if previous_close else None,

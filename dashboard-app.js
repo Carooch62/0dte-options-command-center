@@ -1,4 +1,5 @@
 import {entryReadiness,trendSummary,matchesTrend,quoteKey,observePremiums,premiumChange,positionEstimate,reentryProblem,positionAlerts,validPlan} from './trade-review.js?v=20261002-trend-filters';
+import {signalChecklist,earlyWatchVisible} from './signal-checklist.js?v=20261008-shadow-v1';
 import {refreshProgress,publishedReceipt,closedReceipt,refreshBlocksNewRequest,publicationCheckExpired,verifiedRefresh} from './refresh-progress.js?v=20261001-opening-bar';
 import {thetaDecayPct,expirationView,finite,minutes,snapshotUsable,dataStatus,recordedState,matchesState,robinhoodStockUrl,contractExplanation,contractRank,contractShortlist,displayState,selectableContracts,tradePL,validTrade,riskSummary} from './dashboard-logic.js?v=20261007-readiness';
 const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -66,7 +67,12 @@ function compactCard(x){
  <details class="details setup-details" data-ticker="${esc(x.ticker)}" data-section="setup"><summary>Setup, trends &amp; sources <span class="disclosure-hint">Levels · catalyst · freshness</span></summary><p class="smallnote">${esc(entryReadiness(x,effective))}. ${freshness?esc(freshness.detail):'Delayed research data; verify current quotes.'}</p><div class="levels">${[['TRIGGER',x.trigger_price],['INVALIDATION',x.invalidation_price],['VWAP',x.vwap],['EXTENSION 1',levels.target_1],['EXTENSION 2',levels.target_2]].map(([label,n])=>`<div class="level"><small>${label}</small><b>${money(n)}</b></div>`).join('')}</div><p class="smallnote">Score ${value(x.score,1)} · acceleration ${value(x.volume_acceleration)}×<br>${esc(x.catalyst_level)} catalyst · ${esc(x.momentum_state)} · chase ${esc(x.chase_risk)}<br>Call/put volume balance ${esc(x.volume_balance||'UNKNOWN')} · core ETF context ${esc(x.market_alignment||'UNKNOWN')}</p>${trendContext(x)}<div class="news">${links||'No company-specific headline confirmed.'}</div><p class="smallnote">${x.second_wave_event?'Development: '+esc(x.second_wave_event)+'<br>':''}Completed bar ${esc(time(x.bar_end))} · ${x.session_bar_count||0} session bars · ${value(minutes(x.bar_end),1)} min old.<br>Options ${esc(x.chain_status||'UNKNOWN')} · ${opts.length} pass your filters.<br>Bar source ${esc(x.price_source||'Unknown')}.</p></details>
  ${tradeChecklist(x)}<div class="card-footer">${stockLink(x.ticker)}<small>Opens stock page · choose Trade</small></div></article>`;
 }
-function card(x){return document.body.classList.contains('compact-glass')?compactCard(x):classicCard(x);}
+function card(x){
+ const effective=dataDownloadFailed?{...data,generated_at:null}:data;
+ const checks=signalChecklist(x,effective,Number($('askMin').value),Number($('askMax').value));
+ const panel=`<details class="details" data-ticker="${esc(x.ticker)}" data-section="signals"><summary>Why this setup · signal checklist${earlyWatchVisible(x,effective)?' · EARLY WATCH (shadow)':''}</summary><p class="smallnote">Evidence checklist, not a confidence percentage. Shadow patterns do not change scores or entry eligibility.</p>${checks.map(c=>`<div class="change-item"><b>${esc(c.label)}: ${esc(c.state)}</b><p class="smallnote">${esc(c.detail)}</p></div>`).join('')}</details>`;
+ return (document.body.classList.contains('compact-glass')?compactCard(x):classicCard(x)).replace(/(<article[^>]*>)/,'$1'+panel);
+}
 const filterDefaults={thetaMax:'prefer',expiration:'today',state:'ALL',direction:'ALL',trendPeriod:'overall',trendDirection:'ALL',trendAlignment:'ALL',catalyst:'ALL',askMin:'0.10',askMax:'0.30',onlyContracts:'all',sort:'state'};
 function ageLabel(ts){const age=minutes(ts);return age===null||age<-.5?'Unknown time':`${Math.max(0,age).toFixed(1)} min old · ${time(ts)}`;}
 function freshnessStrip(x,first){
@@ -115,6 +121,9 @@ $('board').addEventListener('toggle',event=>{const el=event.target;if(el.tagName
 function boardAnchor(){const el=[...$('board').querySelectorAll('article')].find(el=>el.getBoundingClientRect().bottom>0);return el?{ticker:el.querySelector('[data-star]')?.dataset.star,top:el.getBoundingClientRect().top}:null;}
 function restoreBoardAnchor(anchor){if(!anchor||anchor.top>innerHeight)return;const el=[...$('board').querySelectorAll('article')].find(el=>el.querySelector('[data-star]')?.dataset.star===anchor.ticker);if(el)window.scrollBy(0,el.getBoundingClientRect().top-anchor.top);}
 
+const earlyPanel=document.createElement('section');earlyPanel.className='panel';earlyPanel.id='earlyWatchPanel';
+earlyPanel.innerHTML='<h2>EARLY WATCH · shadow research</h2><p class="smallnote">Pre-breakout pattern hypotheses, not entry signals. Requires a company catalyst, compression, quiet volume, directional structure and proximity to a level. Uses completed bars only. Existing ranking and contract gates remain unchanged.</p><div id="earlyWatchList"></div>';
+$('candidateBoard').before(earlyPanel);
 function render(){if(!data)return;
  if($('board').contains(document.activeElement)&&document.activeElement.matches('input,textarea,select'))return;
  const anchor=boardAnchor();
@@ -130,6 +139,8 @@ function render(){if(!data)return;
  let rows=all.filter(x=>tickerMatches(x.ticker,$('tickerSearch').value)&&matchesState(x,dataDownloadFailed?{...data,generated_at:null}:data,$('state').value)&&($('direction').value==='ALL'||x.direction===$('direction').value)&&matchesTrend(x,$('trendPeriod').value,$('trendDirection').value,$('trendAlignment').value,dataDownloadFailed?{...data,generated_at:null}:data)&&($('catalyst').value==='ALL'||x.catalyst_level===$('catalyst').value)&&($('onlyContracts').value!=='contracts'||selectableContracts(x,min,max).length)&&($('onlyContracts').value!=='starred'||stars.includes(x.ticker)));
  const order={'CONFIRMED DELAYED':7,TRIGGERED:6,'SECOND-WAVE':5,WATCH:4,DECAYING:3,PASS:2,'STALE PRICE DATA':1,'STALE SCAN':1,'MARKET CLOSED':1,'DATA UNAVAILABLE':0};
  rows.sort((a,b)=>$('sort').value==='score'?(b.score||0)-(a.score||0):$('sort').value==='move'?Math.abs(b.move_5m||0)-Math.abs(a.move_5m||0):(order[recordedState(b)]||0)-(order[recordedState(a)]||0)||contractRank(b,min,max)-contractRank(a,min,max)||(b.score||0)-(a.score||0));
+ const early=rows.filter(x=>earlyWatchVisible(x,dataDownloadFailed?{...data,generated_at:null}:data));
+ $('earlyWatchList').innerHTML=early.length?early.map(x=>`<div class="change-item"><b>${esc(x.ticker)} · ${esc(x.direction)} · EARLY WATCH</b><p class="smallnote">Observed stock ${money(x.price)} · reference trigger ${money(x.pattern_research.trigger)} · bar ${esc(time(x.bar_end))}. Await a fresh level break with volume and qualifying option quotes; no entry approval.</p>${stockLink(x.ticker)}</div>`).join(''):'<p class="smallnote">No fresh shadow patterns match these filters. Older snapshots without pattern evidence remain unknown; no setup is manufactured.</p>';
  const detailKey=d=>d.dataset.ticker+'|'+(d.dataset.section||'contracts');
  const opened=new Set([...expandedCards,...[...$('board').querySelectorAll('details[open]')].map(detailKey)]);
  $('shown').textContent=rows.length+' candidates';$('board').innerHTML=rows.map(card).join('')||'<p class="empty">No candidates match. Clear the search or adjust your filters. Star a stock to add it to your watchlist.</p>';

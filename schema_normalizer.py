@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 from datetime import datetime, timezone, date
 from quality import number, freshness, contract_checks, verified_delta, ET
+from pattern_research import attach_early_watch
 
 direct_terms = (
     'reports earnings','reports results','earnings beat','earnings miss','raises guidance',
@@ -91,6 +92,7 @@ def normalize(data,now=None):
             ([ 'Directional momentum not confirmed' ] if not directional else []) + \
             ([ 'Momentum and acceleration confirmation missing' ] if not confirmation else []) + \
             ([ 'Company-specific catalyst not confirmed' ] if not x['catalyst'] else [])
+        attach_early_watch(x,current)
         x['flow_aligned']=False  # cumulative call/put volume is not verified buying flow
         x['volume_balance_aligned']=(x.get('volume_balance')=='CALL' and side=='call') or (x.get('volume_balance')=='PUT' and side=='put')
         x['execution_readiness']='VERIFIED_DELAYED' if strong and confirmation else 'WATCH_ONLY' if current else 'INSUFFICIENT_DATA'
