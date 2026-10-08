@@ -1,7 +1,7 @@
 const $=id=>document.getElementById(id);
 const status=$('rh-live-status');
 async function api(path,body){
- const r=await fetch(`/private/robinhood/${path}`,{method:body===undefined?'GET':'POST',credentials:'same-origin',cache:'no-store',headers:body===undefined?{}:{'Content-Type':'application/json','X-Requested-With':'RobinhoodQuotes'},...(body===undefined?{}:{body:JSON.stringify(body)})});
+ const r=await fetch(`/private/plaid/robinhood/${path}`,{method:body===undefined?'GET':'POST',credentials:'same-origin',cache:'no-store',headers:body===undefined?{}:{'Content-Type':'application/json','X-Requested-With':'RobinhoodQuotes'},...(body===undefined?{}:{body:JSON.stringify(body)})});
  const data=await r.json();if(!r.ok)throw Error(data.error||`HTTP ${r.status}`);return data;
 }
 async function load(){

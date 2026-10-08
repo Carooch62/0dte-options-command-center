@@ -48,7 +48,7 @@ export default {
   },
   async fetch(request,env) {
     const url=new URL(request.url);
-    if(url.pathname.startsWith('/private/robinhood/')) {
+    if(url.pathname.startsWith('/private/plaid/robinhood/')) {
       try{return await handleRobinhood(request,env)}catch{return response({ok:false,error:'Private Robinhood service unavailable'},502,request)}
     }
     if(url.pathname.startsWith('/private/plaid/')) {

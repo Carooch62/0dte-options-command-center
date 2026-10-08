@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {handleRobinhood,quoteRequest,quoteAge,normalizeQuotes,rpc} from '../robinhood-live.js';
 import worker from '../worker.js';
 const host='https://example.workers.dev';
-const request=(path,method='GET',headers={},body)=>new Request(`${host}/private/robinhood/${path}`,{method,headers,...(body===undefined?{}:{body:JSON.stringify(body)})});
-const base={ROBINHOOD_HOSTED_APPROVED:'true',ROBINHOOD_CLIENT_ID:'client-test',ROBINHOOD_REDIRECT_URI:host+'/private/robinhood/callback',PLAID_ENCRYPTION_KEY:Buffer.alloc(32,17).toString('base64'),CF_ACCESS_TEAM_DOMAIN:'test.cloudflareaccess.com',CF_ACCESS_AUD:'aud',CF_ACCESS_EMAIL:'me@example.com'};
+const request=(path,method='GET',headers={},body)=>new Request(`${host}/private/plaid/robinhood/${path}`,{method,headers,...(body===undefined?{}:{body:JSON.stringify(body)})});
+const base={ROBINHOOD_CONNECTION_ENABLED:'true',ROBINHOOD_CLIENT_ID:'client-test',ROBINHOOD_REDIRECT_URI:host+'/private/plaid/robinhood/callback',PLAID_ENCRYPTION_KEY:Buffer.alloc(32,17).toString('base64'),CF_ACCESS_TEAM_DOMAIN:'test.cloudflareaccess.com',CF_ACCESS_AUD:'aud',CF_ACCESS_EMAIL:'me@example.com'};
 async function harness(run){
  const pair=await crypto.subtle.generateKey({name:'RSASSA-PKCS1-v1_5',modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'},true,['sign','verify']);
  const jwk=await crypto.subtle.exportKey('jwk',pair.publicKey);jwk.kid='test';
@@ -23,7 +23,7 @@ test('anonymous private routes fail closed and never fall through to assets',asy
  assert.equal((await worker.fetch(request('status'),{ASSETS:{fetch(){throw Error('Asset fallback')}}})).status,401);
 });
 test('activation gate prevents provider calls and credential access',async()=>harness(async({env,auth,calls})=>{
- assert.equal((await handleRobinhood(request('status','GET',auth),{...env,ROBINHOOD_HOSTED_APPROVED:'false'})).status,503);
+ assert.equal((await handleRobinhood(request('status','GET',auth),{...env,ROBINHOOD_CONNECTION_ENABLED:'false'})).status,503);
  assert.equal(calls.length,0);
 }));
 test('cross-origin mutation and non-fixed callback configuration are rejected',async()=>harness(async({env,auth,calls})=>{
