@@ -1,5 +1,16 @@
 import {finite,dataStatus,selectableContracts,minutes} from './dashboard-logic.js?v=20261007-readiness';
 const verdict=v=>v===true?'PASS':v===false?'FAIL':'UNKNOWN';
+export function relativeVolumeEvidence(row,data,now=Date.now()) {
+ const r=row.relative_volume_research||{},ratio=finite(r.ratio),count=finite(r.baseline_count);
+ const age=minutes(r.bar_end,now);
+ const known=r.mode==='SHADOW'&&r.status==='READY'&&r.method==='LATEST_5M_VS_SAME_ET_SLOT_MEAN'
+  &&ratio!==null&&ratio>=0&&count!==null&&count>=3&&Array.isArray(r.baseline_sessions)
+  &&new Set(r.baseline_sessions).size===count&&r.bar_end===row.bar_end
+  &&age!==null&&age>=0&&age<=8&&dataStatus(row,data,now)===null;
+ return {label:'Same-time RVOL · shadow',state:known?'OBSERVED':'UNKNOWN',
+  detail:known?`${ratio.toFixed(2)}× at ${r.slot_et} ET vs ${count} prior sessions (${r.baseline_sessions.join(', ')}). Latest five-minute bar only; limited baseline, no validated pass threshold. Source: ${r.source||'unknown'}.`
+   :`Unavailable (${r.status||'not collected'}); needs fresh matching bars from at least 3 prior sessions. Research only—not an entry gate.`};
+}
 export function signalChecklist(row,data,min=.1,max=.3,now=Date.now()) {
  const q=row.qualification_checks||{},p=row.pattern_research||{},status=dataStatus(row,data,now);
  const picks=selectableContracts(row,min,max),attempted=row.chain_attempted===true&&row.chain_status==='SUCCESS';
@@ -18,7 +29,9 @@ export function signalChecklist(row,data,min=.1,max=.3,now=Date.now()) {
   ['Contract filters',attempted?picks.length>0:null,attempted?`${picks.length} contracts pass selected price/quality filters. Not entry confirmation.`:'Chain unavailable, not scanned, or source failed.'],
   ['Option quote time',quoteTime,'Source timing check only—not live execution verification.']
  ];
- return items.map(([label,v,detail])=>({label,state:verdict(v),detail}));
+ const checklist=items.map(([label,v,detail])=>({label,state:verdict(v),detail}));
+ checklist.splice(5,0,relativeVolumeEvidence(row,data,now));
+ return checklist;
 }
 export function earlyWatchVisible(row,data,now=Date.now()) {
  return row.early_watch===true&&row.pattern_research?.mode==='SHADOW'&&dataStatus(row,data,now)===null;
