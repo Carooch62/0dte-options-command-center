@@ -388,6 +388,7 @@ def update_history(data, path="data/scan-history.json", limit=200):
                 "score": x.get("score"),
                 "previous_close": x.get("previous_close"),
                 "previous_close_source": x.get("previous_close_source"),
+                "previous_close_date": x.get("previous_close_date"),
                 "volume_ratio": x.get("volume_ratio"),
                 "vwap": x.get("vwap"),
                 "price_freshness": x.get("price_freshness"),
