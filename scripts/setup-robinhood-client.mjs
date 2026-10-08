@@ -38,10 +38,10 @@ for(const path of ['/brokerage.html','/private/plaid/robinhood/status','/private
 }
 const guarded=guards.every(g=>g.protected)&&new Set(guards.map(g=>g.host)).size===1;
 const privatePrerequisitesReady=missing.length===0&&guarded;
-// First live authorization failed. Registration and Access checks cannot establish
-// that Robinhood accepts this hosted callback. Pause until provider validation.
-const enabled=false;
+// The owner explicitly requested a manual retry. This enables sign-in attempts
+// only; registration and Access checks do not prove provider authorization.
+const enabled=privatePrerequisitesReady;
 await api('/workers/scripts/'+worker+'/secrets',{method:'PUT',body:JSON.stringify({name:'ROBINHOOD_CONNECTION_ENABLED',text:enabled?'true':'false',type:'secret_text'})});
-const result={registered_client_configured:true,manual_connection_enabled:enabled,private_prerequisites_ready:privatePrerequisitesReady,authorization_status:'PAUSED_PENDING_PROVIDER_VALIDATION',protected_routes:guards.map(({path,protected:guard})=>({path,protected:guard})),missing_bindings:missing,access_inspection:accessInspection,access_routes:accessRoutes,automatic_polling_enabled:false};
+const result={registered_client_configured:true,manual_connection_enabled:enabled,private_prerequisites_ready:privatePrerequisitesReady,authorization_status:enabled?'MANUAL_RETRY_UNVERIFIED':'SETUP_REQUIRED',protected_routes:guards.map(({path,protected:guard})=>({path,protected:guard})),missing_bindings:missing,access_inspection:accessInspection,access_routes:accessRoutes,automatic_polling_enabled:false};
 console.log('Robinhood setup: '+JSON.stringify(result));
 if(process.env.GITHUB_STEP_SUMMARY)appendFileSync(process.env.GITHUB_STEP_SUMMARY,'\nRobinhood setup (no credentials):\n\n```json\n'+JSON.stringify(result,null,2)+'\n```\n');
