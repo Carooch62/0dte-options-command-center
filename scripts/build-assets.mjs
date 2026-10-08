@@ -15,6 +15,7 @@ const assets = [
   "dashboard-app-previous.js",
   "dashboard-app.js",
   "dashboard-logic.js",
+  "signal-checklist.js",
   "refresh-progress.js",
   "trade-review.js",
   "brokerage.html",
