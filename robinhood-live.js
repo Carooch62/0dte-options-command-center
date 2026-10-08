@@ -73,7 +73,7 @@ function quoteData(result){
 export async function handleRobinhood(request,env){
  const url=new URL(request.url),path=url.pathname;
  if(!await verifyAccess(request,env))return reply({ok:false,error:'Private sign in required'},401);
- if(!configured(env))return reply({ok:false,status:'SETUP_REQUIRED',error:'Robinhood private quote connection is awaiting configuration'},503);
+ if(!configured(env))return reply({ok:false,status:'SETUP_REQUIRED',error:'Robinhood hosted sign-in is paused after authorization failed. Callback compatibility must be verified before reconnecting.'},503);
  const redirect=new URL(env.ROBINHOOD_REDIRECT_URI);
  if(redirect.protocol!=='https:'||redirect.origin!==url.origin||redirect.pathname!=='/private/plaid/robinhood/callback'||redirect.search||redirect.hash)return reply({ok:false,error:'Invalid Robinhood callback configuration'},503);
  await key(env);
