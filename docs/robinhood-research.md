@@ -56,3 +56,14 @@ The deployment workflow installs the public client ID and callback as Worker sec
 
 
 The registered callback was moved into the existing protected prefix after a direct unauthenticated check returned the expected Cloudflare Access redirect. The earlier public-route registration has never received user consent or tokens. This release completes the private sign-in surface; the user must authorize the new client directly with Robinhood before any authenticated quote compatibility test.
+
+
+## First live authorization failure — October 8, 10:48 ET
+
+The user's first browser authorization attempt ended on Robinhood's generic application-connection error page. The previous registration HTTP 200, deployment success and mocked authentication tests did **not** establish that Robinhood accepts the hosted callback. Registration returned the gateway's default client ID/name; returned redirect metadata is not evidence of callback allowlisting.
+
+The deployment now sets `ROBINHOOD_CONNECTION_ENABLED=false` and reports `PAUSED_PENDING_PROVIDER_VALIDATION`. Route protection and encrypted-storage readiness are reported separately. The page disables Connect and explains the pause. This supersedes earlier activation notes: no repeat sign-in should be requested until hosted callback compatibility is established. No scanner provider substitution has occurred.
+
+A first-hand report from another hosted implementation describes the same error after public HTTPS callback rejection: https://github.com/Simple-With-Us/Socratic-Trade/blob/main/docs/robinhood-connection-guide.md . Robinhood's official onboarding article directs other platforms to contact support: https://robinhood.com/us/en/support/articles/onboarding-an-external-agent/ . Callback rejection is a leading hypothesis, not a confirmed account-specific error: an anonymous authorization-API check returned 401, and no authenticated provider diagnostic is available here. The screenshot alone cannot distinguish callback rejection from another authorization error.
+
+Provider validation should cover the exact callback `https://0dte-options-command-center.h69htk56cq.workers.dev/private/plaid/robinhood/callback`, resource `https://agent.robinhood.com/mcp/trading`, scope `internal`, authorization-code PKCE S256, and read-only personal quote use. Request an approved client/callback or the provider-supported hosted setup. Do not impersonate another platform's client, forward codes from a different redirect, or export the chat connector's tokens. After provider validation, test the real authorization callback and quotes before enabling automatic collection.
