@@ -68,3 +68,5 @@
 
 /* Keep provenance and the catalyst visible without opening a card. */
 .source-ages{display:grid;gap:5px;padding:10px 12px;margin:10px 0;border:1px solid #b98a48;border-radius:12px;background:rgba(185,138,72,.08);font-size:12px;overflow-wrap:anywhere}.source-ages b{color:var(--text,#f1f5f9)}.catalyst-preview{font-size:13px;line-height:1.5;margin:10px 0;overflow-wrap:anywhere}.compact-card .entry-plan>p{font-size:12px}.compact-card .controls button,.star{min-height:44px;min-width:44px}@media(max-width:600px){.controls{flex-wrap:wrap}.controls button{min-height:44px}.source-ages{font-size:12px}.compact-card{min-width:0}.catalyst-preview a{overflow-wrap:anywhere}}
+
+.board-navigation{display:grid;gap:10px;grid-column:1/-1;margin:12px 0}.board-navigation label{display:grid;gap:6px}.board-navigation input{box-sizing:border-box;width:100%;min-height:44px;font-size:16px}.board-navigation button{min-height:44px}.board-navigation button[aria-pressed="true"]{outline:2px solid #7dd3fc;outline-offset:2px}.board-navigation .controls{display:flex;flex-wrap:wrap;gap:10px}
