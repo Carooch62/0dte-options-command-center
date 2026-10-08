@@ -1,3 +1,4 @@
+import {handleRobinhood} from './robinhood-live.js';
 import {handlePlaid,scheduledPlaidSync} from './plaid-sync.js';
 const REPO = 'Carooch62/0dte-options-command-center';
 const WORKFLOW = 'market-scan.yml';
@@ -47,6 +48,9 @@ export default {
   },
   async fetch(request,env) {
     const url=new URL(request.url);
+    if(url.pathname.startsWith('/private/robinhood/')) {
+      try{return await handleRobinhood(request,env)}catch{return response({ok:false,error:'Private Robinhood service unavailable'},502,request)}
+    }
     if(url.pathname.startsWith('/private/plaid/')) {
       try{return await handlePlaid(request,env)}catch(e){return response({ok:false,error:e.message},502,request)}
     }
