@@ -64,3 +64,7 @@
 .plan-fields label{display:grid;gap:5px;font-size:12px}
 .plan-fields input{width:100%;min-width:0}
 .plan-save-status{font-size:12px;color:#8bc8ff}
+
+
+/* Keep provenance and the catalyst visible without opening a card. */
+.source-ages{display:grid;gap:5px;padding:10px 12px;margin:10px 0;border:1px solid #b98a48;border-radius:12px;background:rgba(185,138,72,.08);font-size:12px;overflow-wrap:anywhere}.source-ages b{color:var(--text,#f1f5f9)}.catalyst-preview{font-size:13px;line-height:1.5;margin:10px 0;overflow-wrap:anywhere}.compact-card .entry-plan>p{font-size:12px}.compact-card .controls button,.star{min-height:44px;min-width:44px}@media(max-width:600px){.controls{flex-wrap:wrap}.controls button{min-height:44px}.source-ages{font-size:12px}.compact-card{min-width:0}.catalyst-preview a{overflow-wrap:anywhere}}
