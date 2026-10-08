@@ -23,7 +23,8 @@ const assets = [
   "brokerage-history.js",
   "execution-evidence.js",
   "robinhood-review.js",
-  "robinhood-panel.js"
+  "robinhood-panel.js",
+  "robinhood-connect.js"
 ];
 for (const file of assets) {
   if (!statSync(join(root, file)).isFile()) throw new Error('Missing browser asset: ' + file);
