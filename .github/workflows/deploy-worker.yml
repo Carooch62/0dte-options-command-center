@@ -2,7 +2,7 @@ name: Deploy Cloudflare Worker
 on:
   push:
     branches: [main]
-    paths: ['worker.js', 'plaid-sync.js', 'robinhood-live.js', 'robinhood-connect.js', 'wrangler.toml', 'scripts/build-assets.mjs', 'scripts/setup-robinhood-client.mjs', '*.html', 'dashboard-*.js', 'dashboard-mobile.css', 'refresh-progress.js', 'trade-review.js', '.github/workflows/deploy-worker.yml']
+    paths: ['worker.js', 'plaid-sync.js', 'robinhood-live.js', 'robinhood-connect.js', 'wrangler.toml', 'scripts/build-assets.mjs', 'scripts/setup-robinhood-client.mjs', '*.html', 'dashboard-*.js', 'signal-checklist.js', 'dashboard-mobile.css', 'refresh-progress.js', 'trade-review.js', '.github/workflows/deploy-worker.yml']
   workflow_dispatch:
 permissions:
   contents: read
