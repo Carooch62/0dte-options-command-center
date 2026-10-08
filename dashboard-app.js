@@ -101,7 +101,23 @@ function renderFilterChips(){
  $('activeFilters').innerHTML=chips.join('')+(changed.length?'<button class="filter-reset" data-clear-filter="all">Reset all</button>':'');
  $('filterSummary').textContent=`${changed.length?changed.length+' controls changed':'All candidates'} · ask ${money($('askMin').value)}–${money($('askMax').value)}`;
 }
+
+function tickerMatches(ticker,query){return String(ticker||'').toUpperCase().includes(String(query||'').trim().toUpperCase());}
+const navigation=document.createElement('div');navigation.className='board-navigation';
+navigation.innerHTML='<label>Find a ticker<input id="tickerSearch" type="search" placeholder="e.g. NVDA" autocomplete="off" autocapitalize="characters" spellcheck="false"></label><div class="controls"><button id="allStocks" type="button">All stocks</button><button id="watchStocks" type="button">★ Watchlist</button><button id="clearSearch" type="button">Clear search</button></div><p id="watchlistNotice" class="smallnote" role="status"></p>';
+$('board').before(navigation);
+$('tickerSearch').addEventListener('input',()=>render());
+$('clearSearch').onclick=()=>{$('tickerSearch').value='';render();$('tickerSearch').focus();};
+$('allStocks').onclick=()=>{$('onlyContracts').value='all';persistFilters();render();};
+$('watchStocks').onclick=()=>{$('onlyContracts').value='starred';persistFilters();render();};
+const expandedCards=new Set();
+$('board').addEventListener('toggle',event=>{const el=event.target;if(el.tagName!=='DETAILS'||!el.dataset.ticker||!el.isConnected)return;const key=el.dataset.ticker+'|'+(el.dataset.section||'contracts');if(el.open)expandedCards.add(key);else expandedCards.delete(key);},true);
+function boardAnchor(){const el=[...$('board').querySelectorAll('article')].find(el=>el.getBoundingClientRect().bottom>0);return el?{ticker:el.querySelector('[data-star]')?.dataset.star,top:el.getBoundingClientRect().top}:null;}
+function restoreBoardAnchor(anchor){if(!anchor||anchor.top>innerHeight)return;const el=[...$('board').querySelectorAll('article')].find(el=>el.querySelector('[data-star]')?.dataset.star===anchor.ticker);if(el)window.scrollBy(0,el.getBoundingClientRect().top-anchor.top);}
+
 function render(){if(!data)return;
+ if($('board').contains(document.activeElement)&&document.activeElement.matches('input,textarea,select'))return;
+ const anchor=boardAnchor();
  const age=minutes(data.generated_at),usable=!dataDownloadFailed&&snapshotUsable(data);
  const sessionKnown=Date.now()>=Date.parse(data.session_open_at)&&Date.now()<Date.parse(data.session_close_at);
  $('session').textContent=sessionKnown?'REGULAR SESSION':'OUTSIDE VERIFIED SESSION';
@@ -111,16 +127,21 @@ function render(){if(!data)return;
  $('stats').innerHTML=[['STOCK ROWS',c.stocks_received??data.scanned_rows??0],['CHAIN ATTEMPTS',c.chains_attempted??'Unknown'],['WITH SAME-DAY CHAIN',c.chains_with_contracts??'Unknown'],['LAST TRIGGERED',counts.TRIGGERED||0],['LAST SECOND-WAVE',counts['SECOND-WAVE']||0],['LAST CONFIRMED',counts['CONFIRMED DELAYED']||0]].map(([a,b])=>`<div class="panel stat"><b>${esc(b)}</b><span>${a}</span></div>`).join('');
  $('coverage').textContent=`Universe: ${data.universe_size??'unknown'} · ${c.chains_not_attempted??'unknown'} chains not yet attempted · ${Object.entries(c.chain_status_counts||{}).map(([a,b])=>a+': '+b).join(' · ')}. Broader discovery: ${Object.entries(data.discovery||{}).map(([a,b])=>a+' '+b.status).join(', ')}.`;
  const min=Number($('askMin').value),max=Number($('askMax').value);$('filterNotice').textContent=(!Number.isFinite(min)||!Number.isFinite(max)||min<0||max<min)?'Enter a valid minimum and maximum.':'';
- let rows=all.filter(x=>matchesState(x,dataDownloadFailed?{...data,generated_at:null}:data,$('state').value)&&($('direction').value==='ALL'||x.direction===$('direction').value)&&matchesTrend(x,$('trendPeriod').value,$('trendDirection').value,$('trendAlignment').value,dataDownloadFailed?{...data,generated_at:null}:data)&&($('catalyst').value==='ALL'||x.catalyst_level===$('catalyst').value)&&($('onlyContracts').value!=='contracts'||selectableContracts(x,min,max).length)&&($('onlyContracts').value!=='starred'||stars.includes(x.ticker)));
+ let rows=all.filter(x=>tickerMatches(x.ticker,$('tickerSearch').value)&&matchesState(x,dataDownloadFailed?{...data,generated_at:null}:data,$('state').value)&&($('direction').value==='ALL'||x.direction===$('direction').value)&&matchesTrend(x,$('trendPeriod').value,$('trendDirection').value,$('trendAlignment').value,dataDownloadFailed?{...data,generated_at:null}:data)&&($('catalyst').value==='ALL'||x.catalyst_level===$('catalyst').value)&&($('onlyContracts').value!=='contracts'||selectableContracts(x,min,max).length)&&($('onlyContracts').value!=='starred'||stars.includes(x.ticker)));
  const order={'CONFIRMED DELAYED':7,TRIGGERED:6,'SECOND-WAVE':5,WATCH:4,DECAYING:3,PASS:2,'STALE PRICE DATA':1,'STALE SCAN':1,'MARKET CLOSED':1,'DATA UNAVAILABLE':0};
  rows.sort((a,b)=>$('sort').value==='score'?(b.score||0)-(a.score||0):$('sort').value==='move'?Math.abs(b.move_5m||0)-Math.abs(a.move_5m||0):(order[recordedState(b)]||0)-(order[recordedState(a)]||0)||contractRank(b,min,max)-contractRank(a,min,max)||(b.score||0)-(a.score||0));
  const detailKey=d=>d.dataset.ticker+'|'+(d.dataset.section||'contracts');
- const opened=new Set([...$('board').querySelectorAll('details[open]')].map(detailKey));
- $('shown').textContent=rows.length+' candidates';$('board').innerHTML=rows.map(card).join('')||'<p class="empty">No candidates match these filters.</p>';
+ const opened=new Set([...expandedCards,...[...$('board').querySelectorAll('details[open]')].map(detailKey)]);
+ $('shown').textContent=rows.length+' candidates';$('board').innerHTML=rows.map(card).join('')||'<p class="empty">No candidates match. Clear the search or adjust your filters. Star a stock to add it to your watchlist.</p>';
  for(const details of $('board').querySelectorAll('details'))details.open=opened.has(detailKey(details));
+ const watching=$('onlyContracts').value==='starred',available=new Set(all.map(x=>x.ticker)),missing=stars.filter(t=>!available.has(t));
+ $('watchStocks').textContent='★ Watchlist ('+stars.length+')';
+ $('watchStocks').setAttribute('aria-pressed',String(watching));$('allStocks').setAttribute('aria-pressed',String(!watching));
+ $('watchlistNotice').textContent=watching?(stars.length?rows.length+' shown of '+stars.length+' starred. Other filters still apply.'+(missing.length?' Not in this scan: '+missing.join(', ')+'.':''):'Your watchlist is empty. Open All stocks and tap a star. Stars are saved on this device.'):'Search covers tickers in this scan. Other filters still apply.';
  renderFilterChips();
  renderChanges();
  const f=data.option_feedback||{};$('feedback').innerHTML=`<p>${f.today_count||0} observations recorded today.</p>`+(f.recent||[]).slice(-5).reverse().map(x=>`<div class="change-item"><b>${esc(x.ticker)} ${esc(x.side)} ${money(x.strike)}</b> · observed ask ${money(x.entry_ask)} · ${esc(time(x.observed_at))}<br>${Object.entries(x.markouts||{}).map(([h,m])=>`${h}m: bid ${money(m.exit_bid)}, gross quote change ${money(m.gross_quote_change_per_contract)} / contract · ${esc(m.interpretation)}`).join('<br>')||'Waiting for a later, changed source snapshot.'}</div>`).join('');
+ restoreBoardAnchor(anchor);
 }
 function rememberRefresh(r){lastRefresh=r;save('0dteLastRefresh',r);}
 function renderRefresh(){
