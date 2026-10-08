@@ -23,4 +23,5 @@ jobs:
       - run: |
           node --check dashboard-app.js
           node --check worker.js
+          node scripts/build-assets.mjs
           git diff --check
