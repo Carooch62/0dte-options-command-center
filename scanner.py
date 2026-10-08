@@ -104,7 +104,7 @@ def chart(t):
     for host in ('query1.finance.yahoo.com', 'query2.finance.yahoo.com'):
         try:
             d = request_json(f'https://{host}/v8/finance/chart/{t}',
-                             params={'interval':'5m','range':'1d','includePrePost':'true'},
+                             params={'interval':'5m','range':'5d','includePrePost':'true'},
                              headers={'User-Agent':UA})['chart']['result'][0]
             d['_source'] = 'Yahoo 5m bars'; d['_delay'] = 0
             return d
@@ -130,24 +130,26 @@ def explicit_ticker(ticker, item):
     return bool(pat.search(title) or pat.search(link))
 
 
+def previous_session(now):
+    cal = calendar()
+    day = now.astimezone(ET).date().isoformat()
+    session = cal.date_to_session(day, direction='previous')
+    return cal.previous_session(session) if cal.is_session(day) else session
+
+
 def previous_session_close(data, bars, now):
-    # previousClose is the last session close; chartPreviousClose is the start
-    # of the requested range and may be several sessions old. A partial prior
-    # session in an intraday response must never override the daily baseline.
-    value = number(data.get('meta', {}).get('previousClose'))
-    if value is not None and value > 0:
-        return value, 'PROVIDER_PREVIOUS_CLOSE'
-    prior = [b for b in bars if b['time'].astimezone(ET).date() < now.date()
-             and dtime(9,30) <= b['time'].astimezone(ET).time() < dtime(16)]
-    if prior:
-        last = prior[-1]
-        cal = calendar()
-        expected = cal.date_to_session(now.date().isoformat(), direction='previous')
-        if cal.is_session(now.date().isoformat()):
-            expected = cal.previous_session(expected)
-        close = parse_time(session_info(last['time'])['close_at'])
-        if last['time'].astimezone(ET).date() == expected.date() and close and last['time'] + timedelta(minutes=5) == close:
-            return last['close'], 'COMPLETED_PRIOR_SESSION'
+    # Both provider metadata close fields can lag without a session date.
+    # Only a completed closing bar from the expected prior exchange session
+    # can establish the daily-change baseline. Never use an after-hours print.
+    now = now.astimezone(ET)
+    cal = calendar()
+    expected = previous_session(now)
+    close = cal.session_close(expected).to_pydatetime()
+    for bar in reversed(sorted(bars, key=lambda b: b['time'])):
+        value = number(bar.get('close'))
+        if (bar['time'] + timedelta(minutes=5) == close and close <= now
+                and value is not None and value > 0):
+            return value, 'COMPLETED_PRIOR_SESSION'
     return None, 'UNAVAILABLE'
 
 
@@ -213,6 +215,7 @@ def scan_one(t, now=None, payload=None):
         return {'ticker':t, 'price':round(price,4), 'day_move':round(day,2) if day is not None else None,
                 'open_move':round(pct(price,first),2), 'previous_close':previous_close,
                 'previous_close_source':previous_close_source,
+                'previous_close_date':previous_session(now).date().isoformat() if previous_close else None,
                 'move_5m':m5, 'recent_move':m15, 'move_30m':m30, 'move_60m':m60,
                 'volume_ratio':round(vr,2) if vr is not None else None,
                 'volume_acceleration':round(accel,2) if accel is not None else None,

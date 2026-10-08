@@ -20,8 +20,8 @@ class ClosingReviewTests(unittest.TestCase):
         value, source = scanner.previous_session_close(
             {'meta': {'previousClose': 19.35, 'chartPreviousClose': 22.02}},
             [self.bar(hour=10, minute=0, close=19)], self.now)
-        self.assertEqual(value, 19.35)
-        self.assertEqual(source, 'PROVIDER_PREVIOUS_CLOSE')
+        self.assertIsNone(value)
+        self.assertEqual(source, 'UNAVAILABLE')
 
     def test_missing_metadata_requires_previous_session_closing_bar(self):
         self.assertEqual(scanner.previous_session_close({}, [self.bar()], self.now)[0], 19.35)
