@@ -21,8 +21,8 @@ function setup({publicCallback=false,missingStorage=false}={}){
  `;
  return execFileSync(process.execPath,['--input-type=module','-e',runner],{encoding:'utf8'});
 }
-test('private testing activates only after protected callback and existing private bindings are verified',()=>{
- const output=setup();assert.match(output,/Enabled: true/);assert.ok(!output.includes('PRIVATE-DEPLOYMENT-TOKEN'));assert.ok(!output.includes('PRIVATE-BINDING-VALUE'));assert.match(output,/"automatic_polling_enabled":false/);
+test('registration and protected routes alone cannot activate unverified hosted authorization',()=>{
+ const output=setup();assert.match(output,/Enabled: false/);assert.match(output,/"private_prerequisites_ready":true/);assert.match(output,/PAUSED_PENDING_PROVIDER_VALIDATION/);assert.ok(!output.includes('PRIVATE-DEPLOYMENT-TOKEN'));assert.ok(!output.includes('PRIVATE-BINDING-VALUE'));assert.match(output,/"automatic_polling_enabled":false/);
 });
 test('an unprotected callback cannot activate quote connection',()=>{assert.match(setup({publicCallback:true}),/Enabled: false/);});
 test('missing encrypted storage cannot activate quote connection',()=>{assert.match(setup({missingStorage:true}),/Enabled: false/);});
