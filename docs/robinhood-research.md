@@ -46,3 +46,10 @@ Before activation:
 API routes: authenticated `GET /private/robinhood/status`; same-origin `POST connect`, `disconnect`, `quotes`; authenticated OAuth `GET callback`. Quote bodies are `{kind:"equity", symbols:["JD","AAL"]}` or `{kind:"option", instrument_ids:["<Robinhood UUID>"]}`, at most 20 per batch. The connection status remains `CONNECTED_UNVERIFIED`; quote responses explicitly report `latency_verified:false` and `scanner_feed:"DELAYED_RESEARCH"`.
 
 Validation includes encrypted PKCE callback exchange, state/issuer and origin rejection, Access authentication, activation gating, market-data allowlisting, quote identity/coverage checks, event-clock age, unknown clocks, zero/crossed books and official dated close preservation. These mocked protocol tests are not a live Robinhood compatibility test.
+
+
+### Registration and deployment progress
+
+On October 8, Robinhood's advertised dynamic-registration endpoint accepted this separate public PKCE client with the exact protected Worker callback. Registration returned no client secret or user authorization. This confirms registration compatibility; it does not confirm permission for unattended polling or distribution of market data.
+
+The deployment workflow installs the public client ID and callback as Worker secrets and prints only prerequisite binding names and Access route coverage. The activation switch remains off. Existing Cloudflare Access protects the brokerage page and Plaid routes; the new Robinhood path must be added to the same owner-only Access application before sign-in can work. Automatic collection and live scanner substitution remain unimplemented and disabled.
