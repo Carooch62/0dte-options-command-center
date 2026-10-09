@@ -16,6 +16,18 @@ Open `http://localhost:8765/dashboard_v2.html`. `pipeline.py` scans in a tempora
 
 ## Data and eligibility
 
+- News requests remain capped at 50 stocks per scan: the top 40 price/volume
+  scores plus 10 rotating candidates from a ticker-sorted remainder when more
+  than 50 stocks are available. This broadens discovery but is not full-market
+  news coverage or a guaranteed revisit interval when the universe changes.
+- News status distinguishes SUCCESS (including an empty response), SOURCE_FAILURE,
+  and NOT_SCANNED. Failed, unchecked and legacy unknown coverage cannot establish
+  that a catalyst is absent; the checklist reports UNKNOWN and qualification
+  remains blocked. A successful search with no recognized event reports no
+  catalyst found in that response, not proof that no catalyst exists anywhere.
+  Candidate history retains the status and check time. Existing catalyst
+  recognition, numeric scores and contract thresholds are unchanged.
+
 - A static universe plus public gainers, losers and most-active discovery is scanned. Discovery coverage and failures are visible; this is not a claim to cover every listed stock.
 - Five-minute OHLCV bars are aligned by timestamp. Partial bars are excluded. The current session has its own VWAP. Missing longer horizons remain null. NYSE holidays and early closes use `exchange-calendars`.
 - Yahoo chart requests retry transient errors and try a second Yahoo host. Both are the same provider. An optional independent Alpaca bar fallback uses server-side `APCA_API_KEY_ID` and `APCA_API_SECRET_KEY`. Without those credentials it is unavailable, explicitly logged. Default Alpaca feed is IEX, whose volume covers a single exchange. `ALPACA_DATA_FEED=sip` requests bars ending 16 minutes ago; these are marked stale for confirmation. No brokerage trading endpoint is used.

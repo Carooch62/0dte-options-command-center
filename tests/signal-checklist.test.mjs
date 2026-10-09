@@ -3,6 +3,12 @@ import assert from 'node:assert/strict';
 import {signalChecklist,earlyWatchVisible,relativeVolumeEvidence} from '../signal-checklist.js';
 const now=Date.parse('2026-10-08T15:01:00Z');
 const data={generated_at:'2026-10-08T15:00:00Z',market_session:'OPEN',session_open_at:'2026-10-08T13:30:00Z',session_close_at:'2026-10-08T20:00:00Z'};
+test('news coverage distinguishes unknown from a completed negative search',()=>{
+ for(const [value,detail,expected] of [[null,'News not checked this scan','UNKNOWN'],[null,'News source failed','UNKNOWN'],[false,'None confirmed','FAIL'],[true,'Company-specific event','PASS']]){
+  const item=signalChecklist({bar_end:data.generated_at,qualification_checks:{catalyst_confirmed:value},catalyst_type:detail},data,.1,.3,now).find(x=>x.label==='Catalyst');
+  assert.equal(item.state,expected);assert.equal(item.detail,detail);
+ }
+});
 test('missing signal evidence is unknown, not pass',()=>{
  const c=signalChecklist({bar_end:data.generated_at},data,.1,.3,now);
  assert.equal(c.find(x=>x.label==='Catalyst').state,'UNKNOWN');

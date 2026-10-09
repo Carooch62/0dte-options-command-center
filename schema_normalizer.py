@@ -73,7 +73,8 @@ def normalize(data,now=None):
             group['eligible_contracts']=[o for o in future if o['quote_valid'] and o['delta_ok'] and o['near_atm']
                 and o['expiry_verified'] and o['direction_aligned'] and number(o.get('volume'),0)>=20 and o['usable_spread']]
         strong=any(o['quote_freshness'] in ('RECENT','DELAYED') for o in x['preferred_contracts'])
-        items=x.get('news_items',[])
+        news_status=x.get('news_status')
+        items=x.get('news_items',[]) if news_status in (None,'SUCCESS') else []
         for n in items:
             title=str(n.get('title','')).lower(); age=number(n.get('age_hours'))
             explicit=ticker_explicit(x['ticker'],n)
@@ -83,15 +84,20 @@ def normalize(data,now=None):
         x['catalyst_level']='DIRECT' if any(n['level']=='DIRECT' for n in items) else 'LIKELY' if any(n['level']=='LIKELY' for n in items) else 'NONE'
         x['catalyst_type']='Company-specific event' if x['catalyst_level']=='DIRECT' else 'Company-specific news' if x['catalyst_level']=='LIKELY' else 'None confirmed'
         x['catalyst']=x['catalyst_level']!='NONE'
+        news_unknown=not x['catalyst'] and news_status!='SUCCESS'
+        if news_unknown:
+            x['catalyst_level']='UNKNOWN'
+            x['catalyst_type']={'NOT_SCANNED':'News not checked this scan',
+                               'SOURCE_FAILURE':'News source failed'}.get(news_status,'News coverage unknown')
         confirmation=x['momentum_confirmed'] or x['acceleration_confirmed']
         x['setup_qualified']=bool(x['catalyst'] and confirmation)
         x['qualification_checks']={'current_session_data':bool(current),'direction_confirmed':bool(x['direction_confirmed']),
                                    'momentum_confirmed':x['momentum_confirmed'],'acceleration_confirmed':x['acceleration_confirmed'],
-                                   'catalyst_confirmed':x['catalyst']}
+                                   'catalyst_confirmed':None if news_unknown else x['catalyst']}
         x['qualification_reasons']=([ 'Current session data unavailable' ] if not current else []) + \
             ([ 'Directional momentum not confirmed' ] if not directional else []) + \
             ([ 'Momentum and acceleration confirmation missing' ] if not confirmation else []) + \
-            ([ 'Company-specific catalyst not confirmed' ] if not x['catalyst'] else [])
+            ([ x['catalyst_type'] if news_unknown else 'Company-specific catalyst not confirmed' ] if not x['catalyst'] else [])
         attach_early_watch(x,current)
         x['flow_aligned']=False  # cumulative call/put volume is not verified buying flow
         x['volume_balance_aligned']=(x.get('volume_balance')=='CALL' and side=='call') or (x.get('volume_balance')=='PUT' and side=='put')
