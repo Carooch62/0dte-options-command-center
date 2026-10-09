@@ -25,7 +25,7 @@ def validate(stage):
         if 'execution_state' not in x:raise ValueError('Missing execution state')
         for o in x.get('preferred_contracts',[]):
             if not o['quote_valid'] or not o['delta_ok'] or not o['tight_spread']:raise ValueError('Invalid preferred contract')
-    return {'status':'DEGRADED' if raw.get('core_missing') or received<configured*.9 or raw['coverage']['chain_status_counts'].get('SOURCE_FAILURE') else 'SUCCESS',
+    return {'status':'DEGRADED' if raw.get('core_missing') or received<configured*.9 or any(raw['coverage']['chain_status_counts'].get(s) for s in ('SOURCE_FAILURE','EMPTY_UNVERIFIED')) else 'SUCCESS',
             'coverage':raw['coverage'],'core_missing':raw.get('core_missing',[]),'scan_id':raw['scan_id']}
 
 def run():

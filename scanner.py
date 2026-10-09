@@ -74,9 +74,10 @@ def market_session(now=None):
     return session_info(now)['session']
 
 def request_json(url, **kwargs):
+    timeout = kwargs.pop('timeout', 8)
     for attempt in range(3):
         try:
-            r = requests.get(url, timeout=kwargs.pop('timeout', 8), **kwargs)
+            r = requests.get(url, timeout=timeout, **kwargs)
             r.raise_for_status()
             return r.json()
         except (requests.RequestException, ValueError) as exc:
@@ -392,6 +393,14 @@ def nasdaq_options(t):
                         params={'assetclass':'etf' if t in CORE_TICKERS else 'stocks','limit':'1000'},
                         headers={**HEADERS,'Referer':'https://www.nasdaq.com/'})
     rows = ((data.get('data') or {}).get('table') or {}).get('rows')
+    # An explicit provider-negative response is not a transport/parser failure,
+    # but neither is it authoritative proof that no listed options exist.
+    if ((data.get('status') or {}).get('rCode') == 200
+            and (data.get('data') or {}).get('totalRecord') == 0
+            and rows in (None, [])
+            and data.get('message') == 'Options are not available for this symbol'):
+        return {'contracts':[], 'source':'Nasdaq public chain', 'timestamp':None,
+                'status':'EMPTY_UNVERIFIED', 'availability':'NO_OPTIONS_REPORTED'}
     if not isinstance(rows,list) or not rows: raise ValueError('empty Nasdaq chain')
     opts = parse_nasdaq_rows(rows,today,max_days=31)
     for o in opts:
@@ -407,7 +416,9 @@ def options(t):
             result=provider(t); result['errors']=failures
             return result
         except Exception as exc:
-            record_error(t,provider_name,exc); failures.append(provider_name+':'+type(exc).__name__)
+            record_error(t,provider_name,exc)
+            code = getattr(getattr(exc, 'response', None), 'status_code', None)
+            failures.append(provider_name+':'+type(exc).__name__+(f':HTTP_{code}' if code is not None else ''))
     return {'contracts':[],'source':'Options providers unavailable','timestamp':None,
             'status':'SOURCE_FAILURE','errors':failures}
 
@@ -458,6 +469,7 @@ def enrich_options(x, result):
              option_call_put_ratio=ratio,option_flow_direction=balance,option_direction=balance,
              volume_balance=balance, option_source=result['source'],option_timestamp=result.get('timestamp'),
              option_payload_timestamp=result.get('payload_timestamp'), chain_status=result['status'],
+             option_availability=result.get('availability'),
              chain_attempted=True, chain_errors=result.get('errors',[]), expirations=result.get('expirations',[]),
              options_quality='FULL_GREEKS' if any(o.get('greeks_verified') for o in zero) else 'CHAIN_ONLY' if zero else 'NONE')
 
