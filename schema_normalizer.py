@@ -95,7 +95,8 @@ def normalize(data,now=None):
         attach_early_watch(x,current)
         x['flow_aligned']=False  # cumulative call/put volume is not verified buying flow
         x['volume_balance_aligned']=(x.get('volume_balance')=='CALL' and side=='call') or (x.get('volume_balance')=='PUT' and side=='put')
-        x['execution_readiness']='VERIFIED_DELAYED' if strong and confirmation else 'WATCH_ONLY' if current else 'INSUFFICIENT_DATA'
+        # Quote evidence cannot upgrade a stock that failed setup qualification.
+        x['execution_readiness']='VERIFIED_DELAYED' if strong and x['setup_qualified'] else 'WATCH_ONLY' if current else 'INSUFFICIENT_DATA'
         x['setup_bucket']='CONFIRMED WATCH' if strong and x['setup_qualified'] else 'WATCH' if x['setup_qualified'] or (current and eligible) else 'PASS'
     data.update(schema_version=7,data_quality='DELAYED_RESEARCH',dashboard_generated_at=now.isoformat())
     return data
