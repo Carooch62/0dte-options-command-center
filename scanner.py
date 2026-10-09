@@ -387,12 +387,34 @@ def parse_nasdaq_rows(rows, today, max_days=0):
     return out
 
 
+class OptionProviderError(ValueError):
+    """Safe, bounded provider diagnosis; never stores response bodies."""
+    def __init__(self, reason):
+        self.reason = reason
+        super().__init__(reason)
+
+
 def nasdaq_options(t):
     today = datetime.now(ET).date()
     data = request_json(f'https://api.nasdaq.com/api/quote/{t}/option-chain',
                         params={'assetclass':'etf' if t in CORE_TICKERS else 'stocks','limit':'1000'},
                         headers={**HEADERS,'Referer':'https://www.nasdaq.com/'})
-    rows = ((data.get('data') or {}).get('table') or {}).get('rows')
+    if not isinstance(data, dict):
+        raise OptionProviderError('MALFORMED_RESPONSE')
+    status = data.get('status') or {}
+    if not isinstance(status, dict):
+        raise OptionProviderError('MALFORMED_RESPONSE')
+    if status.get('rCode') not in (None, 200):
+        messages = status.get('bCodeMessage')
+        if (status.get('rCode') == 400 and isinstance(messages, list)
+                and any(isinstance(m, dict) and m.get('code') == 1001
+                        and m.get('errorMessage') == 'Symbol not exists.' for m in messages)):
+            raise OptionProviderError('SYMBOL_NOT_RECOGNIZED')
+        raise OptionProviderError('PROVIDER_REJECTED_REQUEST')
+    body = data.get('data') or {}
+    if not isinstance(body, dict) or not isinstance(body.get('table') or {}, dict):
+        raise OptionProviderError('MALFORMED_RESPONSE')
+    rows = (body.get('table') or {}).get('rows')
     # An explicit provider-negative response is not a transport/parser failure,
     # but neither is it authoritative proof that no listed options exist.
     if ((data.get('status') or {}).get('rCode') == 200
@@ -401,7 +423,10 @@ def nasdaq_options(t):
             and data.get('message') == 'Options are not available for this symbol'):
         return {'contracts':[], 'source':'Nasdaq public chain', 'timestamp':None,
                 'status':'EMPTY_UNVERIFIED', 'availability':'NO_OPTIONS_REPORTED'}
-    if not isinstance(rows,list) or not rows: raise ValueError('empty Nasdaq chain')
+    if not isinstance(rows,list) or not rows:
+        raise OptionProviderError('EMPTY_OR_MALFORMED_CHAIN')
+    if any(not isinstance(row, dict) for row in rows):
+        raise OptionProviderError('MALFORMED_RESPONSE')
     opts = parse_nasdaq_rows(rows,today,max_days=31)
     for o in opts:
         o['contract_id'] = f"{t}:{o['expiry']}:{o['side']}:{o['strike']}"
@@ -410,17 +435,25 @@ def nasdaq_options(t):
             'status':'SUCCESS' if any(o['dte']==0 for o in opts) else 'EMPTY_UNVERIFIED'}
 
 def options(t):
-    failures=[]
+    failures=[]; diagnostics=[]
     for provider_name,provider in (('fetch_cboe',fetch_cboe),('nasdaq_options',nasdaq_options)):
         try:
             result=provider(t); result['errors']=failures
+            result['diagnostics']=diagnostics
             return result
         except Exception as exc:
             record_error(t,provider_name,exc)
             code = getattr(getattr(exc, 'response', None), 'status_code', None)
             failures.append(provider_name+':'+type(exc).__name__+(f':HTTP_{code}' if code is not None else ''))
+            reason = (exc.reason if isinstance(exc, OptionProviderError)
+                      else 'ACCESS_DENIED' if code in (401,403)
+                      else 'RATE_LIMITED' if code == 429
+                      else 'TIMEOUT' if isinstance(exc, requests.Timeout)
+                      else 'REQUEST_FAILED')
+            diagnostics.append({'provider':provider_name,'reason':reason,
+                                **({'http_status':code} if code is not None else {})})
     return {'contracts':[],'source':'Options providers unavailable','timestamp':None,
-            'status':'SOURCE_FAILURE','errors':failures}
+            'status':'SOURCE_FAILURE','errors':failures,'diagnostics':diagnostics}
 
 
 def contract_score(o, stock):
@@ -470,6 +503,7 @@ def enrich_options(x, result):
              volume_balance=balance, option_source=result['source'],option_timestamp=result.get('timestamp'),
              option_payload_timestamp=result.get('payload_timestamp'), chain_status=result['status'],
              option_availability=result.get('availability'),
+             option_source_diagnostics=result.get('diagnostics',[]),
              chain_attempted=True, chain_errors=result.get('errors',[]), expirations=result.get('expirations',[]),
              options_quality='FULL_GREEKS' if any(o.get('greeks_verified') for o in zero) else 'CHAIN_ONLY' if zero else 'NONE')
 

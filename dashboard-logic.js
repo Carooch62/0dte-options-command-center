@@ -74,7 +74,13 @@ export function contractExplanation(row,min=.1,max=.3) {
   const matches=selectableContracts(row,min,max);
   if(matches.length)return `${matches.length} contracts pass your price and quality filters. Quotes remain delayed; verify current quotes separately.`;
   if(row.chain_status==='NOT_SCANNED'||row.chain_attempted===false)return 'Option chain not scanned in this run. No contract assessment is available yet.';
-  if(row.chain_status==='SOURCE_FAILURE')return 'Option source failed. Contract availability and delta could not be checked.';
+  if(row.chain_status==='SOURCE_FAILURE'){
+    const diagnostics=Array.isArray(row.option_source_diagnostics)?row.option_source_diagnostics:[];
+    const notes=[];
+    if(diagnostics.some(d=>d.provider==='fetch_cboe'&&d.reason==='ACCESS_DENIED'))notes.push('Cboe denied access');
+    if(diagnostics.some(d=>d.provider==='nasdaq_options'&&d.reason==='SYMBOL_NOT_RECOGNIZED'))notes.push('Nasdaq did not recognize this symbol');
+    return 'Option source failed. Contract availability and delta could not be checked.'+(notes.length?' '+notes.join('; ')+'. This does not prove the stock or its options are delisted.':'');
+  }
   if(row.chain_status==='EMPTY_UNVERIFIED'&&row.option_availability==='NO_OPTIONS_REPORTED')return 'Nasdaq reports options unavailable for this symbol. Listing availability is unverified; this is not proof that no options exist. No contract is eligible.';
   if(row.chain_status==='NO_EXPIRATION_IN_WINDOW')return 'The source returned no expiration in this selected calendar-day window.';
   if(row.chain_status==='NO_EXPIRATION_TODAY')return 'The source returned no contracts expiring today.';

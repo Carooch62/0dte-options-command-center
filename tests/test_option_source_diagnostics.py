@@ -12,6 +12,32 @@ NEGATIVE={'data':{'totalRecord':0,'table':{'rows':None}},
           'message':'Options are not available for this symbol','status':{'rCode':200}}
 
 class OptionSourceDiagnostics(unittest.TestCase):
+    def test_symbol_rejection_remains_failure_with_specific_safe_diagnosis(self):
+        response=requests.Response();response.status_code=403
+        rejected={'data':None,'status':{'rCode':400,'bCodeMessage':[{'code':1001,'errorMessage':'Symbol not exists.'}]}}
+        with patch.object(scanner,'fetch_cboe',side_effect=requests.HTTPError('private',response=response)),patch.object(scanner,'request_json',return_value=rejected):
+            result=scanner.options('DDS')
+        self.assertEqual(result['status'],'SOURCE_FAILURE')
+        self.assertEqual(result['diagnostics'],[
+            {'provider':'fetch_cboe','reason':'ACCESS_DENIED','http_status':403},
+            {'provider':'nasdaq_options','reason':'SYMBOL_NOT_RECOGNIZED'}])
+        row={'ticker':'DDS','price':100,'direction':'UP'}
+        scanner.enrich_options(row,result)
+        self.assertEqual(row['option_source_diagnostics'],result['diagnostics'])
+        self.assertEqual(row['preferred_contracts'],[])
+        self.assertTrue(all(g['chain_status']=='SOURCE_FAILURE' for g in row['expiry_groups'].values()))
+
+    def test_error_envelope_with_rows_is_never_accepted(self):
+        payload={'data':{'table':{'rows':[{'strike':10}]}},'status':{'rCode':500}}
+        with patch.object(scanner,'request_json',return_value=payload):
+            with self.assertRaises(scanner.OptionProviderError) as error:scanner.nasdaq_options('TEST')
+        self.assertEqual(error.exception.reason,'PROVIDER_REJECTED_REQUEST')
+
+    def test_malformed_envelopes_are_classified(self):
+        for payload in ([],{'status':[],'data':{'table':{'rows':[None]}}},{'data':['bad']},{'data':{'table':['bad']}}):
+            with self.subTest(payload=payload),patch.object(scanner,'request_json',return_value=payload):
+                with self.assertRaises(scanner.OptionProviderError):scanner.nasdaq_options('TEST')
+
     def test_unknown_empty_coverage_remains_degraded(self):
         with tempfile.TemporaryDirectory() as folder:
             stage=Path(folder);(stage/'data').mkdir()
