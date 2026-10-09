@@ -43,6 +43,11 @@ The journal stores entered fills, open/closed positions, quantity, and total fee
 
 ## Verified release checks
 
+Confirmation requires an explicitly qualified stock setup (including its catalyst),
+qualifying quote evidence, directional confirmation and a trigger crossing.
+A crossing without full qualification remains TRIGGERED; it is not an option entry.
+VERIFIED_DELAYED is research readiness, not a live executable quote or fill guarantee.
+
 Tests cover opening bars, null alignment, holidays/early closes, stale/future/unknown timestamps, crossed quotes, missing Greeks, relative spreads, signed momentum, second-wave baseline isolation, actual coverage counts, source failure vs no expiry, transient retries, preservation of last good data, immutable quote observations, browser aging, request correlation, and journal/risk calculations.
 
 
