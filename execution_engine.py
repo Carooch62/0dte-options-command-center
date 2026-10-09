@@ -413,6 +413,8 @@ def update_history(data, path="data/scan-history.json", limit=200):
                 "contract_evidence": contract_evidence(x),
                 "setup_qualified": x.get("setup_qualified"),
                 "qualification_checks": x.get("qualification_checks"),
+                "news_status": x.get("news_status"),
+                "news_checked_at": x.get("news_checked_at"),
                 "pattern_research": x.get("pattern_research"),
                 "relative_volume_research": x.get("relative_volume_research"),
                 "early_watch": x.get("early_watch"),

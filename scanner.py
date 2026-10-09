@@ -119,10 +119,14 @@ def news(t):
     try:
         d=request_json('https://query1.finance.yahoo.com/v1/finance/search',
                        params={'q':t,'newsCount':8,'quotesCount':0},headers={'User-Agent':UA})
-        return d.get('news',[])
+        if not isinstance(d, dict) or not isinstance(d.get('news'), list):
+            raise ValueError('Malformed news response')
+        if any(not isinstance(n, dict) for n in d['news']):
+            raise ValueError('Malformed news item')
+        return {'status':'SUCCESS','items':d['news']}
     except Exception as exc:
         record_error(t,'news',exc)
-        return []
+        return {'status':'SOURCE_FAILURE','items':[]}
 
 
 def explicit_ticker(ticker, item):
@@ -237,14 +241,28 @@ def scan_one(t, now=None, payload=None):
         return None
 
 
+def select_news_candidates(rows, budget=50, offset=0):
+    """Keep a bounded momentum allocation plus a ticker-stable revisit window."""
+    budget=max(0,budget)
+    ranked=sorted(rows,key=lambda x:num(x.get('score')),reverse=True)
+    if len(ranked)<=budget:return ranked
+    top=ranked[:max(0,budget-min(10,budget))]
+    tail=sorted(ranked[len(top):],key=lambda x:x['ticker'])
+    slots=budget-len(top)
+    start=(offset*slots)%len(tail)
+    return top+(tail[start:]+tail[:start])[:slots]
+
+
 def add_news(items):
     def one(x):
+        result=news(x['ticker'])
+        checked_at=datetime.now(timezone.utc).isoformat()
         fresh = []
-        for n in news(x["ticker"]):
-            ts = n.get("providerPublishTime", 0)
-            if not ts or not 0 <= time.time() - ts < 36 * 3600:
+        for n in result['items']:
+            ts = number(n.get("providerPublishTime"))
+            if ts is None or not 0 <= time.time() - ts < 36 * 3600:
                 continue
-            related = [str(v).upper() for v in (n.get("relatedTickers") or [])]
+            related = [str(v).upper() for v in n.get('relatedTickers',[]) ] if isinstance(n.get('relatedTickers'),list) else []
             relevant = explicit_ticker(x["ticker"], n) or x["ticker"].upper() in related
             fresh.append({
                 "title": n.get("title", ""),
@@ -255,16 +273,18 @@ def add_news(items):
                 "related_tickers": related[:8],
             })
         fresh.sort(key=lambda n: (1 if n["explicit_ticker"] else 0, -n["age_hours"]), reverse=True)
-        return x["ticker"], fresh[:6]
+        return x["ticker"], fresh[:6], result['status'], checked_at
 
     with ThreadPoolExecutor(max_workers=6) as pool:
         futures = [pool.submit(one, x) for x in items]
         for fut in as_completed(futures):
-            ticker, fresh = fut.result()
+            ticker, fresh, status, checked_at = fut.result()
             x = next((z for z in items if z["ticker"] == ticker), None)
             if x is None:
                 continue
             x["news_items"] = fresh
+            x['news_status']=status
+            x['news_checked_at']=checked_at
             x["news"] = " | ".join(f"{n['title']} ({n['publisher']})" for n in fresh if n.get("title"))
             x["catalyst"] = any(n.get("explicit_ticker") for n in fresh)
 
@@ -492,7 +512,10 @@ def main():
             if x: rows.append(x)
     print(json.dumps({'stage':'prices_complete','rows':len(rows)}),flush=True)
     rows.sort(key=lambda x:num(x['score']),reverse=True)
-    add_news(rows[:50])
+    for x in rows:
+        x.update(news_status='NOT_SCANNED',news_checked_at=None)
+    news_rows=select_news_candidates(rows,offset=int(time.time()//300))
+    add_news(news_rows)
     print(json.dumps({'stage':'news_complete'}),flush=True)
     for x in rows:
         x.setdefault('news_items',[]);x.setdefault('catalyst',False)
@@ -502,7 +525,9 @@ def main():
          'scan_mode':scan_mode,'scan_id':os.getenv('SCAN_REQUEST_ID') or os.getenv('GITHUB_RUN_ID') or str(time.time_ns()),
          'workflow_run_id':os.getenv('GITHUB_RUN_ID'),'source':'Yahoo 5m bars + CBOE delayed options; Nasdaq fallback',
          'data_quality':'DELAYED_RESEARCH','universe_size':len(universe),'scanned_rows':len(rows),
-         'news_universe':min(50,len(rows)),'discovery':discovery,'price_errors':list(ERRORS),
+         'news_universe':len(news_rows),
+         'news_coverage':{s:sum(x['news_status']==s for x in rows) for s in ('SUCCESS','SOURCE_FAILURE','NOT_SCANNED')},
+         'discovery':discovery,'price_errors':list(ERRORS),
          'candidates':rows,'contract_rules':{'preferred_ask_min':.10,'preferred_ask_max':.30,
          'min_delta':.30,'max_delta':.50,'trade_dte_max':14,'swing_dte_min':15,'swing_min_delta':.70,'swing_max_delta':.80,'preferred_delta':.40,'preferred_spread_max':.05,'preferred_spread_pct_max':20}}
     coverage(out);Path('data').mkdir(exist_ok=True)

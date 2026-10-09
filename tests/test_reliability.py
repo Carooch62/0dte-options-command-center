@@ -190,7 +190,8 @@ class ReliabilityTests(unittest.TestCase):
         d=normalize(snapshot(row(news_items=[],move_5m=.01,volume_ratio=.5,volume_acceleration=.5)),NOW)
         x=d['candidates'][0]
         self.assertFalse(x['setup_qualified'])
-        self.assertIn('Company-specific catalyst not confirmed',x['qualification_reasons'])
+        self.assertIn('News coverage unknown',x['qualification_reasons'])
+        self.assertIsNone(x['qualification_checks']['catalyst_confirmed'])
         self.assertIn('Momentum and acceleration confirmation missing',x['qualification_reasons'])
         self.assertTrue(x['qualification_checks']['current_session_data'])
         self.assertFalse(x['qualification_checks']['momentum_confirmed'])
