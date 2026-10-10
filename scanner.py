@@ -270,6 +270,7 @@ def add_news(items):
                 "publisher": n.get("publisher", ""),
                 "url": n.get("link", ""),
                 "age_hours": round((time.time() - ts) / 3600, 1),
+                "published_at": datetime.fromtimestamp(ts,timezone.utc).isoformat(),
                 "explicit_ticker": relevant,
                 "related_tickers": related[:8],
             })

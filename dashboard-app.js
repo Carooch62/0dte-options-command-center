@@ -1,7 +1,7 @@
 import {entryReadiness,trendSummary,matchesTrend,quoteKey,observePremiums,premiumChange,positionEstimate,reentryProblem,positionAlerts,validPlan} from './trade-review.js?v=20261002-trend-filters';
 import {signalChecklist,earlyWatchVisible} from './signal-checklist.js?v=20261008-rvol-v1';
 import {refreshProgress,publishedReceipt,closedReceipt,refreshBlocksNewRequest,publicationCheckExpired,verifiedRefresh} from './refresh-progress.js?v=20261001-opening-bar';
-import {thetaDecayPct,expirationView,finite,minutes,snapshotUsable,dataStatus,recordedState,matchesState,robinhoodStockUrl,contractExplanation,contractRank,contractShortlist,displayState,selectableContracts,tradePL,validTrade,riskSummary} from './dashboard-logic.js?v=20261007-readiness';
+import {newsResearchSummary,thetaDecayPct,expirationView,finite,minutes,snapshotUsable,dataStatus,recordedState,matchesState,robinhoodStockUrl,contractExplanation,contractRank,contractShortlist,displayState,selectableContracts,tradePL,validTrade,riskSummary} from './dashboard-logic.js?v=20261007-readiness';
 const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const PRODUCTION_HOST='0dte-options-command-center.h69htk56cq.workers.dev';
 const PREVIEW=location.hostname.endsWith('.workers.dev')&&location.hostname!==PRODUCTION_HOST;
@@ -82,7 +82,7 @@ function compactCard(x){
 function card(x){
  const effective=dataDownloadFailed?{...data,generated_at:null}:data;
  const checks=signalChecklist(x,effective,Number($('askMin').value),Number($('askMax').value));
- const panel=`<details class="details" data-ticker="${esc(x.ticker)}" data-section="signals"><summary>Why this setup · signal checklist${earlyWatchVisible(x,effective)?' · EARLY WATCH (shadow)':''}</summary><p class="smallnote">Evidence checklist, not a confidence percentage. Shadow patterns and RVOL do not change scores or entry eligibility. OBSERVED means measured—not a pass.</p>${checks.map(c=>`<div class="change-item"><b>${esc(c.label)}: ${esc(c.state)}</b><p class="smallnote">${esc(c.detail)}</p></div>`).join('')}</details>`;
+ const panel=`<details class="details" data-ticker="${esc(x.ticker)}" data-section="signals"><summary>Why this setup · signal checklist${earlyWatchVisible(x,effective)?' · EARLY WATCH (shadow)':''}</summary><p class="smallnote">Evidence checklist, not a confidence percentage. Shadow patterns and RVOL do not change scores or entry eligibility. OBSERVED means measured—not a pass.</p><p class="smallnote">${esc(newsResearchSummary(x))}</p>${(x.news_research?.events||[]).map(e=>`<p class="smallnote">News event ${esc(e.event_id||'unidentified')}: ${esc(e.status)}${e.missing?.length?' · missing '+esc(e.missing.join(', ')):''}</p>`).join('')}${checks.map(c=>`<div class="change-item"><b>${esc(c.label)}: ${esc(c.state)}</b><p class="smallnote">${esc(c.detail)}</p></div>`).join('')}</details>`;
  return (document.body.classList.contains('compact-glass')?compactCard(x):classicCard(x)).replace(/(<article[^>]*>)/,'$1'+panel);
 }
 const filterDefaults={thetaMax:'prefer',expiration:'today',state:'ALL',direction:'ALL',trendPeriod:'overall',trendDirection:'ALL',trendAlignment:'ALL',catalyst:'ALL',askMin:'0.10',askMax:'0.30',onlyContracts:'all',sort:'state'};

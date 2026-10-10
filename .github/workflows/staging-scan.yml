@@ -2,7 +2,7 @@ name: Staging Algorithm Scan
 on:
   push:
     branches: [staging-algorithm]
-    paths: ['*.py', '*.js', '*.toml', 'requirements.txt', 'tests/**', '.github/workflows/staging-scan.yml']
+    paths: ['*.py', '*.js', '*.toml', 'news_event_reviews.json', 'requirements.txt', 'tests/**', '.github/workflows/staging-scan.yml']
   workflow_dispatch:
 permissions:
   contents: write
