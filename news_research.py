@@ -28,6 +28,9 @@ def url_key(value):
 def assess(event,ticker,now,horizon):
     result={'event_id':event.get('event_id'), 'status':'NEEDS_REVIEW','missing':[]}
     missing=result['missing'];scores=event.get('scores');evidence=event.get('evidence')
+    blockers=event.get('review_blockers',[])
+    if not isinstance(blockers,list) or blockers:
+        missing.append('unresolved_review_blockers')
     if not isinstance(scores,dict):scores={}
     if not isinstance(evidence,dict):evidence={}
     for key in DIMENSIONS:

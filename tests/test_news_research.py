@@ -32,6 +32,14 @@ def row(events=None,**changes):
 
 
 class NewsResearchTests(unittest.TestCase):
+    def test_unresolved_provenance_blocks_otherwise_complete_review(self):
+        for blockers in (['Publication timing unresolved'], ['Prior benchmark provenance incomplete'], 'invalid'):
+            r=evaluate(row([event(review_blockers=blockers)]),NOW)
+            self.assertEqual(r['status'],'NEEDS_REVIEW')
+            self.assertIsNone(r['proposed_weights'])
+            self.assertIn('unresolved_review_blockers',r['events'][0]['missing'])
+        self.assertEqual(evaluate(row([event(review_blockers=[])]),NOW)['status'],'ASSESSED')
+
     def test_company_materiality_changes_weight_and_input_is_immutable(self):
         small=event();small['scores']['materiality']=1
         large=event();large['scores']['materiality']=4

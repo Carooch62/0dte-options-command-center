@@ -60,3 +60,5 @@ Same-input comparison currently means reference versus adaptive **weight allocat
 Hosted Robinhood authorization remains awaiting the already-escalated back-office response. It is not a dependency for this shadow work. Promote reviewed code separately; never merge staging scan data/history over production history.
 
 Version 2 selects GRADUAL_2_5 for shadow evaluation following the October 10 allocation comparison. News ranges from 40 to 42.5%, preserving patterns at 35.5% or higher. Historical version 1 snapshots retain their original allocation; do not relabel them. Offline historical reports remain dated evidence, not current policy outputs.
+
+Optional `review_blockers` must be a list. Any unresolved item (or malformed value) withholds a proposal even if ratings and timestamps are filled. Resolve the underlying evidence and document the resolution before clearing blockers. Absence preserves compatibility and does not certify provenance.
