@@ -24,3 +24,6 @@ id = "c141007029b0432abe871df0e27c3bdf"
 # Assets stay top-level; private integrations require separate test resources.
 [previews]
 kv_namespaces = []
+
+[previews.vars]
+APP_ENV = "staging"

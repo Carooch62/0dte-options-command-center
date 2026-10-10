@@ -1,0 +1,90 @@
+{
+  "type": "SYNTHETIC_SENSITIVITY_NOT_OUTCOME_VALIDATION",
+  "policy": "GRADUAL_2_5",
+  "results": [
+    {
+      "severity": 1,
+      "age_hours": 0,
+      "importance": 0.25,
+      "news": 40.62,
+      "patterns": 37.38
+    },
+    {
+      "severity": 1,
+      "age_hours": 6,
+      "importance": 0.125,
+      "news": 40.31,
+      "patterns": 37.69
+    },
+    {
+      "severity": 1,
+      "age_hours": 12,
+      "importance": 0.0625,
+      "news": 40.16,
+      "patterns": 37.84
+    },
+    {
+      "severity": 2,
+      "age_hours": 0,
+      "importance": 0.5,
+      "news": 41.25,
+      "patterns": 36.75
+    },
+    {
+      "severity": 2,
+      "age_hours": 6,
+      "importance": 0.25,
+      "news": 40.62,
+      "patterns": 37.38
+    },
+    {
+      "severity": 2,
+      "age_hours": 12,
+      "importance": 0.125,
+      "news": 40.31,
+      "patterns": 37.69
+    },
+    {
+      "severity": 3,
+      "age_hours": 0,
+      "importance": 0.75,
+      "news": 41.88,
+      "patterns": 36.12
+    },
+    {
+      "severity": 3,
+      "age_hours": 6,
+      "importance": 0.375,
+      "news": 40.94,
+      "patterns": 37.06
+    },
+    {
+      "severity": 3,
+      "age_hours": 12,
+      "importance": 0.1875,
+      "news": 40.47,
+      "patterns": 37.53
+    },
+    {
+      "severity": 4,
+      "age_hours": 0,
+      "importance": 1.0,
+      "news": 42.5,
+      "patterns": 35.5
+    },
+    {
+      "severity": 4,
+      "age_hours": 6,
+      "importance": 0.5,
+      "news": 41.25,
+      "patterns": 36.75
+    },
+    {
+      "severity": 4,
+      "age_hours": 12,
+      "importance": 0.25,
+      "news": 40.62,
+      "patterns": 37.38
+    }
+  ]
+}

@@ -37,6 +37,7 @@ export async function scheduledScan(env,now=new Date()) {
 }
 export default {
   async scheduled(controller,env) {
+    if(env.APP_ENV==='staging')return;
     const result=await scheduledScan(env,new Date(controller.scheduledTime));
     console.log(JSON.stringify({scheduler:result,scheduled_at:controller.scheduledTime}));
     // Existing five-minute trigger: collect a private brokerage snapshot hourly during the session.
@@ -48,6 +49,11 @@ export default {
   },
   async fetch(request,env) {
     const url=new URL(request.url);
+    const staging=env.APP_ENV==='staging';
+    if(staging && (url.pathname.startsWith('/private/') || url.pathname==='/refresh'))
+      return response({ok:false,error:'Disabled in staging. Run the Staging Algorithm Scan workflow to generate test data.'},403,request);
+    if(staging && url.pathname==='/health')
+      return response({ok:true,environment:'staging',latestRun:null,message:'Staging scans run through GitHub Actions.'},200,request);
     if(url.pathname.startsWith('/private/plaid/robinhood/')) {
       try{return await handleRobinhood(request,env)}catch{return response({ok:false,error:'Private Robinhood service unavailable'},502,request)}
     }
@@ -89,7 +95,11 @@ export default {
       }
       // Data commits do not require redeploying the Worker asset bundle.
       if(/^\/data\/(market-dashboard|market|scan-health|scan-history|scan-receipts|feedback|option-observations)\.json$/.test(url.pathname)) {
-        const r=await fetch(`https://raw.githubusercontent.com/${REPO}/main${url.pathname}?v=${Date.now()}`,{cf:{cacheTtl:0},signal:AbortSignal.timeout(15000)});
+        if(staging){
+          const marker=await fetch(`https://raw.githubusercontent.com/${REPO}/staging-algorithm/data/staging-environment.json?v=${Date.now()}`,{cf:{cacheTtl:0},signal:AbortSignal.timeout(15000)});
+          if(!marker.ok || (await marker.json()).environment!=='staging')return response({ok:false,error:'Staging scan has not initialized yet'},503,request);
+        }
+        const r=await fetch(`https://raw.githubusercontent.com/${REPO}/${staging?'staging-algorithm':'main'}${url.pathname}?v=${Date.now()}`,{cf:{cacheTtl:0},signal:AbortSignal.timeout(15000)});
         return new Response(r.body,{status:r.status,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
       }
       return env.ASSETS.fetch(request);
