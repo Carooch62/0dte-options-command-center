@@ -1,4 +1,4 @@
-# Adaptive news importance — shadow version 1
+# Adaptive news importance — shadow version 2
 
 Status: experimental, uncalibrated. No ranking, contract selection, qualification, alert, or production behavior uses this output. Existing 40/38/10/7/5 is a reference allocation, not an already implemented composite scoring model.
 
@@ -37,7 +37,7 @@ Cap strength at the normalized materiality rating. Credibility and novelty canno
 
 Only documented, current events with materiality above zero, novelty above zero, and credibility at least 3 qualify for a proposal. This importance scale is a rubric score, not return, probability, or model confidence.
 
-`news = round(40 + 15*importance, 2)`; `patterns = 78 - news`.
+`news = round(40 + 2.5*importance, 2)`; `patterns = 78 - news`.
 
 Volume stays 10%, options quality 7%, risk/reward 5%; total is 100%. Thus news remains the highest-weighted category and patterns second. Low materiality still lowers importance even when the news category has a high coefficient. These bounds preserve the category priority as an initial experiment; they are not claimed to be optimal. Any later contribution score must use event strength as well as coefficient and must avoid double-counting.
 
@@ -58,3 +58,5 @@ Tests cover same event/different company scale, good vs bad direction, missing c
 Same-input comparison currently means reference versus adaptive **weight allocation**. Do not claim ranking improvement: normalized category scores, point-in-time labeled evidence, a replay dataset and out-of-sample evaluation are still required. Record price/quote coverage and data failures alongside every result. Test zero unsafe eligibility changes first, then rank changes and outcomes using identical snapshots and realistic costs. Avoid using later outcomes or revised estimates as pre-event knowledge.
 
 Hosted Robinhood authorization remains awaiting the already-escalated back-office response. It is not a dependency for this shadow work. Promote reviewed code separately; never merge staging scan data/history over production history.
+
+Version 2 selects GRADUAL_2_5 for shadow evaluation following the October 10 allocation comparison. News ranges from 40 to 42.5%, preserving patterns at 35.5% or higher. Historical version 1 snapshots retain their original allocation; do not relabel them. Offline historical reports remain dated evidence, not current policy outputs.

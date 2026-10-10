@@ -134,5 +134,5 @@ export function newsResearchSummary(row){
  if(!r||r.mode!=='SHADOW')return 'News weighting: not evaluated in this snapshot.';
  if(r.status!=='ASSESSED'||!r.proposed_weights)return `News weighting · shadow: ${r.status}. No adaptive weight proposed; missing evidence does not increase other categories.`;
  const w=r.proposed_weights;
- return `News weighting · ${r.horizon} shadow at ${r.as_of}: news ${w.news}% (reference 40%), patterns ${w.patterns}%, volume ${w.volume}%, options ${w.options}%, risk/reward ${w.risk_reward}%. Importance ${(r.importance*100).toFixed(1)}/100; direction ${r.direction}; setup support ${r.directional_support??'UNKNOWN'}. Strongest event ${r.dominant_event_id}; ${r.duplicates_removed} duplicate reviews removed. Experimental allocation—not win probability. Rankings and eligibility unchanged.`;
+ return `News weighting · ${r.allocation_policy??'legacy policy'} · ${r.horizon} shadow at ${r.as_of}: news ${w.news}% (reference 40%), patterns ${w.patterns}%, volume ${w.volume}%, options ${w.options}%, risk/reward ${w.risk_reward}%. Importance ${(r.importance*100).toFixed(1)}/100; direction ${r.direction}; setup support ${r.directional_support??'UNKNOWN'}. Strongest event ${r.dominant_event_id}; ${r.duplicates_removed} duplicate reviews removed. Experimental allocation—not win probability. Rankings and eligibility unchanged.`;
 }

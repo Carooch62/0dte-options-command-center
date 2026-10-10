@@ -99,10 +99,12 @@ class NewsResearchTests(unittest.TestCase):
                 e=event();e['scores'].update(materiality=materiality,surprise=surprise)
                 w=evaluate(row([e]),NOW)['proposed_weights']
                 self.assertAlmostEqual(sum(w.values()),100)
-                self.assertTrue(40<=w['news']<=55)
+                self.assertTrue(40<=w['news']<=42.5)
                 self.assertGreater(w['news'],w['patterns']);self.assertGreater(w['patterns'],w['volume'])
         e=event();e['scores']={k:4 for k in e['scores']}
-        self.assertEqual(evaluate(row([e]),NOW)['proposed_weights']['news'],55)
+        self.assertEqual(evaluate(row([e]),NOW)['proposed_weights']['news'],42.5)
+        self.assertEqual(evaluate(row([e]),NOW)['allocation_policy'],'GRADUAL_2_5')
+        self.assertGreater(evaluate(row([e]),NOW)['proposed_weights']['patterns'],35)
 
     def test_no_change_to_existing_ranking_or_eligibility(self):
         original,_=fixtures('call')

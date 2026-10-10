@@ -65,7 +65,7 @@ def assess(event,ticker,now,horizon):
 
 def evaluate(row,now=None,horizon='INTRADAY'):
     now=now or datetime.now(timezone.utc)
-    result={'version':1,'mode':'SHADOW','status':'UNKNOWN','as_of':now.isoformat(),'horizon':horizon,
+    result={'version':2,'allocation_policy':'GRADUAL_2_5','mode':'SHADOW','status':'UNKNOWN','as_of':now.isoformat(),'horizon':horizon,
             'reference_weights':dict(REFERENCE),'proposed_weights':None,'importance':None,
             'direction':'UNKNOWN','directional_support':None,'events':[],
             'duplicates_removed':0,'ranking_effect':'NONE','eligibility_effect':'NONE',
@@ -98,7 +98,7 @@ def evaluate(row,now=None,horizon='INTRADAY'):
     if not active:result['status']='NO_CURRENT_MATERIAL_EVENT';return result
     # Do not let many articles inflate weight. Use the strongest assessed event only.
     dominant=max(active,key=lambda e:(e['importance'],e['event_id']))
-    importance=dominant['importance'];news=round(40+15*importance,2)
+    importance=dominant['importance'];news=round(40+2.5*importance,2)
     result.update(status='ASSESSED',importance=importance,dominant_event_id=dominant['event_id'],
                   proposed_weights={**REFERENCE,'news':news,'patterns':round(78-news,2)})
     directions={e['direction'] for e in active}
