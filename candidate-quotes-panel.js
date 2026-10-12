@@ -11,12 +11,14 @@ function render(){
 }
 for(const id of ['scanner','research'])$(id).onchange=async e=>{try{const f=e.target.files[0];if(!f)return;if(f.size>10000000)throw Error('Maximum file size is 10 MB');const data=JSON.parse(await f.text());if(id==='scanner'){if(!Array.isArray(data.candidates))throw Error('Expected scanner candidates');candidateQuotes(data,[]);scanner=data;}else observations=validateRobinhoodPack(data).observations;render();$('status').textContent='Snapshot checks updated. No scanner rankings changed.';}catch(e){if(id==='scanner')scanner=null;else observations=[];render();$('refresh').disabled=true;$('status').textContent=e.message;}};
 $('refresh').onclick=async()=>{
+ if(busy)return;
  busy=true;const rows=render(),ids=[...new Set(rows.map(r=>r.instrument_id).filter(Boolean))];
  if(ids.length>20){busy=false;render();$('status').textContent='More than 20 matches. Import a smaller candidate snapshot.';return;}
  const prior=observations;observations=[];render();$('status').textContent='Fetching matched quotes…';
  try{const response=await fetch('/private/plaid/robinhood/quotes',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json','X-Requested-With':'RobinhoodQuotes'},body:JSON.stringify({kind:'option',instrument_ids:ids})});
  if(!response.headers.get('content-type')?.includes('application/json'))throw Error('Open the hosted brokerage page, sign in, then retry.');const data=await response.json();if(!response.ok)throw Error(data.error||'Quote request failed');
  const seen=new Set();observations=data.observations.map(x=>{const id=x.quote.instrument_id;if(!ids.includes(id)||seen.has(id))throw Error('Unexpected quote identity');seen.add(id);const old=prior.find(p=>p.instrument.id===id);return {instrument:old.instrument,quote:x.quote,received_at:data.received_at};});
+ observations.push(...prior.filter(x=>!seen.has(x.instrument.id)).map(x=>({...x,quote:{instrument_id:x.instrument.id},received_at:null})));
  $('status').textContent=`Received ${data.received_at}. Missing contracts: ${ids.filter(id=>!seen.has(id)).length}.`;
  }catch(e){observations=prior.map(x=>({...x,quote:{instrument_id:x.instrument.id},received_at:null}));$('status').textContent=e.message;}finally{busy=false;render();}
 };
