@@ -28,3 +28,9 @@ test('partial response preserves missing contract mapping for retry, but clears 
 test('unexpected quote ID is rejected without retaining previous price',async()=>{
  const h=await harness([Response.json({observations:[{quote:{instrument_id:'wrong'}}]})]);await h.get('refresh').onclick();assert.match(h.get('status').textContent,/Unexpected quote identity/);assert.equal(h.get('rows').children[0].children[1].textContent,'Unknown');
 });
+test('loader checks environment before data and displays source timestamp',async()=>{
+ const h=await harness([Response.json({environment:'staging'}),Response.json({generated_at:'2026-10-12T14:00:00Z',candidates:[]})]);await h.get('load-scanner').onclick();assert.deepEqual(h.calls.map(x=>x[0]),['/health','/data/market-dashboard.json']);assert.match(h.get('snapshot-info').textContent,/Staging.*2026-10-12/);
+});
+test('production loader rejection clears prior snapshot without fetching data',async()=>{
+ const h=await harness([Response.json({environment:'production'})]);await h.get('load-scanner').onclick();assert.equal(h.calls.length,1);assert.equal(h.get('rows').children.length,0);assert.match(h.get('status').textContent,/requires the staging/);
+});
