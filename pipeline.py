@@ -8,10 +8,11 @@ import sys
 import tempfile
 from datetime import datetime, timezone, timedelta
 from market_clock import session_info
+from candidate_snapshot import write_compact
 from scan_archive import archive_research, archive_receipt
 
 ROOT=Path(__file__).resolve().parent
-FILES=('market.json','market-dashboard.json','scan-history.json','feedback.json','option-observations.json','trend-cache.json')
+FILES=('candidate-snapshot.json','market.json','market-dashboard.json','scan-history.json','feedback.json','option-observations.json','trend-cache.json')
 
 def validate(stage):
     raw=json.loads((stage/'data/market.json').read_text())
@@ -61,6 +62,7 @@ def run():
                              'completed_at':datetime.now(timezone.utc).isoformat(),
                              **({'retry_after':health['retry_after']} if waiting else {})})
             receipt_path.write_text(json.dumps(receipts[-100:],separators=(',',':')))
+            if (dest/'market-dashboard.json').exists():write_compact(dest)
             return 0
         with tempfile.TemporaryDirectory(prefix='scan-') as folder:
             stage=Path(folder);(stage/'data').mkdir()
@@ -95,8 +97,10 @@ def run():
             receipts=[r for r in receipts if r.get('scan_id')!=snapshot['scan_id']]
             receipts.append({'scan_id':snapshot['scan_id'],'run_id':health['run_id'],
                              'generated_at':snapshot['generated_at'],'coverage':snapshot['coverage']})
+            write_compact(stage/'data')
             for name in FILES:shutil.copy2(stage/'data'/name,dest/name)
             receipt_path.write_text(json.dumps(receipts[-100:],separators=(',',':')))
+        if (dest/'market-dashboard.json').exists():write_compact(dest)
         health['stage']='VALIDATED'
         return 0
     except Exception as exc:

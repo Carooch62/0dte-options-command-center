@@ -5,7 +5,7 @@ let scanner=null,observations=[],busy=false,scannerSource='No snapshot';
 function render(){
  $('load-scanner').disabled=busy;
  const generated=Date.parse(scanner?.generated_at),age=(Date.now()-generated)/60000;
- $('snapshot-info').textContent=scanner?`${scannerSource} · Generated: ${scanner.generated_at||'unknown'} · Age: ${Number.isFinite(age)&&age>=0?age.toFixed(1)+' minutes':'unknown'} · Snapshot freshness is separate from quote freshness.`:'No scanner snapshot loaded.';
+ $('snapshot-info').textContent=scanner?`${scannerSource} · Generated: ${scanner.generated_at||'unknown'} · Age: ${Number.isFinite(age)&&age>=0?age.toFixed(1)+' minutes':'unknown'} · Coverage: ${scanner.included_contracts??'unknown'} included / ${scanner.total_contracts??'unknown'} total; ${scanner.omitted_contracts??'unknown'} omitted · Snapshot freshness is separate from quote freshness.`:'No scanner snapshot loaded.';
  $('scanner').disabled=busy;$('research').disabled=busy;
  $('rows').replaceChildren();if(!scanner){$('refresh').disabled=true;return [];}
  const rows=candidateQuotes(scanner,observations);
@@ -18,7 +18,7 @@ $('load-scanner').onclick=async()=>{
  try{
  const read=async path=>{const r=await fetch(path,{cache:'no-store',credentials:'same-origin'});if(!r.ok||!r.headers.get('content-type')?.includes('application/json'))throw Error('Staging snapshot unavailable. Import a JSON snapshot instead.');return r.json();};
  const health=await read('/health');if(health.environment!=='staging')throw Error('This loader requires the staging environment. Import a snapshot instead.');
- const data=await read('/data/market-dashboard.json');candidateQuotes(data,[]);
+ const data=await read('/data/candidate-snapshot.json');candidateQuotes(data,[]);
  if(!Number.isFinite(Date.parse(data.generated_at)))throw Error('Snapshot generation timestamp is missing or invalid.');
  scanner=data;scannerSource='Staging · same-origin scanner data';$('status').textContent='Staging snapshot loaded. Review its generation time before using candidates.';
  }catch(e){$('status').textContent=e.message;}finally{busy=false;render();}

@@ -94,7 +94,7 @@ export default {
         return response({ok:true,status:'ACCEPTED',request_id:id},202,request);
       }
       // Data commits do not require redeploying the Worker asset bundle.
-      if(/^\/data\/(market-dashboard|market|scan-health|scan-history|scan-receipts|feedback|option-observations)\.json$/.test(url.pathname)) {
+      if(/^\/data\/(candidate-snapshot|market-dashboard|market|scan-health|scan-history|scan-receipts|feedback|option-observations)\.json$/.test(url.pathname)) {
         if(staging){
           const marker=await fetch(`https://raw.githubusercontent.com/${REPO}/staging-algorithm/data/staging-environment.json?v=${Date.now()}`,{cf:{cacheTtl:0},signal:AbortSignal.timeout(15000)});
           if(!marker.ok || (await marker.json()).environment!=='staging')return response({ok:false,error:'Staging scan has not initialized yet'},503,request);

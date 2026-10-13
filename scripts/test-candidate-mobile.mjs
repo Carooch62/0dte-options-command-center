@@ -16,7 +16,7 @@ try{
  const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
  try{
  await page.route('**/health',r=>r.fulfill({json:{environment:'staging'}}));
- await page.route('**/data/market-dashboard.json',r=>r.fulfill({json:{generated_at:'2026-10-12T14:00:00Z',candidates:[{ticker:'TEST',options:[{contract_id:'SYNTHETIC-LONG-CONTRACT-NAME-261012C00100000',strike:100,side:'call',expiry:'2026-10-12'}]}]}}));
+ await page.route('**/data/candidate-snapshot.json',r=>r.fulfill({json:{generated_at:'2026-10-12T14:00:00Z',candidates:[{ticker:'TEST',options:[{contract_id:'SYNTHETIC-LONG-CONTRACT-NAME-261012C00100000',strike:100,side:'call',expiry:'2026-10-12'}]}]}}));
  await page.goto(`http://127.0.0.1:${server.address().port}/`);
  await page.getByRole('button',{name:'Load staging scanner snapshot',exact:true}).click();
  await page.getByText('UNVERIFIED: NO_CONTRACT_MATCH',{exact:false}).waitFor();
