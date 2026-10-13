@@ -62,7 +62,10 @@ def run():
                              'completed_at':datetime.now(timezone.utc).isoformat(),
                              **({'retry_after':health['retry_after']} if waiting else {})})
             receipt_path.write_text(json.dumps(receipts[-100:],separators=(',',':')))
-            if (dest/'market-dashboard.json').exists():write_compact(dest)
+            if (dest/'market-dashboard.json').exists():
+                try:write_compact(dest)
+                except (ValueError,TypeError,KeyError):
+                    (dest/'candidate-snapshot.json').unlink(missing_ok=True)
             return 0
         with tempfile.TemporaryDirectory(prefix='scan-') as folder:
             stage=Path(folder);(stage/'data').mkdir()
