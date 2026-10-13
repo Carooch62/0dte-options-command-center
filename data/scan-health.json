@@ -1,1 +1,1 @@
-{"updated_at":"2026-10-12T19:11:40.882335+00:00","run_id":"38295912451","request_id":"staging-38295912451","status":"SUCCESS","stage":"VALIDATED","coverage":{"stocks_configured":209,"stocks_received":205,"chains_attempted":74,"chain_status_counts":{"NO_EXPIRATION_TODAY":65,"SUCCESS":9},"chains_with_contracts":9,"chains_not_attempted":131},"core_missing":[],"scan_id":"staging-38295912451"}
+{"updated_at":"2026-10-13T00:43:11.763608+00:00","run_id":"38328598651","request_id":"staging-38328598651","status":"CLOSED","stage":"MARKET_CALENDAR"}
