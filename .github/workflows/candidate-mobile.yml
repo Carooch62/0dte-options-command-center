@@ -2,9 +2,9 @@ name: Candidate Mobile QA
 on:
   push:
     branches: [release/private-candidate-workflow-20261014]
-    paths: ['candidate-quotes*', 'robinhood-review.js', 'robinhood-live.js', 'private-candidates.js', 'tests/candidate-quotes*', 'tests/private-candidates.test.mjs', 'scripts/test-candidate-mobile.mjs', '.github/workflows/candidate-mobile.yml']
+    paths: ['candidate-quotes*', 'quote-evidence.js', 'tests/quote-evidence.test.mjs', 'robinhood-review.js', 'robinhood-live.js', 'private-candidates.js', 'tests/candidate-quotes*', 'tests/private-candidates.test.mjs', 'scripts/test-candidate-mobile.mjs', '.github/workflows/candidate-mobile.yml']
   pull_request:
-    paths: ['candidate-quotes*', 'robinhood-review.js', 'robinhood-live.js', 'private-candidates.js', 'tests/candidate-quotes*', 'tests/private-candidates.test.mjs', 'scripts/test-candidate-mobile.mjs', '.github/workflows/candidate-mobile.yml']
+    paths: ['candidate-quotes*', 'quote-evidence.js', 'tests/quote-evidence.test.mjs', 'robinhood-review.js', 'robinhood-live.js', 'private-candidates.js', 'tests/candidate-quotes*', 'tests/private-candidates.test.mjs', 'scripts/test-candidate-mobile.mjs', '.github/workflows/candidate-mobile.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -33,4 +33,5 @@ jobs:
           path: test-results/mobile/
           if-no-files-found: warn
           retention-days: 7
+
 
