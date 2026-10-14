@@ -1,4 +1,5 @@
 // Separate, private OAuth client. Never inherits the ChatGPT connection.
+import {contractRequest,resolveContracts,readSnapshot} from './private-candidates.js';
 import {verifyAccess} from './plaid-sync.js';
 const MCP='https://agent.robinhood.com/mcp/trading';
 const ISSUER=MCP;
@@ -20,7 +21,7 @@ async function connection(env){const raw=await env.PLAID_STORE.get(storageKey(en
 async function exchange(form){const response=await fetch(TOKEN,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(form),signal:AbortSignal.timeout(15000)});if(!response.ok)throw Error('Robinhood authorization failed; reconnect to retry');const data=await response.json();if(typeof data.access_token!=='string'||!data.access_token||!Number.isFinite(Number(data.expires_in))||Number(data.expires_in)<=0||data.token_type?.toLowerCase()!=='bearer')throw Error('Invalid Robinhood authorization response');return {access_token:data.access_token,expires_at:Date.now()+Number(data.expires_in)*1000};}
 
 // The client cannot accept arbitrary MCP methods or tool names from the browser.
-const ALLOWED=new Set(['get_equity_quotes','get_option_quotes']);
+const ALLOWED=new Set(['get_equity_quotes','get_option_quotes','get_option_chains','get_option_instruments']);
 export async function rpc(token,method,params={},session=null){
  if(!['initialize','tools/list','tools/call'].includes(method)||method==='tools/call'&&!ALLOWED.has(params.name))throw Error('Market-data operation required');
  const response=await fetch(MCP,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json',Accept:'application/json, text/event-stream',...(session?{'Mcp-Session-Id':session,'MCP-Protocol-Version':'2025-03-26'}:{})},body:JSON.stringify({jsonrpc:'2.0',id:crypto.randomUUID(),method,params}),signal:AbortSignal.timeout(15000)});
@@ -70,6 +71,17 @@ function quoteData(result){
  for(const item of result?.content||[])if(item.type==='text'){try{const data=JSON.parse(item.text);return data.data??data;}catch{}}
  throw Error('Unsupported Robinhood quote response');
 }
+async function marketClient(token,required){
+ const init=await rpc(token,'initialize',{protocolVersion:'2025-03-26',capabilities:{},clientInfo:{name:'0DTE Private Quotes',version:'1.1.0'}});
+ if(init.result?.protocolVersion!=='2025-03-26')throw Error('Unsupported Robinhood protocol version');
+ const ready=await fetch(MCP,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json',Accept:'application/json, text/event-stream','MCP-Protocol-Version':'2025-03-26',...(init.session?{'Mcp-Session-Id':init.session}:{})},body:JSON.stringify({jsonrpc:'2.0',method:'notifications/initialized'}),signal:AbortSignal.timeout(15000)});
+ if(!ready.ok)throw Error('Robinhood initialization failed');
+ const found=new Set();let cursor,count=0;
+ do{const listed=await rpc(token,'tools/list',cursor?{cursor}:{},init.session);for(const t of listed.result?.tools||[])found.add(t.name);cursor=listed.result?.nextCursor;if(++count>10)throw Error('Robinhood tool discovery incomplete');}while(cursor&&!required.every(n=>found.has(n)));
+ if(!required.every(n=>found.has(n)))throw Error('Required read-only metadata or quote tool is unavailable');
+ let calls=0;const deadline=Date.now()+90000;
+ return async(name,args)=>{if(!required.includes(name)||++calls>100||Date.now()>deadline)throw Error('Private lookup limit exceeded');return quoteData((await rpc(token,'tools/call',{name,arguments:args},init.session)).result);};
+}
 export async function handleRobinhood(request,env){
  const url=new URL(request.url),path=url.pathname;
  if(!await verifyAccess(request,env))return reply({ok:false,error:'Private sign in required'},401);
@@ -77,6 +89,9 @@ export async function handleRobinhood(request,env){
  const redirect=new URL(env.ROBINHOOD_REDIRECT_URI);
  if(redirect.protocol!=='https:'||redirect.origin!==url.origin||redirect.pathname!=='/private/plaid/robinhood/callback'||redirect.search||redirect.hash)return reply({ok:false,error:'Invalid Robinhood callback configuration'},503);
  await key(env);
+ if(path==='/private/plaid/robinhood/candidates'&&request.method==='GET'){
+  try{const r=await fetch(`https://raw.githubusercontent.com/Carooch62/0dte-options-command-center/main/data/candidate-quote-batch.json?v=${Date.now()}`,{cf:{cacheTtl:0},signal:AbortSignal.timeout(15000)});return reply({ok:true,snapshot:await readSnapshot(r)});}catch{return reply({ok:false,error:'Current scanner snapshot unavailable or too large. Import a JSON snapshot instead.'},502);}
+ }
  if(path==='/private/plaid/robinhood/status'&&request.method==='GET'){
   const saved=await connection(env),connected=!!saved&&saved.expires_at>Date.now();
   return reply({ok:true,connected,expires_at:saved?new Date(saved.expires_at).toISOString():null,status:connected?'CONNECTED_UNVERIFIED':saved?'RECONNECT_REQUIRED':'READY_TO_CONNECT',scanner_feed:'DELAYED_RESEARCH'});
@@ -107,20 +122,17 @@ export async function handleRobinhood(request,env){
   await env.PLAID_STORE.delete(storageKey(env));
   return reply({ok:true,connected:false,revocation_note:'Stored authorization erased. Remove this client in Robinhood to revoke its provider authorization.'},200,{'Set-Cookie':cookie('',0)});
  }
+ if(path==='/private/plaid/robinhood/resolve'){
+  let contracts;try{const raw=await request.text();if(raw.length>10000)throw Error();contracts=contractRequest(JSON.parse(raw));}catch{return reply({ok:false,error:'Invalid exact contract request'},400);}
+  const saved=await connection(env);if(!saved||saved.expires_at<=Date.now()+15000)return reply({ok:false,error:'Reconnect Robinhood before resolving contracts'},409);
+  try{const call=await marketClient(saved.access_token,['get_option_chains','get_option_instruments']);return reply({ok:true,source:'Robinhood MCP metadata',resolved_at:new Date().toISOString(),results:await resolveContracts(contracts,call)});}catch{return reply({ok:false,error:'Exact metadata lookup failed or is unavailable. Import a matching research snapshot instead.'},502);}
+ }
  if(path==='/private/plaid/robinhood/quotes'){
   let operation;try{if(Number(request.headers.get('Content-Length'))>10000)throw Error();const raw=await request.text();if(raw.length>10000)throw Error();operation=quoteRequest(JSON.parse(raw));}catch{return reply({ok:false,error:'Invalid quote request'},400);}
   const saved=await connection(env);if(!saved||saved.expires_at<=Date.now()+15000)return reply({ok:false,error:'Reconnect Robinhood before collecting quotes'},409);
   try{
-   const init=await rpc(saved.access_token,'initialize',{protocolVersion:'2025-03-26',capabilities:{},clientInfo:{name:'0DTE Private Quotes',version:'1.0.0'}});
-   if(init.result?.protocolVersion!=='2025-03-26')throw Error('Unsupported Robinhood protocol version');
-   // Complete initialization before any market-data operation.
-   const ready=await fetch(MCP,{method:'POST',headers:{Authorization:`Bearer ${saved.access_token}`,'Content-Type':'application/json',Accept:'application/json, text/event-stream','MCP-Protocol-Version':'2025-03-26',...(init.session?{'Mcp-Session-Id':init.session}:{})},body:JSON.stringify({jsonrpc:'2.0',method:'notifications/initialized'}),signal:AbortSignal.timeout(15000)});
-   if(!ready.ok)throw Error('Robinhood initialization failed');
-   let cursor,matched=false,count=0;
-   do{const listed=await rpc(saved.access_token,'tools/list',cursor?{cursor}:{},init.session);matched||=listed.result?.tools?.some(tool=>tool.name===operation.name);cursor=listed.result?.nextCursor;if(++count>10)throw Error('Robinhood tool discovery incomplete');}while(cursor&&!matched);
-   if(!matched)throw Error('Required Robinhood quote tool is unavailable');
-   const result=await rpc(saved.access_token,'tools/call',operation,init.session),receivedAt=Date.now();
-   const data=quoteData(result.result);
+   const call=await marketClient(saved.access_token,[operation.name]);
+   const data=await call(operation.name,operation.arguments),receivedAt=Date.now();
    // Extract only quote pairs; never expose arbitrary tool content or account data.
    const normalized=normalizeQuotes(data,operation,receivedAt);
    return reply({ok:true,source:'Robinhood MCP',received_at:new Date(receivedAt).toISOString(),...normalized,latency_verified:false,greek_calculation_time:null,scanner_feed:'DELAYED_RESEARCH'});
@@ -128,3 +140,4 @@ export async function handleRobinhood(request,env){
  }
  return reply({ok:false,error:'Not found'},404);
 }
+

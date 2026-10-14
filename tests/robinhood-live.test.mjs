@@ -89,3 +89,30 @@ test('authenticated quote path completes MCP initialization and returns only san
  assert.deepEqual(methods,['initialize','notifications/initialized','tools/list','tools/call']);
  assert.equal(result.headers.get('Cache-Control'),'no-store');
 }));
+
+test('candidate and metadata routes require Access and reject cross-origin and invalid contracts',async()=>harness(async({env,auth,calls})=>{
+ assert.equal((await handleRobinhood(request('candidates'),env)).status,401);
+ assert.equal((await handleRobinhood(request('resolve','POST',{...auth,Origin:'https://evil.test'},{contracts:[]}),env)).status,403);
+ assert.equal((await handleRobinhood(request('resolve','POST',auth,{contracts:[{ticker:'SPY',strike:772,side:'order',expiry:'2026-10-16'}]}),env)).status,400);
+ assert.equal(calls.length,0);
+}));
+test('private scanner route projects the fixed main source without needing stored broker credentials',async()=>harness(async({env,auth,setUpstream})=>{
+ setUpstream(async(url)=>{assert.match(url,/^https:\/\/raw.githubusercontent.com\/Carooch62\/0dte-options-command-center\/main\/data\/candidate-quote-batch.json\?v=\d+$/);return Response.json({format:'candidate-identities-v1',generated_at:'2026-10-14T14:00:00Z',included_contracts:1,total_contracts:1,qualifying_contracts:1,omitted_contracts:0,candidates:[{ticker:'SPY',options:[{strike:772,side:'put',expiry:'2026-10-16',scanner_ask:.2}]}]});});
+ const r=await handleRobinhood(request('candidates','GET',auth),env);assert.equal(r.status,200);assert.equal((await r.json()).snapshot.included_contracts,1);assert.equal(r.headers.get('Cache-Control'),'no-store');
+}));
+test('authenticated metadata path discovers only read-only tools and sanitizes exact match',async()=>harness(async({env,auth,setUpstream})=>{
+ const started=await handleRobinhood(request('connect','POST',auth,{}),env),target=new URL((await started.json()).authorization_url);
+ const cb=new URL(env.ROBINHOOD_REDIRECT_URI);cb.search=new URLSearchParams({code:'code',state:target.searchParams.get('state'),iss:'https://agent.robinhood.com/mcp/trading'});
+ setUpstream(async()=>Response.json({access_token:'secret',token_type:'Bearer',expires_in:3600}));
+ await handleRobinhood(new Request(cb,{headers:{...auth,Cookie:started.headers.get('Set-Cookie').split(';')[0]}}),env);
+ const chain='11111111-1111-1111-1111-111111111111',id='22222222-2222-2222-2222-222222222222';const operations=[];
+ setUpstream(async(url,options)=>{
+  const b=JSON.parse(options.body);if(b.method==='initialize')return Response.json({result:{protocolVersion:'2025-03-26'}});
+  if(b.method==='notifications/initialized')return new Response(null,{status:202});
+  if(b.method==='tools/list')return Response.json({result:{tools:[{name:'get_option_chains'},{name:'get_option_instruments'},{name:'place_option_order'}]}});
+  operations.push(b.params.name);
+  const data=b.params.name==='get_option_chains'?{chains:[{id:chain,expiration_dates:['2026-10-16']}]}:{instruments:[{id,chain_id:chain,chain_symbol:'SPY',expiration_date:'2026-10-16',strike_price:'772',type:'put',state:'active',tradability:'tradable',trade_value_multiplier:'100',sellout_datetime:'2026-10-16T19:45:00Z',account_number:'PRIVATE'}]};
+  return Response.json({result:{structuredContent:{data}}});
+ });
+ const r=await handleRobinhood(request('resolve','POST',auth,{contracts:[{ticker:'SPY',strike:772,side:'put',expiry:'2026-10-16'}]}),env),text=await r.text();assert.equal(r.status,200);assert.ok(!text.includes('PRIVATE'));assert.ok(!text.includes('secret'));assert.equal(JSON.parse(text).results[0].status,'EXACT_METADATA_MATCH');assert.deepEqual(operations,['get_option_chains','get_option_instruments']);
+}));

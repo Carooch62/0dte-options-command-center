@@ -26,3 +26,8 @@ test('UUID mismatch, adjusted contracts and expired deadlines fail',()=>{
 test('latest collection supersedes older successful quote even when newest is invalid',()=>{
  const a=observation(),b=observation();b.received_at='2026-10-12T15:00:00Z';b.quote.bid_price=null;assert.ok(candidateQuotes(scanner(),[a,b],now)[0].reasons.includes('INVALID_BOOK'));
 });
+
+test('live ask limit is separate from quote checks and becomes unknown on failure',()=>{
+ for(const [ask,expected] of [['.30','WITHIN_LIMIT'],['.31','ABOVE_LIMIT']]){const o=observation();o.quote.bid_price='.29';o.quote.ask_price=ask;const r=candidateQuotes(scanner(),[o],now)[0];assert.equal(r.status,'QUOTE_CHECK_PASSED');assert.equal(r.premium_status,expected);assert.equal(candidateQuotes(scanner(),[o],now+61000)[0].premium_status,'UNKNOWN');}
+ const s=scanner();s.candidates[0].options[0].ask=.10;const r=candidateQuotes(s,[observation()],now)[0];assert.equal(r.premium_status,'ABOVE_LIMIT');
+});

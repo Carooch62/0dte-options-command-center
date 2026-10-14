@@ -10,7 +10,7 @@ export function candidateQuotes(snapshot,observations,now=Date.now()){
  for(const o of contracts){
  const matches=observations.filter(x=>x.instrument?.chain_symbol===c.ticker&&x.instrument?.type===o.side&&x.instrument?.expiration_date===o.expiry&&number(x.instrument?.strike_price)>0&&number(x.instrument?.strike_price)===number(o.strike));
  const ids=new Set(matches.map(x=>x.instrument.id));
- const row={contract:o.contract_id||`${c.ticker} ${o.strike} ${o.side} ${o.expiry}`,instrument_id:null,status:'UNVERIFIED',reasons:[],ranking_effect:'NONE',eligibility_effect:'NONE'};
+ const row={contract:o.contract_id||`${c.ticker} ${o.strike} ${o.side} ${o.expiry}`,instrument_id:null,status:'UNVERIFIED',premium_status:'UNKNOWN',premium_limit:0.30,reasons:[],ranking_effect:'NONE',eligibility_effect:'NONE'};
  if(ids.size!==1){row.reasons.push(ids.size?'AMBIGUOUS_CONTRACT':'NO_CONTRACT_MATCH');rows.push(row);continue;}
  const x=[...matches].sort((a,b)=>millis(b.received_at)-millis(a.received_at))[0],i=x.instrument,q=x.quote||{};
  row.instrument_id=i.id;
@@ -27,6 +27,8 @@ export function candidateQuotes(snapshot,observations,now=Date.now()){
  if(!Number.isFinite(bid)||!Number.isFinite(ask)||bid<=0||ask<=0||bid>ask)row.reasons.push('INVALID_BOOK');
  else{row.bid=bid;row.ask=ask;row.spread=ask-bid;row.spread_pct=100*(ask-bid)/((ask+bid)/2);if(row.spread>.10+1e-9||row.spread_pct>30+1e-9)row.reasons.push('WIDE_SPREAD');}
  row.status=row.reasons.length?'REQUIRES_RECHECK':'QUOTE_CHECK_PASSED';
+ row.premium_status=row.reasons.length?'UNKNOWN':ask<=.30?'WITHIN_LIMIT':'ABOVE_LIMIT';
  rows.push(row);
  }}return rows;
 }
+

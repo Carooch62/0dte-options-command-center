@@ -52,6 +52,9 @@ jobs:
       - name: Scan, enrich, and validate
         id: scan
         run: python pipeline.py
+      - name: Generate compact quote-check batch
+        if: success()
+        run: node scripts/write-candidate-batch.mjs
       - name: Audit research readiness
         if: success()
         run: python ml_readiness.py > data/ml-readiness.json
@@ -81,3 +84,4 @@ jobs:
           git commit -m 'Update validated scan and health'
           git pull --rebase origin main
           git push origin HEAD:main
+
