@@ -221,6 +221,7 @@ def scan_one(t, now=None, payload=None):
         end = current[-1]['time']+timedelta(minutes=5)
         return {'ticker':t, 'price':round(price,4), 'day_move':round(day,2) if day is not None else None,
                 'pattern_research':pattern_snapshot(current,direction),
+                'research_bars':[{**{k:v for k,v in b.items() if k != 'time'}, 'time':b['time'].isoformat()} for b in current],
                 'relative_volume_research':same_time_rvol(bars,now,d.get('_source','Yahoo 5m bars')),
                 'open_move':round(pct(price,first),2), 'previous_close':previous_close,
                 'previous_close_source':previous_close_source,

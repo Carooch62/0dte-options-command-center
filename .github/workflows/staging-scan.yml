@@ -47,6 +47,18 @@ jobs:
           PY
       - name: Run staging pipeline using public research sources
         run: python pipeline.py
+      - name: Capture public shadow evidence after a validated scan
+        run: |
+          python - <<'PY'
+          import json, subprocess
+          from pathlib import Path
+          from shadow_evidence import capture
+          health=json.loads(Path('data/scan-health.json').read_text())
+          if health.get('stage') == 'VALIDATED' and health.get('status') in ('SUCCESS','DEGRADED'):
+              print(json.dumps(capture('data', source_commit=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip())))
+          else:
+              print('No new validated scan; retained evidence keeps its original timestamps.')
+          PY
       - name: Publish staging results only
         if: always() && !cancelled()
         run: |
@@ -59,3 +71,4 @@ jobs:
           git commit -m 'Update isolated staging scan results'
           git pull --rebase origin staging-algorithm
           git push origin HEAD:staging-algorithm
+
