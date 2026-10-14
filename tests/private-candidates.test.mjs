@@ -65,3 +65,7 @@ test('batch respects published contract scores, two per ticker, global 20 and di
  assert.deepEqual(p.candidates.slice(0,2).map(x=>x.options[0].strike),[103,102]);for(const ticker of tickers)assert.ok(p.candidates.filter(x=>x.ticker===ticker).length<=2);
  const rejected=projectCandidates({generated_at:s.generated_at,candidates:[{ticker:'SPY',options:[{...c,ask:.20}]}]});assert.equal(rejected.price_qualifying_contracts,1);assert.equal(rejected.research_rejected_contracts,1);assert.equal(rejected.included_contracts,0);
 });
+
+test('old price-only batches are rejected until a screened batch is regenerated',async()=>{
+ const p=projectCandidates({generated_at:'2026-10-14T14:00:00Z',candidates:[]});delete p.selection_policy;await assert.rejects(readSnapshot(Response.json(p)),/batch/);
+});

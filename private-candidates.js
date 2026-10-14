@@ -33,13 +33,13 @@ export function projectCandidates(snapshot){
   perTicker.set(identity.ticker,(perTicker.get(identity.ticker)||0)+1);
   selected.push({ticker:identity.ticker,options:[{contract_id:option.contract_id||`${identity.ticker} ${identity.strike} ${identity.side} ${identity.expiry}`,...identity,scanner_ask:ask}]});
  }
- return {format:'candidate-identities-v1',environment:'production',source:'main / market-dashboard.json',generated_at:snapshot.generated_at,scan_id:snapshot.scan_id??null,market_session:snapshot.market_session??null,candidates:selected,scanned_contracts:total,price_qualifying_contracts:priceQualifying,research_rejected_contracts:priceQualifying-eligible,total_contracts:eligible,qualifying_contracts:eligible,included_contracts:selected.length,omitted_contracts:eligible-selected.length,max_per_ticker:2,selection:'Research ask > $0 and <= $0.30; published quote, volume >=20, near-ATM, delta and usable-spread checks required; DTE 0–14. At most 2 per ticker, using scanner ticker order and published contract scores. Live quote and trading eligibility remain separate.',ranking_effect:'NONE'};
+ return {format:'candidate-identities-v1',selection_policy:'published-research-screens-v1',environment:'production',source:'main / market-dashboard.json',generated_at:snapshot.generated_at,scan_id:snapshot.scan_id??null,market_session:snapshot.market_session??null,candidates:selected,scanned_contracts:total,price_qualifying_contracts:priceQualifying,research_rejected_contracts:priceQualifying-eligible,total_contracts:eligible,qualifying_contracts:eligible,included_contracts:selected.length,omitted_contracts:eligible-selected.length,max_per_ticker:2,selection:'Research ask > $0 and <= $0.30; published quote, volume >=20, near-ATM, delta and usable-spread checks required; DTE 0–14. At most 2 per ticker, using scanner ticker order and published contract scores. Live quote and trading eligibility remain separate.',ranking_effect:'NONE'};
 }
 
 export function validateBatch(s){
- if(s?.format!=='candidate-identities-v1'||!Number.isFinite(Date.parse(s.generated_at))||!Array.isArray(s.candidates)||s.candidates.length>20)throw Error('Invalid candidate batch');
- const contracts=[];
- for(const c of s.candidates){if(!Array.isArray(c.options)||c.options.length!==1||!(num(c.options[0].scanner_ask)>0&&num(c.options[0].scanner_ask)<=.30))throw Error('Invalid batch selection');contracts.push({...c.options[0],ticker:c.ticker});}
+ if(s?.format!=='candidate-identities-v1'||s.selection_policy!=='published-research-screens-v1'||s.max_per_ticker!==2||!Number.isFinite(Date.parse(s.generated_at))||!Array.isArray(s.candidates)||s.candidates.length>20)throw Error('Invalid candidate batch');
+ const contracts=[],counts=new Map();
+ for(const c of s.candidates){if(!Array.isArray(c.options)||c.options.length!==1||!(num(c.options[0].scanner_ask)>0&&num(c.options[0].scanner_ask)<=.30))throw Error('Invalid batch selection');counts.set(c.ticker,(counts.get(c.ticker)||0)+1);if(counts.get(c.ticker)>2)throw Error('Invalid ticker batch limit');contracts.push({...c.options[0],ticker:c.ticker});}
  if(contracts.length)contractRequest({contracts});
  if(s.included_contracts!==contracts.length||!Number.isInteger(s.total_contracts)||s.total_contracts<contracts.length||s.omitted_contracts!==s.total_contracts-contracts.length||s.qualifying_contracts!==s.total_contracts)throw Error('Invalid batch coverage');
  return s;
