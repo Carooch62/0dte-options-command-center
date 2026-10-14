@@ -44,7 +44,7 @@ $('resolve').onclick=async()=>{
  const d=await readPrivate('resolve',{contracts});if(!Array.isArray(d.results)||d.results.length!==contracts.length)throw Error('Incomplete metadata response');
  const mapped=[];
  for(let n=0;n<contracts.length;n++){
- const r=d.results[n],c=contracts[n];if(!r.contract||r.contract.ticker!==c.ticker||Number(r.contract.strike)!==c.strike||r.contract.expiry!==c.expiry||r.contract.side!==c.side)throw Error('Unexpected contract response');
+ const r=d.results[n],c=contracts[n];if(!r?.contract||r.contract.ticker!==c.ticker||Number(r.contract.strike)!==c.strike||r.contract.expiry!==c.expiry||r.contract.side!==c.side)throw Error('Unexpected contract response');
  if(r.status==='EXACT_METADATA_MATCH'){const i=r.instrument;if(i?.chain_symbol!==c.ticker||Number(i.strike_price)!==c.strike||i.expiration_date!==c.expiry||i.type!==c.side)throw Error('Unexpected contract metadata');mapped.push({instrument:i,quote:{instrument_id:i.id},received_at:null});}
  }
  observations=mapped;$('status').textContent=`Matched ${mapped.length} of ${contracts.length}. Missing, ambiguous or incomplete mappings stay unverified. Refresh matched quotes next.`;
@@ -57,6 +57,7 @@ $('refresh').onclick=async()=>{
  if(ids.length>20){busy=false;render();$('status').textContent='More than 20 matches. Import a smaller candidate snapshot.';return;}
  const prior=observations;observations=[];render();$('status').textContent='Fetching matched quotes…';
  try{const data=await readPrivate('quotes',{kind:'option',instrument_ids:ids});
+ if(!Array.isArray(data.observations))throw Error('Quote response is incomplete. Retry the private request.');
  const seen=new Set();observations=data.observations.map(x=>{const id=x.quote.instrument_id;if(!ids.includes(id)||seen.has(id))throw Error('Unexpected quote identity');seen.add(id);const old=prior.find(p=>p.instrument.id===id);return {instrument:old.instrument,quote:x.quote,received_at:data.received_at};});
  observations.push(...prior.filter(x=>!seen.has(x.instrument.id)).map(x=>({...x,quote:{instrument_id:x.instrument.id},received_at:null})));
  $('status').textContent=`Received ${data.received_at}. Missing contracts: ${ids.filter(id=>!seen.has(id)).length}.`;
