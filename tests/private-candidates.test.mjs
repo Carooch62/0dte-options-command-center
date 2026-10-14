@@ -43,3 +43,9 @@ test('generation removes obsolete batches when retained snapshot is unreadable w
  const dir=await mkdtemp(join(tmpdir(),'candidate-batch-'));
  try{await writeFile(join(dir,'market-dashboard.json'),JSON.stringify({generated_at:'2026-10-14T14:00:00Z',candidates:[{ticker:'SPY',options:[{...c,ask:.2}]}]}));assert.equal((await writeCandidateBatch(dir)).status,'AVAILABLE');assert.equal(JSON.parse(await readFile(join(dir,'candidate-quote-batch.json'),'utf8')).generated_at,'2026-10-14T14:00:00Z');await writeFile(join(dir,'market-dashboard.json'),'bad');assert.equal((await writeCandidateBatch(dir)).status,'UNAVAILABLE');await assert.rejects(readFile(join(dir,'candidate-quote-batch.json')));}finally{await rm(dir,{recursive:true,force:true});}
 });
+
+test('nullable empty provider lists and terminal cursor are treated as missing or complete, never ambiguous success',async()=>{
+ assert.equal((await resolveContracts([c],async()=>({chains:null})))[0].status,'NO_CONTRACT_MATCH');
+ assert.equal((await resolveContracts([c],provider(null,null)))[0].status,'NO_CONTRACT_MATCH');
+ assert.equal((await resolveContracts([c],provider([instrument()],null)))[0].status,'EXACT_METADATA_MATCH');
+});

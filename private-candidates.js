@@ -42,6 +42,7 @@ export async function resolveContracts(contracts,call){
  for(const c of contracts){
   if(!chains.has(c.ticker)){
    const data=await call('get_option_chains',{underlying_symbol:c.ticker});
+   if(data.chains===null)data.chains=[];
    if(!Array.isArray(data.chains)||data.chains.length>8||data.chains.some(x=>!uuid.test(x?.id)||!Array.isArray(x.expiration_dates)))throw Error('Unsupported option-chain response');
    chains.set(c.ticker,data.chains);
   }
@@ -51,13 +52,14 @@ export async function resolveContracts(contracts,call){
    let cursor,count=0;const cursors=new Set();
    do{
     const data=await call('get_option_instruments',{chain_id:chain.id,expiration_dates:c.expiry,strike_price:String(c.strike),type:c.side,state:'active',...(cursor?{cursor}:{})});
+    if(data.instruments===null)data.instruments=[];
     if(!Array.isArray(data.instruments)||data.instruments.length>100)throw Error('Unsupported contract metadata response');
     for(const i of data.instruments){
      if(i?.chain_id!==chain.id||i.chain_symbol!==c.ticker||i.expiration_date!==c.expiry||i.type!==c.side||num(i.strike_price)!==c.strike||!uuid.test(i.id))throw Error('Provider contract identity mismatch');
      const safe=Object.fromEntries(['id','chain_id','chain_symbol','expiration_date','type','strike_price','trade_value_multiplier','state','tradability','sellout_datetime','underlying_type'].filter(k=>['string','number'].includes(typeof i[k])).map(k=>[k,i[k]]));
      if(matches.has(i.id)&&JSON.stringify(matches.get(i.id))!==JSON.stringify(safe))throw Error('Conflicting contract metadata');matches.set(i.id,safe);
     }
-    cursor=data.next;if(cursor!==undefined&&typeof cursor!=='string')throw Error('Invalid metadata cursor');
+    cursor=data.next??undefined;if(cursor!==undefined&&typeof cursor!=='string')throw Error('Invalid metadata cursor');
     if(cursor&&(cursors.has(cursor)||++count>=5)){complete=false;break;}if(cursor)cursors.add(cursor);
    }while(cursor);
   }
