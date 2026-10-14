@@ -26,4 +26,5 @@ Run `python component_scoring.py INPUT.json` to record scores, or give the same 
 
 ## Validation boundary
 
-Synthetic tests verify arithmetic and refusal behavior only. Historical snapshots without complete contemporaneous reviews remain excluded. Report exclusions, chronological session partitions, fixed/adaptive rank differences and ties. No profitability or improvement claim follows from a rank reversal. Current hosted quote checks and an open-session version-2 news assessment remain separate pending checks.
+Synthetic tests verify arithmetic and refusal behavior only. Historical snapshots without complete contemporaneous reviews remain excluded. Report exclusions, chronological session partitions, fixed/adaptive rank differences and ties. No profitability or improvement claim follows from a rank reversal. Hosted candidate quote workflow checks have progressed separately; they do not establish rubric consistency, ranking improvement, or an open-session version-2 news assessment. Rubric-labeled saved scores without their underlying reviews are withheld; replay recomputes exported reviewed records from their dimensions.
+

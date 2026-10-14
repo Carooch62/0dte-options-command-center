@@ -11,7 +11,8 @@ def replay(snapshot):
         raise ValueError('Timezone-aware as_of required')
     scored, withheld, seen = [], [], set()
     for row in snapshot.get('candidates', []):
-        if 'component_reviews' in row:
+        reviewed_input = 'component_reviews' in row
+        if reviewed_input:
             row = score_candidate(row, now.isoformat())
         ident = row.get('candidate_id')
         if not isinstance(ident, str) or not ident or ident in seen:
@@ -25,6 +26,8 @@ def replay(snapshot):
             components = {}
         if any(isinstance(c, dict) and c.get('method_version') == VERSION for c in components.values()):
             reasons.extend(gate_reasons(row, now))
+            if not reviewed_input:
+                reasons.append('RUBRIC_REVIEWS_REQUIRED')
         values = {}
         for key in REFERENCE:
             c = components.get(key, {})
@@ -33,7 +36,8 @@ def replay(snapshot):
             value, stamp = c.get('score'), clock(c.get('available_at'))
             if type(value) not in (int, float) or not 0 <= value <= 100:
                 reasons.append(key + ':MISSING_OR_INVALID_SCORE')
-            elif stamp is None or stamp > now or not c.get('source') or not c.get('method_version'):
+            elif (stamp is None or stamp > now or not isinstance(c.get('source'),str) or not c['source'].strip()
+                    or not isinstance(c.get('method_version'),str) or not c['method_version'].strip()):
                 reasons.append(key + ':UNVERIFIED_POINT_IN_TIME_PROVENANCE')
             else:
                 values[key] = value
@@ -74,3 +78,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
     with open(args.input) as handle:
         print(json.dumps(replay(json.load(handle)), indent=2))
+
