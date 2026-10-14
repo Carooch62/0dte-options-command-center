@@ -34,3 +34,18 @@ test('loader checks environment before data and displays source timestamp',async
 test('production loader rejection clears prior snapshot without fetching data',async()=>{
  const h=await harness([Response.json({environment:'production'})]);await h.get('load-scanner').onclick();assert.equal(h.calls.length,1);assert.equal(h.get('rows').children.length,0);assert.match(h.get('status').textContent,/requires the staging/);
 });
+
+test('private current loader clears previous mapping and reports current source',async()=>{
+ const h=await harness([Response.json({snapshot:{generated_at:'2026-10-14T14:00:00Z',candidates:[],included_contracts:0,qualifying_contracts:0}})]);await h.get('load-current').onclick();assert.match(h.get('snapshot-info').textContent,/Production/);assert.equal(h.calls[0][0],'/private/plaid/robinhood/candidates');assert.equal(h.get('refresh').disabled,true);
+});
+test('network failures clear quotes, preserve retry and explain sign-in recovery',async()=>{
+ const h=await harness([Promise.reject(new TypeError('Failed to fetch'))]);await h.get('refresh').onclick();assert.match(h.get('status').textContent,/sign in.*retry/);assert.equal(h.get('rows').children[0].children[1].textContent,'Unknown');assert.equal(h.get('refresh').disabled,false);assert.equal(h.get('rows').children[0].children[3].textContent,'UNKNOWN');
+});
+test('metadata resolution checks returned identities before automatic refresh',async()=>{
+ const h=await harness([Response.json({results:[{contract:{ticker:'QQQ',strike:778,side:'call',expiry:'2026-10-12'},status:'EXACT_METADATA_MATCH',instrument:{}}]})]);await h.get('resolve').onclick();assert.match(h.get('status').textContent,/Unexpected contract/);assert.equal(h.calls.length,1);assert.equal(h.get('refresh').disabled,true);
+});
+test('resolved metadata triggers quotes, preserves unresolved contracts, and evaluates live ask',async()=>{
+ const id='bbdbf613-f3e0-4f68-9cc7-fc090ca84e24',now=new Date().toISOString(),c={ticker:'SPY',strike:778,side:'call',expiry:'2026-10-12'};
+ const h=await harness([Response.json({results:[{contract:c,status:'EXACT_METADATA_MATCH',instrument:{id,chain_symbol:'SPY',strike_price:778,type:'call',expiration_date:c.expiry,state:'active',tradability:'tradable',trade_value_multiplier:100,sellout_datetime:'2099-01-01T00:00:00Z'}}]}),Response.json({received_at:now,observations:[{quote:{instrument_id:id,bid_price:'.29',ask_price:'.30',updated_at:now}}]})]);
+ await h.get('resolve').onclick();assert.deepEqual(h.calls.map(x=>x[0]),['/private/plaid/robinhood/resolve','/private/plaid/robinhood/quotes']);assert.equal(h.get('rows').children[0].children[3].textContent,'WITHIN_LIMIT');
+});
