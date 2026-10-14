@@ -1,0 +1,25 @@
+name: Opening Shadow Validation (October 15)
+on:
+  schedule:
+    # 09:36 America/New_York on October 15, 2026 (EDT).
+    - cron: '36 13 15 10 *'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: write
+jobs:
+  request-staging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Dispatch only the authorized opening-session staging run
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date()).map(p=>[p.type,p.value]));
+            const date=`${parts.year}-${parts.month}-${parts.day}`,minutes=Number(parts.hour)*60+Number(parts.minute);
+            if(date!=='2026-10-15'||minutes<576||minutes>=960){core.notice('Outside the one-time October 15 opening validation window; no dispatch.');return;}
+            const runs=await github.rest.actions.listWorkflowRuns({owner:context.repo.owner,repo:context.repo.repo,workflow_id:'staging-scan.yml',branch:'staging-algorithm',per_page:30});
+            if(runs.data.workflow_runs.some(r=>r.status!=='completed')){core.notice('Staging run already active. Verify its actual scan timestamps; no duplicate dispatch.');return;}
+            await github.rest.actions.createWorkflowDispatch({owner:context.repo.owner,repo:context.repo.repo,workflow_id:'staging-scan.yml',ref:'staging-algorithm'});
+            core.notice('Staging scan requested. Completion and fresh evidence still require verification.');
