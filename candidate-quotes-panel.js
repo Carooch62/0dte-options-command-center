@@ -12,7 +12,7 @@ let scanner=null,observations=[],busy=false,scannerSource='No snapshot';
 function render(){
  $('load-scanner').disabled=busy;$('load-current').disabled=busy;$('resolve').disabled=busy||!scanner;
  const generated=Date.parse(scanner?.generated_at),age=(Date.now()-generated)/60000;
- $('snapshot-info').textContent=scanner?`${scannerSource} · Generated: ${scanner.generated_at||'unknown'} · Age: ${Number.isFinite(age)&&age>=0?age.toFixed(1)+' minutes':'unknown'} · Coverage: ${scanner.included_contracts??'unknown'} included / ${scanner.total_contracts??'unknown'} total; ${scanner.omitted_contracts??'unknown'} omitted${scanner.scanned_contracts!==undefined?' · '+scanner.scanned_contracts+' identities examined; batch selected by research ask':''} · Snapshot freshness is separate from quote freshness.`:'No scanner snapshot loaded.';
+ $('snapshot-info').textContent=scanner?`${scannerSource} · Generated: ${scanner.generated_at||'unknown'} · Age: ${Number.isFinite(age)&&age>=0?age.toFixed(1)+' minutes':'unknown'} · Coverage: ${scanner.included_contracts??'unknown'} included / ${scanner.total_contracts??'unknown'} total; ${scanner.omitted_contracts??'unknown'} omitted${scanner.research_rejected_contracts!==undefined?' · '+scanner.research_rejected_contracts+' price-only matches rejected by research screens':''}${scanner.scanned_contracts!==undefined?' · '+scanner.scanned_contracts+' identities examined; batch requires published research screens':''} · Snapshot freshness is separate from quote freshness.`:'No scanner snapshot loaded.';
  $('scanner').disabled=busy;$('research').disabled=busy;
  $('rows').replaceChildren();if(!scanner){$('refresh').disabled=true;return [];}
  const rows=candidateQuotes(scanner,observations);
@@ -32,7 +32,7 @@ $('load-scanner').onclick=async()=>{
 };
 $('load-current').onclick=async()=>{
  if(busy)return;busy=true;scanner=null;observations=[];render();$('status').textContent='Loading current scanner candidates…';
- try{const d=await readPrivate('candidates');candidateQuotes(d.snapshot,[]);if(!Number.isFinite(Date.parse(d.snapshot.generated_at)))throw Error('Invalid scanner timestamp');scanner=d.snapshot;scannerSource='Production · private current scanner batch';$('status').textContent=`Loaded ${scanner.included_contracts} contracts from ${scanner.qualifying_contracts} with research ask <= $0.30. Review snapshot age; research prices are not live.`;}catch(e){$('status').textContent=failure(e);}finally{busy=false;render();}
+ try{const d=await readPrivate('candidates');candidateQuotes(d.snapshot,[]);if(!Number.isFinite(Date.parse(d.snapshot.generated_at)))throw Error('Invalid scanner timestamp');scanner=d.snapshot;scannerSource='Production · private current scanner batch';$('status').textContent=`Loaded ${scanner.included_contracts} contracts from ${scanner.qualifying_contracts} passing research screens and ask <= $0.30. At most two per ticker. Review scan age; prices are not live.${scanner.included_contracts===0?' No candidates passed; no fallback to unscreened contracts.':''}`;}catch(e){$('status').textContent=failure(e);}finally{busy=false;render();}
 };
 $('resolve').onclick=async()=>{
  if(busy||!scanner)return;

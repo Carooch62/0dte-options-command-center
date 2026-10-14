@@ -97,7 +97,7 @@ test('candidate and metadata routes require Access and reject cross-origin and i
  assert.equal(calls.length,0);
 }));
 test('private scanner route projects the fixed main source without needing stored broker credentials',async()=>harness(async({env,auth,setUpstream})=>{
- setUpstream(async(url)=>{assert.match(url,/^https:\/\/raw.githubusercontent.com\/Carooch62\/0dte-options-command-center\/main\/data\/candidate-quote-batch.json\?v=\d+$/);return Response.json({format:'candidate-identities-v1',generated_at:'2026-10-14T14:00:00Z',included_contracts:1,total_contracts:1,qualifying_contracts:1,omitted_contracts:0,candidates:[{ticker:'SPY',options:[{strike:772,side:'put',expiry:'2026-10-16',scanner_ask:.2}]}]});});
+ setUpstream(async(url)=>{assert.match(url,/^https:\/\/raw.githubusercontent.com\/Carooch62\/0dte-options-command-center\/main\/data\/candidate-quote-batch.json\?v=\d+$/);return Response.json({format:'candidate-identities-v1',selection_policy:'published-research-screens-v1',max_per_ticker:2,generated_at:'2026-10-14T14:00:00Z',included_contracts:1,total_contracts:1,qualifying_contracts:1,omitted_contracts:0,candidates:[{ticker:'SPY',options:[{strike:772,side:'put',expiry:'2026-10-16',scanner_ask:.2}]}]});});
  const r=await handleRobinhood(request('candidates','GET',auth),env);assert.equal(r.status,200);assert.equal((await r.json()).snapshot.included_contracts,1);assert.equal(r.headers.get('Cache-Control'),'no-store');
 }));
 test('authenticated metadata path discovers only read-only tools and sanitizes exact match',async()=>harness(async({env,auth,setUpstream})=>{
