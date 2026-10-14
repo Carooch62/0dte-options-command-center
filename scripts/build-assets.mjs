@@ -10,6 +10,7 @@ const assets = [
   "dashboard_v2.html",
   "dashboard_glass.html",
   "dashboard_clean.html",
+  "dashboard_liquid.html",
   "dashboard-clean-app.js",
   "dashboard_glass_previous.html",
   "dashboard_mobile_preview.html",
