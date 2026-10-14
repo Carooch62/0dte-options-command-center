@@ -1,6 +1,6 @@
 import {candidateQuotes} from './candidate-quotes.js';
 import {validateRobinhoodPack} from './robinhood-review.js';
-import {quoteGuidance,appendQuoteEvidence,quoteEvidenceInput} from './quote-evidence.js';
+import {quoteGuidance,appendQuoteEvidence,quoteEvidenceInput,scannerFromEvidencePacket,validationTiming} from './quote-evidence.js';
 const $=id=>document.getElementById(id);
 const recovery='Quote request could not reach the private service. Open Brokerage review and sign in, then retry. If already signed in, check your connection.';
 const failure=e=>e instanceof TypeError||e.name==='AbortError'||e.name==='TimeoutError'?recovery:e.message;
@@ -12,6 +12,7 @@ async function readPrivate(path,body){
 let scanner=null,observations=[],evidenceHistory=[],busy=false,scannerSource='No snapshot';
 function render(){
  $('load-scanner').disabled=busy;$('load-current').disabled=busy;$('resolve').disabled=busy||!scanner;
+ $('load-validation').disabled=busy;$('validation-clock').textContent=validationTiming(evidenceHistory);
  $('export-evidence').disabled=busy||!evidenceHistory.length;
  const generated=Date.parse(scanner?.generated_at),age=(Date.now()-generated)/60000;
  $('snapshot-info').textContent=scanner?`${scannerSource} · Generated: ${scanner.generated_at||'unknown'} · Age: ${Number.isFinite(age)&&age>=0?age.toFixed(1)+' minutes':'unknown'} · Coverage: ${scanner.included_contracts??'unknown'} included / ${scanner.total_contracts??'unknown'} total; ${scanner.omitted_contracts??'unknown'} omitted${scanner.research_rejected_contracts!==undefined?' · '+scanner.research_rejected_contracts+' price-only matches rejected by research screens':''}${scanner.scanned_contracts!==undefined?' · '+scanner.scanned_contracts+' identities examined; batch requires published research screens':''} · Snapshot freshness is separate from quote freshness.`:'No scanner snapshot loaded.';
@@ -35,6 +36,12 @@ $('load-scanner').onclick=async()=>{
 $('load-current').onclick=async()=>{
  if(busy)return;busy=true;scanner=null;observations=[];evidenceHistory=[];render();$('status').textContent='Loading current scanner candidates…';
  try{const d=await readPrivate('candidates');candidateQuotes(d.snapshot,[]);if(!Number.isFinite(Date.parse(d.snapshot.generated_at)))throw Error('Invalid scanner timestamp');scanner=d.snapshot;scannerSource='Production · private current scanner batch';$('status').textContent=`Loaded ${scanner.included_contracts} contracts from ${scanner.qualifying_contracts} passing research screens and ask <= $0.30. At most two per ticker. Review scan age; prices are not live.${scanner.included_contracts===0?' No candidates passed; no fallback to unscreened contracts.':''}`;}catch(e){$('status').textContent=failure(e);}finally{busy=false;render();}
+};
+$('load-validation').onclick=async()=>{
+ if(busy)return;busy=true;scanner=null;observations=[];evidenceHistory=[];render();
+ try{const r=await fetch('/data/staging-shadow-evidence-latest.json',{cache:'no-store',credentials:'same-origin'});if(!r.ok||!r.headers.get('content-type')?.includes('application/json'))throw Error('Staging evidence unavailable. Open the review queue to check the staging scan.');
+ scanner=scannerFromEvidencePacket(await r.json());scannerSource='STAGING VALIDATION · frozen evidence packet';$('status').textContent=`Loaded ${scanner.included_contracts} staging contracts. Packet captured ${scanner.captured_at}; session ${scanner.market_session||'unknown'}. Require a fresh OPEN-session packet for tomorrow’s test. Match contracts and fetch live quotes next.`;
+ }catch(e){$('status').textContent=e.message;}finally{busy=false;render();}
 };
 $('resolve').onclick=async()=>{
  if(busy||!scanner)return;
@@ -73,5 +80,6 @@ $('export-evidence').onclick=()=>{
  a.href=url;a.download='private-quote-outcomes.json';a.click();URL.revokeObjectURL(url);
  $('status').textContent='Private quote observations exported. Run the offline outcome tool to evaluate available windows. Refresh manually to collect later observations.';
 };
+
 
 

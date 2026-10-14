@@ -34,6 +34,10 @@ try{
  await page.route('**/private/plaid/robinhood/candidates',r=>r.fulfill({json:{snapshot:{generated_at:now,included_contracts:1,total_contracts:1,qualifying_contracts:1,omitted_contracts:0,candidates:[{ticker:'TEST',options:[{...contract,contract_id:'TEST20990101C00100000'}]}]}}}));
  await page.route('**/private/plaid/robinhood/resolve',r=>r.fulfill({json:{results:[{contract,status:'EXACT_METADATA_MATCH',instrument:{id,chain_symbol:'TEST',strike_price:100,type:'call',expiration_date:'2099-01-01',state:'active',tradability:'tradable',trade_value_multiplier:100,sellout_datetime:'2099-01-01T19:45:00Z'}}]}}));
  await page.route('**/private/plaid/robinhood/quotes',r=>r.fulfill({json:{received_at:new Date().toISOString(),observations:[{quote:{instrument_id:id,bid_price:'.30',ask_price:'.31',updated_at:now}}]}}));
+ await page.route('**/data/staging-shadow-evidence-latest.json',r=>r.fulfill({json:{format:'shadow-evidence-v1',packet_id:'a'.repeat(64),scan_id:'staging-test',generated_at:now,captured_at:now,market_session:'OPEN',candidates:[{candidate_id:'TEST20990101C00100000',ticker:'TEST',contract:{contract_id:'TEST20990101C00100000',strike:100,side:'call',expiry:'2099-01-01'}}]}}));
+ await page.getByRole('button',{name:'Load staging validation batch',exact:true}).click();
+ await page.getByText('Loaded 1 staging contracts',{exact:false}).waitFor();
+ assert.match(await page.locator('#snapshot-info').innerText(),/STAGING VALIDATION/);
  await page.getByRole('button',{name:'Load current $0.30 scanner batch',exact:true}).click();
  await page.getByText('Loaded 1 contracts',{exact:false}).waitFor();
  await page.getByRole('button',{name:'Match contracts and fetch live quotes',exact:true}).click();
@@ -42,7 +46,8 @@ try{
  const downloadPromise=page.waitForEvent('download');
  await page.getByRole('button',{name:'Export private quote observations',exact:true}).click();
  const download=await downloadPromise,exported=JSON.parse(await readFile(await download.path(),'utf8'));
- assert.equal(exported.entries.length,1);assert.equal(exported.entries[0].quote.ask,.31);
+ assert.equal(exported.entries.length,1);
+ assert.match(await page.locator('#validation-clock').innerText(),/5-min:.*15-min:.*30-min:/);assert.equal(exported.entries[0].quote.ask,.31);
  assert.equal(exported.entries[0].decision_at,exported.entries[0].quote.received_at);
  assert.ok(!JSON.stringify(exported).includes('account_id'));
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'private results overflow');
@@ -59,5 +64,6 @@ try{
  }finally{await page.screenshot({path:`test-results/mobile/${width}-final.png`,fullPage:true});await writeFile(`test-results/mobile/${width}-errors.json`,JSON.stringify(errors));await context.tracing.stop({path:`test-results/mobile/${width}-trace.zip`});await context.close();}
  }
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}
+
 
 

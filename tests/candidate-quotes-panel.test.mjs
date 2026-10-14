@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {candidateQuotes} from '../candidate-quotes.js';
 import {validateRobinhoodPack} from '../robinhood-review.js';
-import {quoteGuidance,appendQuoteEvidence,quoteEvidenceInput} from '../quote-evidence.js';
+import {quoteGuidance,appendQuoteEvidence,quoteEvidenceInput,scannerFromEvidencePacket,validationTiming} from '../quote-evidence.js';
 const source=(await readFile(new URL('../candidate-quotes-panel.js',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'');
 async function harness(responses=[]){
  const nodes=new Map(),node=()=>({children:[],disabled:false,textContent:'',append(x){this.children.push(x);},replaceChildren(){this.children=[];}});
  const get=id=>{if(!nodes.has(id))nodes.set(id,node());return nodes.get(id);};let tick;
  const calls=[];const fetch=async(...args)=>{calls.push(args);return responses.shift();};
- new Function('document','fetch','setInterval','candidateQuotes','validateRobinhoodPack','quoteGuidance','appendQuoteEvidence','quoteEvidenceInput',source)({getElementById:get,createElement:node},fetch,fn=>tick=fn,candidateQuotes,validateRobinhoodPack,quoteGuidance,appendQuoteEvidence,quoteEvidenceInput);
+ new Function('document','fetch','setInterval','candidateQuotes','validateRobinhoodPack','quoteGuidance','appendQuoteEvidence','quoteEvidenceInput','scannerFromEvidencePacket','validationTiming',source)({getElementById:get,createElement:node},fetch,fn=>tick=fn,candidateQuotes,validateRobinhoodPack,quoteGuidance,appendQuoteEvidence,quoteEvidenceInput,scannerFromEvidencePacket,validationTiming);
  const load=async(id,data)=>get(id).onchange({target:{files:[{size:100,text:async()=>JSON.stringify(data)}]}});
  const id='bbdbf613-f3e0-4f68-9cc7-fc090ca84e24';const now=new Date().toISOString();
  await load('scanner',{candidates:[{ticker:'SPY',options:[{strike:778,side:'call',expiry:'2026-10-12'}]}]});
@@ -39,6 +39,10 @@ test('production loader rejection clears prior snapshot without fetching data',a
 test('private current loader clears previous mapping and reports current source',async()=>{
  const h=await harness([Response.json({snapshot:{generated_at:'2026-10-14T14:00:00Z',candidates:[],included_contracts:0,qualifying_contracts:0}})]);await h.get('load-current').onclick();assert.match(h.get('snapshot-info').textContent,/Production/);assert.equal(h.calls[0][0],'/private/plaid/robinhood/candidates');assert.equal(h.get('refresh').disabled,true);
 });
+test('staging validation loader preserves the frozen contract cohort and clears earlier mapping',async()=>{
+ const p={format:'shadow-evidence-v1',packet_id:'a'.repeat(64),scan_id:'staging-test',generated_at:'2026-10-15T13:36:00Z',captured_at:'2026-10-15T13:37:00Z',market_session:'OPEN',candidates:[{candidate_id:'TEST',ticker:'TEST',contract:{contract_id:'TEST',strike:100,side:'put',expiry:'2026-10-16'}}]};
+ const h=await harness([Response.json(p)]);await h.get('load-validation').onclick();assert.equal(h.calls[0][0],'/data/staging-shadow-evidence-latest.json');assert.match(h.get('snapshot-info').textContent,/STAGING VALIDATION/);assert.equal(h.get('refresh').disabled,true);assert.match(h.get('rows').children[0].children[0].textContent,/TEST/);
+});
 test('network failures clear quotes, preserve retry and explain sign-in recovery',async()=>{
  const h=await harness([Promise.reject(new TypeError('Failed to fetch'))]);await h.get('refresh').onclick();assert.match(h.get('status').textContent,/sign in.*retry/);assert.equal(h.get('rows').children[0].children[1].textContent,'Unknown');assert.equal(h.get('refresh').disabled,false);assert.equal(h.get('rows').children[0].children[3].textContent,'UNKNOWN');
 });
@@ -50,4 +54,5 @@ test('resolved metadata triggers quotes, preserves unresolved contracts, and eva
  const h=await harness([Response.json({results:[{contract:c,status:'EXACT_METADATA_MATCH',instrument:{id,chain_symbol:'SPY',strike_price:778,type:'call',expiration_date:c.expiry,state:'active',tradability:'tradable',trade_value_multiplier:100,sellout_datetime:'2099-01-01T00:00:00Z'}}]}),Response.json({received_at:now,observations:[{quote:{instrument_id:id,bid_price:'.29',ask_price:'.30',updated_at:now}}]})]);
  await h.get('resolve').onclick();assert.deepEqual(h.calls.map(x=>x[0]),['/private/plaid/robinhood/resolve','/private/plaid/robinhood/quotes']);assert.equal(h.get('rows').children[0].children[3].textContent,'WITHIN_LIMIT');
 });
+
 
