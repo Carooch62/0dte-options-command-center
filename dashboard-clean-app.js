@@ -116,11 +116,11 @@ function renderChanges(){
 }
 function persistFilters(){save('0dteCleanDashboardFilters',Object.fromEntries(Object.keys(filterDefaults).map(id=>[id,$(id).value])));}
 function restoreFilters(values){if(!values||typeof values!=='object')return;for(const id of Object.keys(filterDefaults)){const el=$(id),v=values[id];if(typeof v!=='string')continue;if(el.tagName==='SELECT'&&![...el.options].some(o=>o.value===v))continue;if(el.type==='number'&&(finite(v)===null||Number(v)<0))continue;el.value=v;}}
-restoreFilters(read('0dteDashboardFilters',{}));
+restoreFilters(read('0dteCleanDashboardFilters',{}));
 const shortcuts=document.createElement('div');shortcuts.className='controls';shortcuts.setAttribute('aria-label','Saved dashboard views');
 shortcuts.innerHTML='<button data-view="starred">★ Watchlist</button><button data-view="calls">Calls</button><button data-view="puts">Puts</button><button data-view="preferred">$0.10–$0.30</button><button data-view="save">Save this view</button><button data-view="restore">My saved view</button><span id="viewNotice" role="status" class="smallnote">Filters remembered on this device</span>';
 $('activeFilters')?.before(shortcuts);
-shortcuts.onclick=e=>{const view=e.target.dataset.view;if(!view)return;if(view==='save'){const ok=save('0dteCleanSavedView',Object.fromEntries(Object.keys(filterDefaults).map(id=>[id,$(id).value])));$('viewNotice').textContent=ok?'View saved on this device':'Could not save view';return;}if(view==='restore'){const saved=read('0dteSavedView',null);if(!saved){$('viewNotice').textContent='Save a view first';return;}restoreFilters(saved);}else if(view==='starred')$('onlyContracts').value='starred';else if(view==='calls'||view==='puts')$('direction').value=view==='calls'?'UP':'DOWN';else if(view==='preferred'){ $('askMin').value='0.10';$('askMax').value='0.30';$('onlyContracts').value='contracts';}persistFilters();render();};
+shortcuts.onclick=e=>{const view=e.target.dataset.view;if(!view)return;if(view==='save'){const ok=save('0dteCleanSavedView',Object.fromEntries(Object.keys(filterDefaults).map(id=>[id,$(id).value])));$('viewNotice').textContent=ok?'View saved on this device':'Could not save view';return;}if(view==='restore'){const saved=read('0dteCleanSavedView',null);if(!saved){$('viewNotice').textContent='Save a view first';return;}restoreFilters(saved);}else if(view==='starred')$('onlyContracts').value='starred';else if(view==='calls'||view==='puts')$('direction').value=view==='calls'?'UP':'DOWN';else if(view==='preferred'){ $('askMin').value='0.10';$('askMax').value='0.30';$('onlyContracts').value='contracts';}persistFilters();render();};
 function renderFilterChips(){
  if(!$('activeFilters'))return;
  const labels={thetaMax:'Time decay',expiration:'Expiration',state:'State',direction:'Direction',trendPeriod:'Timeframe',trendDirection:'Trend',trendAlignment:'Alignment',catalyst:'Catalyst',onlyContracts:'Display',sort:'Sort'};
@@ -148,12 +148,13 @@ const earlyPanel=document.createElement('section');earlyPanel.className='panel';
 earlyPanel.innerHTML='<h2>EARLY WATCH · shadow research</h2><p class="smallnote">Pre-breakout pattern hypotheses, not entry signals. Requires a company catalyst, compression, quiet volume, directional structure and proximity to a level. Uses completed bars only. Existing ranking and contract gates remain unchanged.</p><div id="earlyWatchList"></div>';
 $('candidateBoard').before(earlyPanel);
 function render(){if(!data)return;
- if($('board').contains(document.activeElement)&&document.activeElement.matches('input,textarea,select'))return;
  const anchor=boardAnchor();
  const age=minutes(data.generated_at),usable=!dataDownloadFailed&&snapshotUsable(data);
  const sessionKnown=Date.now()>=Date.parse(data.session_open_at)&&Date.now()<Date.parse(data.session_close_at);
  $('session').textContent=sessionKnown?'REGULAR SESSION':'OUTSIDE VERIFIED SESSION';
  notice('freshness',`${usable?'Research snapshot':'STALE / RESEARCH ONLY'} · generated ${time(data.generated_at)} · ${age===null?'unknown age':value(age,1)+' min old'}. Options remain delayed; unknown quote times cannot confirm an entry.`,usable?'warn':'bad');
+ // Update freshness above even while protecting an in-progress entry-plan edit.
+ if($('board').contains(document.activeElement)&&document.activeElement.matches('input,textarea,select'))return;
  const all=(data.candidates||[]).map(x=>({...expirationView(x,$('expiration').value),prefer_low_theta:$('thetaMax').value!=='off',theta_limit_pct:['prefer','off'].includes($('thetaMax').value)?null:Number($('thetaMax').value)})),counts={};for(const x of all){const s=recordedState(x);counts[s]=(counts[s]||0)+1;}
  const c=data.coverage||{};
  $('stats').innerHTML=[['STOCK ROWS',c.stocks_received??data.scanned_rows??0],['CHAIN ATTEMPTS',c.chains_attempted??'Unknown'],['WITH SAME-DAY CHAIN',c.chains_with_contracts??'Unknown'],['LAST TRIGGERED',counts.TRIGGERED||0],['LAST SECOND-WAVE',counts['SECOND-WAVE']||0],['LAST CONFIRMED',counts['CONFIRMED DELAYED']||0]].map(([a,b])=>`<div class="panel stat"><b>${esc(b)}</b><span>${a}</span></div>`).join('');
@@ -314,4 +315,5 @@ setInterval(()=>{if(!document.hidden){$('clock').textContent=new Date().toLocale
 setInterval(pollRun,5000);
 setInterval(()=>{if(!document.hidden&&active)renderRefresh();},1000);
 document.addEventListener('visibilitychange',()=>{startTimer();if(!document.hidden){load();pollRun();}});
+
 
