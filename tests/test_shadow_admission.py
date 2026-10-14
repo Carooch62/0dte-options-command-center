@@ -13,6 +13,11 @@ def run(row):
     with patch('shadow_replay.evaluate',return_value={'status':'ASSESSED','proposed_weights':REFERENCE,'allocation_policy':'synthetic'}):
         return replay({'as_of':NOW,'candidates':[row]})
 class ShadowAdmissionTests(unittest.TestCase):
+    def test_actual_review_time_cannot_be_backdated_by_dimension_clocks(self):
+        row=reviewed();row['reviewed_at']='2026-10-14T15:00:01+00:00'
+        self.assertIn('REVIEW_AFTER_CUTOFF_OR_UNKNOWN',run(row)['withheld'][0]['reasons'])
+        row['reviewed_at']='2026-10-14T14:59:59+00:00'
+        self.assertIn('REVIEW_PRECEDES_COMPONENT_EVIDENCE',run(row)['withheld'][0]['reasons'])
     def test_precomputed_rubric_label_cannot_replace_missing_reviews(self):
         row=score_candidate(reviewed(),NOW);row.pop('component_reviews');before=copy.deepcopy(row);r=run(row)
         self.assertEqual(r['scored'],[]);self.assertIn('RUBRIC_REVIEWS_REQUIRED',r['withheld'][0]['reasons']);self.assertEqual(row,before)

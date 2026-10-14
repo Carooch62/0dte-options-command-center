@@ -19,6 +19,17 @@ def replay(snapshot):
             raise ValueError('Unique candidate_id required (include side/contract as appropriate)')
         seen.add(ident)
         reasons = []
+        if snapshot.get('packet_id') and row.get('evidence_set_id') != snapshot['packet_id']:
+            reasons.append('EVIDENCE_PACKET_MISMATCH')
+        if reviewed_input and 'reviewed_at' in row:
+            reviewed_at = clock(row.get('reviewed_at'))
+            if reviewed_at is None or reviewed_at > now:
+                reasons.append('REVIEW_AFTER_CUTOFF_OR_UNKNOWN')
+            elif any(clock(c.get('available_at')) is not None and clock(c['available_at']) > reviewed_at
+                     for c in list(row.get('research_components', {}).values())
+                     + [g for g in (row.get('eligibility_evidence', {}).values()
+                                    if isinstance(row.get('eligibility_evidence'), dict) else []) if isinstance(g, dict)]):
+                reasons.append('REVIEW_PRECEDES_COMPONENT_EVIDENCE')
         if row.get('eligibility_passed') is not True:
             reasons.append('ELIGIBILITY_NOT_VERIFIED')
         components = row.get('research_components', {})
@@ -66,7 +77,7 @@ def replay(snapshot):
         for kind in ('reference', 'adaptive'):
             item[kind+'_rank'] = ranks[(kind, item['candidate_id'])]
         item['rank_change'] = item['reference_rank'] - item['adaptive_rank']
-    return {'mode':'OFFLINE_SHADOW', 'as_of':now.isoformat(), 'scored':scored,
+    return {'mode':'OFFLINE_SHADOW', 'as_of':now.isoformat(), 'packet_id':snapshot.get('packet_id'), 'scored':scored,
             'withheld':withheld, 'candidate_count':len(seen),
             'ranking_effect':'NONE', 'eligibility_effect':'NONE',
             'limitation':'Paired complete cases only; no outcomes or profitability measured. Component definitions require separate validation.'}
@@ -78,4 +89,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
     with open(args.input) as handle:
         print(json.dumps(replay(json.load(handle)), indent=2))
+
 
