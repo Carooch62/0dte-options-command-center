@@ -41,11 +41,17 @@ def evaluate_outcomes(entries, observations, as_of, stock_observations=None):
         raise ValueError('Entries, observations and timezone-aware as_of required')
     seen, results = set(), []
     stock_observations = stock_observations or []
+    quotes_by_id, stocks_by_ticker = {}, {}
+    for quote in observations:
+        quotes_by_id.setdefault(quote.get('contract_id'), []).append(quote)
+    for stock in stock_observations:
+        stocks_by_ticker.setdefault(stock.get('ticker'), []).append(stock)
     for entry in entries:
         ident, decision = entry.get('candidate_id'), clock(entry.get('decision_at'))
         if not isinstance(ident, str) or not ident or decision is None or (ident, decision) in seen:
             raise ValueError('Unique candidate_id/decision_at required')
         seen.add((ident, decision))
+        contract_quotes = quotes_by_id.get(ident, [])
         start = entry.get('quote', {})
         valid_entry = decision <= now and start.get('contract_id') == ident and quote_valid(start, decision)
         row = {'candidate_id': ident, 'decision_at': decision.isoformat(), 'windows': [],
@@ -59,7 +65,7 @@ def evaluate_outcomes(entries, observations, as_of, stock_observations=None):
             elif now >= target:
                 # First observed eligible quote in the declared window; never best hindsight price.
                 candidates = []
-                for quote in observations:
+                for quote in contract_quotes:
                     observed, received = clock(quote.get('observed_at')), clock(quote.get('received_at'))
                     if (quote.get('contract_id') == ident and observed is not None and received is not None
                             and target <= observed <= end and received <= now and quote_valid(quote, received)):
@@ -80,13 +86,14 @@ def evaluate_outcomes(entries, observations, as_of, stock_observations=None):
                     window['status'] = 'WITHHELD_MISSING_WINDOW_QUOTE'
             row['windows'].append(window)
         # Extremes use all valid observed bids; missing intervals make these sampled estimates.
-        sample_quotes = [q for q in observations if q.get('contract_id') == ident
+        sample_quotes = [q for q in contract_quotes if q.get('contract_id') == ident
                    and clock(q.get('observed_at')) is not None and clock(q.get('received_at')) is not None
                    and decision < clock(q['observed_at']) <= min(now, decision+timedelta(minutes=30))
                    and clock(q['received_at']) <= now and quote_valid(q, clock(q['received_at']))]
-        conflicting = {clock(q['observed_at']) for q in sample_quotes
-                       if len({(s['bid'], s['ask'], s['source']) for s in sample_quotes
-                               if clock(s['observed_at']) == clock(q['observed_at'])}) > 1}
+        books = {}
+        for q in sample_quotes:
+            books.setdefault(clock(q['observed_at']), set()).add((q['bid'], q['ask'], q['source']))
+        conflicting = {stamp for stamp, values in books.items() if len(values) > 1}
         samples = [q['bid'] for q in sample_quotes if clock(q['observed_at']) not in conflicting]
         row['sampled_excursion'] = ({'samples': len(samples),
                                     'best_bid_change_dollars': round((max(samples)-start['ask'])*100, 6),
@@ -100,7 +107,7 @@ def evaluate_outcomes(entries, observations, as_of, stock_observations=None):
             if not stock.get('ticker') or not stock_valid(stock, decision):
                 window['status'] = 'WITHHELD_ENTRY_STOCK'
             elif now >= target:
-                candidates = [s for s in stock_observations if s.get('ticker') == stock['ticker']
+                candidates = [s for s in stocks_by_ticker.get(stock['ticker'], []) if s.get('ticker') == stock['ticker']
                               and clock(s.get('observed_at')) is not None and clock(s.get('received_at')) is not None
                               and target <= clock(s['observed_at']) <= target+timedelta(seconds=TOLERANCE_SECONDS)
                               and clock(s['received_at']) <= now and stock_valid(s, clock(s['received_at']))]
