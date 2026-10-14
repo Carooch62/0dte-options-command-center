@@ -1,4 +1,5 @@
 import {handleRobinhood} from './robinhood-live.js';
+import {handleShadowResearch} from './shadow-research.js';
 import {handlePlaid,scheduledPlaidSync} from './plaid-sync.js';
 const REPO = 'Carooch62/0dte-options-command-center';
 const WORKFLOW = 'market-scan.yml';
@@ -56,6 +57,8 @@ export default {
     }
     if(request.method==='OPTIONS')return response({},204,request);
     try {
+      const shadow=await handleShadowResearch(request);
+      if(shadow)return shadow;
       if(url.pathname==='/health') {
         if(!env.GITHUB_TOKEN)return response({ok:false,error:'Refresh service is not configured'},503,request);
         const id=url.searchParams.get('request_id');
@@ -96,3 +99,4 @@ export default {
     }catch(e){return response({ok:false,error:e.message},502,request);}
   }
 };
+
