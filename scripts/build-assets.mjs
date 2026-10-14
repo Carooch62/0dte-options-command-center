@@ -9,6 +9,8 @@ const assets = [
   "dashboard.html",
   "dashboard_v2.html",
   "dashboard_glass.html",
+  "dashboard_clean.html",
+  "dashboard-clean-app.js",
   "dashboard_glass_previous.html",
   "dashboard_mobile_preview.html",
   "dashboard-mobile.css",
