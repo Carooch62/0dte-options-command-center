@@ -3,12 +3,13 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {candidateQuotes} from '../candidate-quotes.js';
 import {validateRobinhoodPack} from '../robinhood-review.js';
+import {quoteGuidance,appendQuoteEvidence,quoteEvidenceInput} from '../quote-evidence.js';
 const source=(await readFile(new URL('../candidate-quotes-panel.js',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'');
 async function harness(responses=[]){
  const nodes=new Map(),node=()=>({children:[],disabled:false,textContent:'',append(x){this.children.push(x);},replaceChildren(){this.children=[];}});
  const get=id=>{if(!nodes.has(id))nodes.set(id,node());return nodes.get(id);};let tick;
  const calls=[];const fetch=async(...args)=>{calls.push(args);return responses.shift();};
- new Function('document','fetch','setInterval','candidateQuotes','validateRobinhoodPack',source)({getElementById:get,createElement:node},fetch,fn=>tick=fn,candidateQuotes,validateRobinhoodPack);
+ new Function('document','fetch','setInterval','candidateQuotes','validateRobinhoodPack','quoteGuidance','appendQuoteEvidence','quoteEvidenceInput',source)({getElementById:get,createElement:node},fetch,fn=>tick=fn,candidateQuotes,validateRobinhoodPack,quoteGuidance,appendQuoteEvidence,quoteEvidenceInput);
  const load=async(id,data)=>get(id).onchange({target:{files:[{size:100,text:async()=>JSON.stringify(data)}]}});
  const id='bbdbf613-f3e0-4f68-9cc7-fc090ca84e24';const now=new Date().toISOString();
  await load('scanner',{candidates:[{ticker:'SPY',options:[{strike:778,side:'call',expiry:'2026-10-12'}]}]});
@@ -49,3 +50,4 @@ test('resolved metadata triggers quotes, preserves unresolved contracts, and eva
  const h=await harness([Response.json({results:[{contract:c,status:'EXACT_METADATA_MATCH',instrument:{id,chain_symbol:'SPY',strike_price:778,type:'call',expiration_date:c.expiry,state:'active',tradability:'tradable',trade_value_multiplier:100,sellout_datetime:'2099-01-01T00:00:00Z'}}]}),Response.json({received_at:now,observations:[{quote:{instrument_id:id,bid_price:'.29',ask_price:'.30',updated_at:now}}]})]);
  await h.get('resolve').onclick();assert.deepEqual(h.calls.map(x=>x[0]),['/private/plaid/robinhood/resolve','/private/plaid/robinhood/quotes']);assert.equal(h.get('rows').children[0].children[3].textContent,'WITHIN_LIMIT');
 });
+
