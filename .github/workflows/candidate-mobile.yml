@@ -1,0 +1,35 @@
+name: Candidate Mobile QA
+on:
+  push:
+    branches: [release/private-candidate-checker-20261014]
+    paths: ['candidate-quotes*', 'robinhood-review.js', 'scripts/test-candidate-mobile.mjs', '.github/workflows/candidate-mobile.yml']
+  pull_request:
+    paths: ['candidate-quotes*', 'robinhood-review.js', 'scripts/test-candidate-mobile.mjs', '.github/workflows/candidate-mobile.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mobile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify browser asset bundle
+        run: node scripts/build-assets.mjs
+      - name: Install pinned browser test dependency
+        run: npm install --no-save --package-lock=false playwright@1.56.1
+      - name: Install matching Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run phone-width checks
+        run: node scripts/test-candidate-mobile.mjs
+      - name: Preserve screenshots and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: candidate-mobile-${{ github.run_id }}
+          path: test-results/mobile/
+          if-no-files-found: warn
+          retention-days: 7
