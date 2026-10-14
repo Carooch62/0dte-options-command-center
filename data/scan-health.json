@@ -1,1 +1,1 @@
-{"updated_at":"2026-10-14T05:13:11.525004+00:00","run_id":"38515397606","request_id":null,"status":"CLOSED","stage":"MARKET_CALENDAR"}
+{"updated_at":"2026-10-14T13:32:49.221643+00:00","run_id":"38572571081","request_id":"scheduled-5973282","status":"WAITING_FOR_BAR","stage":"MARKET_CALENDAR","retry_after":"2026-10-14T13:35:00+00:00","message":"Waiting for the first completed five-minute regular-session bar; last snapshot retained."}
