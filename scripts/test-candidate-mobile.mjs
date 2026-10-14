@@ -5,7 +5,7 @@ import {createServer} from 'node:http';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 await mkdir('test-results/mobile',{recursive:true});
 import assert from 'node:assert/strict';
-const server=createServer(async(req,res)=>{try{const path=req.url==='/'?'candidate-quotes.html':req.url.slice(1);if(!['candidate-quotes.html','candidate-quotes-panel.js','candidate-quotes.js','robinhood-review.js'].includes(path)){res.writeHead(404);res.end();return;}res.setHeader('Content-Type',path.endsWith('.js')?'text/javascript':'text/html');res.end(await readFile(new URL('../'+path,import.meta.url)));}catch{res.writeHead(500);res.end();}});
+const server=createServer(async(req,res)=>{try{const path=req.url==='/'?'candidate-quotes.html':req.url.slice(1);if(!['candidate-quotes.html','candidate-quotes-panel.js','candidate-quotes.js','robinhood-review.js','quote-evidence.js'].includes(path)){res.writeHead(404);res.end();return;}res.setHeader('Content-Type',path.endsWith('.js')?'text/javascript':'text/html');res.end(await readFile(new URL('../'+path,import.meta.url)));}catch{res.writeHead(500);res.end();}});
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 let browser;
 try{
@@ -20,7 +20,7 @@ try{
  await page.goto(`http://127.0.0.1:${server.address().port}/`);
  await page.locator('summary').click();
  await page.getByRole('button',{name:'Load staging scanner snapshot',exact:true}).click();
- await page.getByText('UNVERIFIED: NO_CONTRACT_MATCH',{exact:false}).waitFor();
+ await page.getByText('Contract metadata has not been matched.',{exact:false}).waitFor();
  assert.match(await page.locator('#snapshot-info').innerText(),/Staging.*2026-10-12T14:00:00Z/);
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'page overflow');
  for(const button of await page.locator('button').all()){const box=await button.boundingBox();assert.ok(box.height>=44);assert.ok(box.x>=0&&box.x+box.width<=width);}
@@ -38,7 +38,13 @@ try{
  await page.getByText('Loaded 1 contracts',{exact:false}).waitFor();
  await page.getByRole('button',{name:'Match contracts and fetch live quotes',exact:true}).click();
  await page.getByText('ABOVE_LIMIT',{exact:true}).waitFor();
- await page.getByText('QUOTE_CHECK_PASSED',{exact:true}).waitFor();
+ await page.getByText('Live ask is above $0.30.',{exact:false}).waitFor();
+ const downloadPromise=page.waitForEvent('download');
+ await page.getByRole('button',{name:'Export private quote observations',exact:true}).click();
+ const download=await downloadPromise,exported=JSON.parse(await readFile(await download.path(),'utf8'));
+ assert.equal(exported.entries.length,1);assert.equal(exported.entries[0].quote.ask,.31);
+ assert.equal(exported.entries[0].decision_at,exported.entries[0].quote.received_at);
+ assert.ok(!JSON.stringify(exported).includes('account_id'));
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'private results overflow');
  assert.equal(await page.locator('td[data-label="$0.30 live ask"]').innerText(),'ABOVE_LIMIT');
  await page.screenshot({path:`test-results/mobile/${width}-private-live.png`,fullPage:true});
@@ -53,4 +59,5 @@ try{
  }finally{await page.screenshot({path:`test-results/mobile/${width}-final.png`,fullPage:true});await writeFile(`test-results/mobile/${width}-errors.json`,JSON.stringify(errors));await context.tracing.stop({path:`test-results/mobile/${width}-trace.zip`});await context.close();}
  }
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}
+
 
