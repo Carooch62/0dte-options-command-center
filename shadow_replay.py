@@ -2,6 +2,7 @@
 import argparse
 import json
 from news_research import REFERENCE, clock, evaluate
+from component_scoring import score_candidate, gate_reasons, VERSION
 
 
 def replay(snapshot):
@@ -10,6 +11,8 @@ def replay(snapshot):
         raise ValueError('Timezone-aware as_of required')
     scored, withheld, seen = [], [], set()
     for row in snapshot.get('candidates', []):
+        if 'component_reviews' in row:
+            row = score_candidate(row, now.isoformat())
         ident = row.get('candidate_id')
         if not isinstance(ident, str) or not ident or ident in seen:
             raise ValueError('Unique candidate_id required (include side/contract as appropriate)')
@@ -20,6 +23,8 @@ def replay(snapshot):
         components = row.get('research_components', {})
         if not isinstance(components, dict):
             components = {}
+        if any(isinstance(c, dict) and c.get('method_version') == VERSION for c in components.values()):
+            reasons.extend(gate_reasons(row, now))
         values = {}
         for key in REFERENCE:
             c = components.get(key, {})
