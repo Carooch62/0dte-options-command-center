@@ -1,7 +1,18 @@
 # Quote-session recovery release
 
-Scope: browser-only quote workflow hardening. No scanner scores, order placement,
-authentication policy, private endpoint permissions or production ranking changes.
+Scope: quote workflow hardening and isolated branch-preview configuration. No
+scanner scores, order placement, production authentication or ranking changes.
+
+## Branch-preview build recovery
+
+Cloudflare retry passed repository fetch, then rejected the missing `previews`
+block. Define an explicit empty preview KV binding list and `APP_ENV=preview`.
+These previews serve the interface/public research; private routes, manual scans
+and scheduled scan/sync handlers fail closed before any provider/storage access.
+Production `PLAID_STORE` remains top-level only, with its existing identifier.
+No production secrets or namespace are copied into previews. Synthetic browser
+tests exercise private quote flows; live provider smoke testing stays on the
+protected production origin after an authorized release.
 
 ## Changes
 

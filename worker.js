@@ -23,6 +23,7 @@ export function regularWeekday(now) {
   return !['Sat','Sun'].includes(parts.weekday)&&minute>=570&&minute<960;
 }
 export async function scheduledScan(env,now=new Date()) {
+  if(env.APP_ENV==='preview')return 'preview-disabled';
   if(!regularWeekday(now))return 'outside-session';
   if(!env.GITHUB_TOKEN)throw Error('Refresh service is not configured');
   const d=await api(`actions/workflows/${WORKFLOW}/runs?branch=main&per_page=30`,env);
@@ -38,6 +39,7 @@ export async function scheduledScan(env,now=new Date()) {
 }
 export default {
   async scheduled(controller,env) {
+    if(env.APP_ENV==='preview')return;
     const result=await scheduledScan(env,new Date(controller.scheduledTime));
     console.log(JSON.stringify({scheduler:result,scheduled_at:controller.scheduledTime}));
     // Existing five-minute trigger: collect a private brokerage snapshot hourly during the session.
@@ -49,6 +51,10 @@ export default {
   },
   async fetch(request,env) {
     const url=new URL(request.url);
+    if(env.APP_ENV==='preview') {
+      if(url.pathname.startsWith('/private/')||url.pathname==='/refresh')return response({ok:false,error:'Private connections and scan requests are disabled in branch previews.'},403,request);
+      if(url.pathname==='/health')return response({ok:true,environment:'preview',private_connections:false,scan_requests:false},200,request);
+    }
     if(url.pathname.startsWith('/private/plaid/robinhood/')) {
       try{return await handleRobinhood(request,env)}catch{return response({ok:false,error:'Private Robinhood service unavailable'},502,request)}
     }
@@ -99,4 +105,5 @@ export default {
     }catch(e){return response({ok:false,error:e.message},502,request);}
   }
 };
+
 
