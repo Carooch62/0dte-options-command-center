@@ -5,6 +5,7 @@ from pathlib import Path
 from datetime import datetime, timezone, date
 from quality import number, freshness, contract_checks, verified_delta, ET
 from pattern_research import attach_early_watch
+from news_research import evaluate as evaluate_news, load_reviews
 
 direct_terms = (
     'reports earnings','reports results','earnings beat','earnings miss','raises guidance',
@@ -99,6 +100,7 @@ def normalize(data,now=None):
             ([ 'Momentum and acceleration confirmation missing' ] if not confirmation else []) + \
             ([ x['catalyst_type'] if news_unknown else 'Company-specific catalyst not confirmed' ] if not x['catalyst'] else [])
         attach_early_watch(x,current)
+        x['news_research']=evaluate_news(x,now)
         x['flow_aligned']=False  # cumulative call/put volume is not verified buying flow
         x['volume_balance_aligned']=(x.get('volume_balance')=='CALL' and side=='call') or (x.get('volume_balance')=='PUT' and side=='put')
         # Quote evidence cannot upgrade a stock that failed setup qualification.
@@ -108,7 +110,11 @@ def normalize(data,now=None):
     return data
 
 def main():
-    data=normalize(json.loads(Path('data/market.json').read_text()))
+    data=json.loads(Path('data/market.json').read_text())
+    reviews=load_reviews()
+    for row in data.get('candidates',[]):
+        row['news_event_evidence']=reviews.get(row['ticker'],[])
+    data=normalize(data)
     Path('data/market-dashboard.json').write_text(json.dumps(data,separators=(',',':'),allow_nan=False))
 
 if __name__=='__main__':main()

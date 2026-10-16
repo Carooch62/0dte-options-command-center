@@ -2,7 +2,8 @@ const $=id=>document.getElementById(id);
 const status=$('rh-live-status');
 async function api(path,body){
  const r=await fetch(`/private/plaid/robinhood/${path}`,{method:body===undefined?'GET':'POST',credentials:'same-origin',cache:'no-store',headers:body===undefined?{}:{'Content-Type':'application/json','X-Requested-With':'RobinhoodQuotes'},...(body===undefined?{}:{body:JSON.stringify(body)})});
- const data=await r.json();if(!r.ok)throw Error(data.error||`HTTP ${r.status}`);return data;
+ if(!r.headers.get('content-type')?.includes('application/json'))throw Object.assign(Error('Private API unavailable. Open the hosted workers.dev brokerage page and sign in, then reload.'),{code:'SIGN_IN_REQUIRED'});
+ const data=await r.json();if(!r.ok)throw Object.assign(Error(data.error||`HTTP ${r.status}`),{code:data.code||(r.status===401?'SIGN_IN_REQUIRED':undefined)});return data;
 }
 async function load(){
  $('rh-live-connect').disabled=true;$('rh-live-disconnect').disabled=true;$('rh-live-test').disabled=true;
@@ -13,10 +14,13 @@ $('rh-live-connect').onclick=async()=>{try{$('rh-live-connect').disabled=true;co
 $('rh-live-disconnect').onclick=async()=>{try{const data=await api('disconnect',{});$('rh-live-results').textContent='';await load();status.textContent=data.revocation_note;}catch(e){status.textContent=e.message;}};
 $('rh-live-test').onclick=async()=>{
  $('rh-live-test').disabled=true;
+ $('rh-live-results').replaceChildren();
+ status.textContent='Fetching private quotes…';
+ let canRetry=true;
  try{const kind=$('rh-live-kind').value,values=$('rh-live-symbols').value.split(/[\s,]+/).filter(Boolean);const data=await api('quotes',kind==='equity'?{kind,symbols:values.map(x=>x.toUpperCase())}:{kind,instrument_ids:values});const output=$('rh-live-results');output.replaceChildren();
  const note=document.createElement('p');note.textContent=`${data.source} · Received ${data.received_at}. Refresh timestamps do not prove exchange latency. Greek calculation times are unknown.`;output.append(note);
  for(const row of data.observations){const p=document.createElement('p');p.textContent=`${row.quote.symbol||row.quote.instrument_id||'Quote'} · Bid ${row.quote.bid_price??'unknown'} / Ask ${row.quote.ask_price??'unknown'} · Updated ${row.quote.venue_last_trade_time??row.quote.updated_at??'unknown'} · ${Object.entries(row.clocks).map(([name,clock])=>name+': '+(clock.age_seconds===null?'unknown':clock.age_seconds.toFixed(1)+' seconds')+' '+clock.freshness).join(' / ')} · Book ${row.book_status}`;output.append(p);}
- status.textContent='Private quotes collected. The scanner feed remains delayed.';
- }catch(e){status.textContent=e.message;}finally{$('rh-live-test').disabled=false;}
+ status.textContent=data.missing?.length?`Partial quote response. Missing: ${data.missing.join(', ')}. The scanner feed remains delayed.`:'Private quotes collected. The scanner feed remains delayed.';
+ }catch(e){status.textContent=e.message;if(e.code==='RECONNECT_REQUIRED'){canRetry=false;$('rh-live-connect').disabled=false;}else if(e.code==='SIGN_IN_REQUIRED'){canRetry=false;$('rh-live-connect').disabled=true;}}finally{$('rh-live-test').disabled=!canRetry;}
 };
 await load();

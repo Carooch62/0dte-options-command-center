@@ -1,10 +1,22 @@
 import {entryReadiness,trendSummary,matchesTrend,quoteKey,observePremiums,premiumChange,positionEstimate,reentryProblem,positionAlerts,validPlan} from './trade-review.js?v=20261002-trend-filters';
 import {signalChecklist,earlyWatchVisible} from './signal-checklist.js?v=20261008-rvol-v1';
 import {refreshProgress,publishedReceipt,closedReceipt,refreshBlocksNewRequest,publicationCheckExpired,verifiedRefresh} from './refresh-progress.js?v=20261001-opening-bar';
-import {thetaDecayPct,expirationView,finite,minutes,snapshotUsable,dataStatus,recordedState,matchesState,robinhoodStockUrl,contractExplanation,contractRank,contractShortlist,displayState,selectableContracts,tradePL,validTrade,riskSummary} from './dashboard-logic.js?v=20261007-readiness';
+import {newsResearchSummary,thetaDecayPct,expirationView,finite,minutes,snapshotUsable,dataStatus,recordedState,matchesState,robinhoodStockUrl,contractExplanation,contractRank,contractShortlist,displayState,selectableContracts,tradePL,validTrade,riskSummary} from './dashboard-logic.js?v=20261007-readiness';
 const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const API='https://0dte-options-command-center.h69htk56cq.workers.dev';
-const DATA=location.hostname==='localhost'||location.hostname==='127.0.0.1'?'./data/':'https://raw.githubusercontent.com/Carooch62/0dte-options-command-center/main/data/';
+const PRODUCTION_HOST='0dte-options-command-center.h69htk56cq.workers.dev';
+const PREVIEW=location.hostname.endsWith('.workers.dev')&&location.hostname!==PRODUCTION_HOST;
+const API=PREVIEW?location.origin:'https://'+PRODUCTION_HOST;
+const DATA=PREVIEW||['localhost','127.0.0.1'].includes(location.hostname)?'./data/':'https://raw.githubusercontent.com/Carooch62/0dte-options-command-center/main/data/';
+if(PREVIEW){
+ const banner=document.createElement('div');
+ banner.textContent='STAGING · Combined algorithm test · Separate scan data · Brokerage and scan dispatch disabled';
+ banner.style.cssText='padding:14px;background:#664800;color:white;font-weight:700;text-align:center';
+ document.body.prepend(banner);
+ for(const link of document.querySelectorAll('a[href]')){
+  if(/brokerage|previous/.test(link.getAttribute('href')))link.remove();
+ }
+
+}
 let lastChecked=null,checkChanged=false;
 let data=null,previous=null,auto=true,timer,loadPromise=null,active=null,polling=false,dataDownloadFailed=false,lastRefresh=null,backendHealth=null,reloadMessage='',schedulerRun=null;
 function read(key,fallback){try{return JSON.parse(localStorage.getItem(key))??fallback;}catch{return fallback;}}
@@ -70,7 +82,7 @@ function compactCard(x){
 function card(x){
  const effective=dataDownloadFailed?{...data,generated_at:null}:data;
  const checks=signalChecklist(x,effective,Number($('askMin').value),Number($('askMax').value));
- const panel=`<details class="details" data-ticker="${esc(x.ticker)}" data-section="signals"><summary>Why this setup · signal checklist${earlyWatchVisible(x,effective)?' · EARLY WATCH (shadow)':''}</summary><p class="smallnote">Evidence checklist, not a confidence percentage. Shadow patterns and RVOL do not change scores or entry eligibility. OBSERVED means measured—not a pass.</p>${checks.map(c=>`<div class="change-item"><b>${esc(c.label)}: ${esc(c.state)}</b><p class="smallnote">${esc(c.detail)}</p></div>`).join('')}</details>`;
+ const panel=`<details class="details" data-ticker="${esc(x.ticker)}" data-section="signals"><summary>Why this setup · signal checklist${earlyWatchVisible(x,effective)?' · EARLY WATCH (shadow)':''}</summary><p class="smallnote">Evidence checklist, not a confidence percentage. Shadow patterns and RVOL do not change scores or entry eligibility. OBSERVED means measured—not a pass.</p><p class="smallnote">${esc(newsResearchSummary(x))}</p>${(x.news_research?.events||[]).map(e=>`<p class="smallnote">News event ${esc(e.event_id||'unidentified')}: ${esc(e.status)}${e.missing?.length?' · missing '+esc(e.missing.join(', ')):''}</p>`).join('')}${checks.map(c=>`<div class="change-item"><b>${esc(c.label)}: ${esc(c.state)}</b><p class="smallnote">${esc(c.detail)}</p></div>`).join('')}</details>`;
  return (document.body.classList.contains('compact-glass')?compactCard(x):classicCard(x)).replace(/(<article[^>]*>)/,'$1'+panel);
 }
 const filterDefaults={thetaMax:'prefer',expiration:'today',state:'ALL',direction:'ALL',trendPeriod:'overall',trendDirection:'ALL',trendAlignment:'ALL',catalyst:'ALL',askMin:'0.10',askMax:'0.30',onlyContracts:'all',sort:'state'};
@@ -230,6 +242,7 @@ async function pollRun(){
  finally{polling=false;}
 }
 async function startScan(mode){
+ if(PREVIEW){alert('Staging: request a new test scan through GitHub Actions. Check now reloads the latest staging result.');return;}
  if(refreshBlocksNewRequest(active))return;
  active={id:crypto.randomUUID(),started:Date.now(),requestStatus:'sending',message:'Sending refresh request…'};
  const id=active.id;save('0dteActiveScan',active);rememberRefresh(active);enableScan(false);renderRefresh();

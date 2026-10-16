@@ -1,0 +1,198 @@
+[
+  {
+    "source_dates": {
+      "first_disclosure_date": "2026-09-18",
+      "publication_date": "2026-09-18"
+    },
+    "review_note": "Transfer announced September 18; planned commencement October 5 is not first disclosure.",
+    "event": {
+      "event_id": "dds-transfer",
+      "ticker": "DDS",
+      "title": "Dillard\u2019s transfer announcement",
+      "source_url": "https://investor.dillards.com/news-releases/news-release-details/dillards-inc-transfer-us-stock-exchange-listings-texas-stock",
+      "event_at": null,
+      "published_at": null,
+      "reviewed_at": "2026-10-10T04:20:51+00:00",
+      "horizon": "INTRADAY",
+      "relevance": "DIRECT",
+      "direction": "UNKNOWN",
+      "scores": {
+        "materiality": null,
+        "surprise": null,
+        "credibility": 4,
+        "novelty": 4
+      },
+      "evidence": {
+        "materiality": "Company-relative economics have not been quantified in this review.",
+        "surprise": "No pre-event expectation benchmark collected.",
+        "credibility": "Primary issuer filing or exchange release checked October 10, 2026.",
+        "novelty": "Transfer announced September 18; planned commencement October 5 is not first disclosure.",
+        "relevance": "Release directly names the issuer.",
+        "horizon": "Check whether this disclosure can support a current intraday proposal."
+      }
+    }
+  },
+  {
+    "source_dates": {
+      "first_disclosure_date": "2026-09-18",
+      "publication_date": "2026-10-09"
+    },
+    "review_note": "October 9 ceremony repeats the previously announced listing transfer. A distinct material development would require separate evidence.",
+    "event": {
+      "event_id": "dds-transfer",
+      "ticker": "DDS",
+      "title": "Dillard\u2019s listing ceremony",
+      "source_url": "https://www.txse.com/press/texas-stock-exchange-celebrates-dillard-s-primary-listing-transfer",
+      "event_at": null,
+      "published_at": null,
+      "reviewed_at": "2026-10-10T04:20:51+00:00",
+      "horizon": "INTRADAY",
+      "relevance": "DIRECT",
+      "direction": "UNKNOWN",
+      "scores": {
+        "materiality": null,
+        "surprise": null,
+        "credibility": 4,
+        "novelty": 0
+      },
+      "evidence": {
+        "materiality": "Company-relative economics have not been quantified in this review.",
+        "surprise": "No pre-event expectation benchmark collected.",
+        "credibility": "Primary issuer filing or exchange release checked October 10, 2026.",
+        "novelty": "October 9 ceremony repeats the previously announced listing transfer. A distinct material development would require separate evidence.",
+        "relevance": "Release directly names the issuer.",
+        "horizon": "Check whether this disclosure can support a current intraday proposal."
+      }
+    }
+  },
+  {
+    "source_dates": {
+      "first_disclosure_date": "2025-10-06",
+      "publication_date": "2025-10-06"
+    },
+    "review_note": "Release is dated October 6, 2025; second-half 2026 refers to planned deployment, not publication.",
+    "event": {
+      "event_id": "amd-openai-2025",
+      "ticker": "AMD",
+      "title": "AMD and OpenAI GPU agreement",
+      "source_url": "https://ir.amd.com/financial-information/sec-filings/content/0001193125-25-230895/d28189dex991.htm",
+      "event_at": null,
+      "published_at": null,
+      "reviewed_at": "2026-10-10T04:20:51+00:00",
+      "horizon": "INTRADAY",
+      "relevance": "DIRECT",
+      "direction": "UNKNOWN",
+      "scores": {
+        "materiality": null,
+        "surprise": null,
+        "credibility": 4,
+        "novelty": 4
+      },
+      "evidence": {
+        "materiality": "Company-relative economics have not been quantified in this review.",
+        "surprise": "No pre-event expectation benchmark collected.",
+        "credibility": "Primary issuer filing or exchange release checked October 10, 2026.",
+        "novelty": "Release is dated October 6, 2025; second-half 2026 refers to planned deployment, not publication.",
+        "relevance": "Release directly names the issuer.",
+        "horizon": "Check whether this disclosure can support a current intraday proposal."
+      }
+    }
+  },
+  {
+    "source_dates": {
+      "first_disclosure_date": "2026-10-08",
+      "publication_date": "2026-10-08"
+    },
+    "review_note": "Bearish for earnings-guidance revision only. Slower positive EPS growth is not an absolute EPS decline. Whole release also raises reported revenue-growth outlook.",
+    "benchmark": {
+      "type": "PRIOR_ISSUER_GUIDANCE",
+      "source_url": "https://www.sec.gov/Archives/edgar/data/77476/000007747626000037/q220268-kxexhibit991.htm",
+      "comparison": "Core constant-currency EPS growth now 1\u20132%; October comparison table describes previous outlook as low end of 4\u20136%. July source confirms 4\u20136% range, but does not independently establish timing of later low-end qualifier.",
+      "consensus_available": false
+    },
+    "event": {
+      "event_id": "pep-guidance-20261008",
+      "ticker": "PEP",
+      "title": "PepsiCo earnings outlook revision",
+      "source_url": "https://www.sec.gov/Archives/edgar/data/77476/000007747626000050/q320268-kxexhibit991.htm",
+      "event_at": null,
+      "published_at": null,
+      "reviewed_at": "2026-10-10T05:01:28.829943+00:00",
+      "horizon": "INTRADAY",
+      "relevance": "DIRECT",
+      "direction": "BEARISH",
+      "scores": {
+        "materiality": null,
+        "surprise": null,
+        "credibility": 4,
+        "novelty": 4
+      },
+      "evidence": {
+        "materiality": "Company-wide forecast revision; numerical severity rating not yet assigned.",
+        "surprise": "Core constant-currency EPS growth now 1\u20132%; October comparison table describes previous outlook as low end of 4\u20136%. July source confirms 4\u20136% range, but does not independently establish timing of later low-end qualifier. Benchmark exists, but rubric score remains pending review.",
+        "credibility": "Primary issuer release or SEC exhibit, checked October 10, 2026.",
+        "novelty": "New revision on stated disclosure date, not a fresh October 10 event.",
+        "relevance": "Company-wide issuer guidance.",
+        "horizon": "Check current intraday eligibility without backdating review. Date-only evidence puts the event outside 24 hours; exact timestamps remain unverified.",
+        "direction": "Bearish for earnings-guidance revision only. Slower positive EPS growth is not an absolute EPS decline. Whole release also raises reported revenue-growth outlook."
+      },
+      "review_blockers": [
+        "SEC acceptance and release-date timing discrepancy unresolved",
+        "Pre-event low-end qualifier source not established"
+      ]
+    },
+    "timing_audit": {
+      "source_url": "https://www.sec.gov/Archives/edgar/data/77476/000007747626000050/0000077476-26-000050-index.htm",
+      "accepted_display": "2026-10-07 17:57:44",
+      "filing_date": "2026-10-08",
+      "interpretation": "Acceptance is not established as first-publication time. No timestamp substituted."
+    }
+  },
+  {
+    "source_dates": {
+      "first_disclosure_date": "2026-10-07",
+      "publication_date": "2026-10-07"
+    },
+    "review_note": "MIXED: improved EPS and organic-growth guidance alongside lower reported growth attributed to currency. These metrics must not be collapsed into one bullish headline.",
+    "benchmark": {
+      "type": "PRIOR_ISSUER_GUIDANCE",
+      "source_url": "https://investors.levistrauss.com/news/financial-news/news-details/2026/Levi-Strauss--Co--Reports-Second-Quarter-Results/default.aspx",
+      "comparison": "Adjusted EPS midpoint rises from 1.49 to 1.55 (4.03%); reported revenue-growth midpoint moves from 7.25% to approximately 7.0%, down 0.25 percentage points. Organic growth moves from 5.5\u20136% to approximately 6%.",
+      "consensus_available": false
+    },
+    "event": {
+      "event_id": "levi-guidance-20261007",
+      "ticker": "LEVI",
+      "title": "Levi Strauss mixed guidance revision",
+      "source_url": "https://investors.levistrauss.com/news/financial-news/news-details/2026/Levi-Strauss--Co--Reports-Third-Quarter-Results/default.aspx",
+      "event_at": null,
+      "published_at": null,
+      "reviewed_at": "2026-10-10T05:01:28.829943+00:00",
+      "horizon": "INTRADAY",
+      "relevance": "DIRECT",
+      "direction": "MIXED",
+      "scores": {
+        "materiality": null,
+        "surprise": null,
+        "credibility": 4,
+        "novelty": 4
+      },
+      "evidence": {
+        "materiality": "Company-wide forecast revision; numerical severity rating not yet assigned.",
+        "surprise": "Adjusted EPS midpoint rises from 1.49 to 1.55 (4.03%); reported revenue-growth midpoint moves from 7.25% to approximately 7.0%, down 0.25 percentage points. Organic growth moves from 5.5\u20136% to approximately 6%. Benchmark exists, but rubric score remains pending review.",
+        "credibility": "Primary issuer release or SEC exhibit, checked October 10, 2026.",
+        "novelty": "New revision on stated disclosure date, not a fresh October 10 event.",
+        "relevance": "Company-wide issuer guidance.",
+        "horizon": "Check current intraday eligibility without backdating review. Date-only evidence puts the event outside 24 hours; exact timestamps remain unverified.",
+        "direction": "MIXED: improved EPS and organic-growth guidance alongside lower reported growth attributed to currency. These metrics must not be collapsed into one bullish headline."
+      },
+      "review_blockers": [
+        "Exact publication time unverified"
+      ]
+    },
+    "timing_audit": {
+      "source_url": "https://www.businesswire.com/news/home/20261007513688/en/Levi-Strauss-Co.-Reports-Third-Quarter-Results",
+      "interpretation": "Issuer-linked wire release located; retrieved text did not establish exact publication timestamp."
+    }
+  }
+]

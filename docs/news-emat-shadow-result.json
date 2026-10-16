@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "mode": "SHADOW",
+  "status": "ASSESSED",
+  "as_of": "2026-10-10T04:23:53.082117+00:00",
+  "horizon": "INTRADAY",
+  "reference_weights": {
+    "news": 40.0,
+    "patterns": 38.0,
+    "volume": 10.0,
+    "options": 7.0,
+    "risk_reward": 5.0
+  },
+  "proposed_weights": {
+    "news": 41.83,
+    "patterns": 36.17,
+    "volume": 10.0,
+    "options": 7.0,
+    "risk_reward": 5.0
+  },
+  "importance": 0.12184,
+  "direction": "BULLISH",
+  "directional_support": "ALIGNED",
+  "events": [
+    {
+      "event_id": "emat-fy2026-guidance-20261009",
+      "status": "ASSESSED",
+      "missing": [],
+      "source_url": "https://www.globenewswire.com/news-release/2026/10/09/3378083/0/en/evolution-metals-technologies-corp-raises-fiscal-2026-revenue-guidance-62-at-midpoint-to-11-million-and-reaffirms-460-million-fiscal-2027-outlook.html",
+      "scores": {
+        "materiality": 3,
+        "surprise": 3,
+        "credibility": 4,
+        "novelty": 4
+      },
+      "evidence": {
+        "materiality": "Provisional 3: company-wide FY2026 revenue midpoint rises $4m from $6.5m to $10.5m (61.54%). FY2027 guidance unchanged; not scored structural. Forecast is not contracted revenue.",
+        "surprise": "Provisional 3: large departure from prior issuer guidance, independently documented September 10 at https://www.sec.gov/Archives/edgar/data/1866226/000121390026098601/ea030508801ex99-1.htm. Not a consensus-surprise estimate; market expectations may differ.",
+        "credibility": "4: issuer-distributed release corroborated by SEC exhibit https://www.sec.gov/Archives/edgar/data/1866226/000121390026108232/ea030819601ex99-1.htm. Credibility establishes provenance, not probability of forecast delivery.",
+        "novelty": "4: new FY2026 revision versus September 10 release; reaffirmed FY2027 forecast is not counted as another new catalyst.",
+        "relevance": "DIRECT: revision concerns EMAT company-wide revenue.",
+        "horizon": "INTRADAY research at actual review time; age measured from October 9 08:40 ET issuer release, earliest disclosure located. No claim that this review existed during the trading session.",
+        "direction": "BULLISH for the revenue revision alone. Execution and financing risks remain; this does not establish net stock direction or option eligibility."
+      },
+      "direction": "BULLISH",
+      "event_at": "2026-10-09T08:40:00-04:00",
+      "published_at": "2026-10-09T08:40:00-04:00",
+      "reviewed_at": "2026-10-10T04:23:53.082117+00:00",
+      "event_age_hours": 15.731,
+      "importance": 0.12184,
+      "degree": "MAJOR"
+    }
+  ],
+  "duplicates_removed": 0,
+  "ranking_effect": "NONE",
+  "eligibility_effect": "NONE",
+  "note": "Experimental allocation, not win probability. Reviews cover only the documented events; no missing weight is redistributed.",
+  "dominant_event_id": "emat-fy2026-guidance-20261009"
+}
