@@ -8,6 +8,16 @@ def q(stamp, bid=.29, ask=.30):
 
 
 class OutcomeTests(unittest.TestCase):
+    def test_explicit_browser_policy_includes_ten_minutes_without_rewriting_legacy(self):
+        entries = [{'candidate_id': 'TEST', 'decision_at': '2026-10-14T15:00:00Z', 'quote': q('2026-10-14T15:00:00Z')}]
+        result = evaluate_outcomes(entries, [q('2026-10-14T15:10:05Z')], '2026-10-14T15:16:01Z', horizons_minutes=[5, 10, 15])
+        self.assertEqual(result['policy']['horizons_minutes'], (5, 10, 15))
+        self.assertEqual(result['results'][0]['windows'][1]['status'], 'QUOTE_ESTIMATE')
+        self.assertEqual(evaluate_outcomes(entries, [], '2026-10-14T15:16:01Z')['policy']['horizons_minutes'], (5, 15, 30))
+        for bad in ([5, 10, 10], [5, 15], [True, 10, 15], None):
+            with self.assertRaises(ValueError):
+                evaluate_outcomes(entries, [], '2026-10-14T15:16:01Z', horizons_minutes=bad)
+
     def run_case(self, observations, now='2026-10-14T15:31:00Z', quote=None):
         return evaluate_outcomes([{'candidate_id': 'TEST', 'decision_at': '2026-10-14T15:00:00Z',
                                    'quote': quote or q('2026-10-14T15:00:00Z')}], observations, now)['results'][0]
@@ -47,3 +57,4 @@ class OutcomeTests(unittest.TestCase):
                                      'received_at': '2026-10-14T15:05:10Z'}])['results'][0]
         self.assertEqual(result['entry_status'], 'WITHHELD_ENTRY_QUOTE')
         self.assertEqual(result['underlying_windows'][0]['change_pct'], 1)
+
