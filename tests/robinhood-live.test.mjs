@@ -68,7 +68,8 @@ test('option refresh clock and crossed book are reported without declaring verif
  const result=normalizeQuotes({results:[{quote:{instrument_id:id,bid_price:'.30',ask_price:'.20',updated_at:'2026-10-08T13:59:58Z',delta:'.4'}}]},operation,now);
  assert.equal(result.observations[0].clocks.refresh.age_seconds,2);assert.equal(result.observations[0].book_status,'CROSSED');
 });
-test('authenticated quote path completes MCP initialization and returns only sanitized quote data',async()=>harness(async({env,auth,calls,setUpstream})=>{
+test('authenticated quote path measures setup and retrieval without changing freshness claims',async t=>harness(async({env,auth,calls,setUpstream})=>{
+ let elapsed=0;t.mock.method(performance,'now',()=>elapsed);
  const started=await handleRobinhood(request('connect','POST',auth,{}),env),target=new URL((await started.json()).authorization_url);
  const cb=new URL(env.ROBINHOOD_REDIRECT_URI);cb.search=new URLSearchParams({code:'code',state:target.searchParams.get('state'),iss:'https://agent.robinhood.com/mcp/trading'});
  setUpstream(async()=>Response.json({access_token:'secret',token_type:'Bearer',expires_in:3600}));
@@ -77,6 +78,7 @@ test('authenticated quote path completes MCP initialization and returns only san
  setUpstream(async(url,options)=>{
   assert.equal(url,'https://agent.robinhood.com/mcp/trading');assert.equal(options.headers.Authorization,'Bearer secret');
   const body=JSON.parse(options.body);methods.push(body.method);
+  elapsed+=({'initialize':10,'notifications/initialized':20,'tools/list':30,'tools/call':40})[body.method];
   if(body.method==='initialize')return Response.json({jsonrpc:'2.0',id:body.id,result:{protocolVersion:'2025-03-26'}},{headers:{'Mcp-Session-Id':'session'}});
   assert.equal(options.headers['Mcp-Session-Id'],'session');
   if(body.method==='notifications/initialized')return new Response(null,{status:202});
@@ -87,6 +89,7 @@ test('authenticated quote path completes MCP initialization and returns only san
  const result=await handleRobinhood(request('quotes','POST',auth,{kind:'equity',symbols:['JD']}),env),text=await result.text();
  assert.equal(result.status,200);assert.ok(!text.includes('secret'));assert.ok(!text.includes('never-return'));assert.equal(JSON.parse(text).latency_verified,false);assert.equal(JSON.parse(text).scanner_feed,'DELAYED_RESEARCH');
  assert.deepEqual(methods,['initialize','notifications/initialized','tools/list','tools/call']);
+ assert.deepEqual(JSON.parse(text).request_timing,{setup_ms:60,quote_ms:40,worker_ms:100});
  assert.equal(result.headers.get('Cache-Control'),'no-store');
 }));
 
@@ -116,3 +119,4 @@ test('authenticated metadata path discovers only read-only tools and sanitizes e
  });
  const r=await handleRobinhood(request('resolve','POST',auth,{contracts:[{ticker:'SPY',strike:772,side:'put',expiry:'2026-10-16'}]}),env),text=await r.text();assert.equal(r.status,200);assert.ok(!text.includes('PRIVATE'));assert.ok(!text.includes('secret'));assert.equal(JSON.parse(text).results[0].status,'EXACT_METADATA_MATCH');assert.deepEqual(operations,['get_option_chains','get_option_instruments']);
 }));
+

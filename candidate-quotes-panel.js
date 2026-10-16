@@ -2,13 +2,17 @@ import {candidateQuotes} from './candidate-quotes.js';
 import {validateRobinhoodPack} from './robinhood-review.js';
 import {quoteGuidance,appendQuoteEvidence,quoteEvidenceInput,scannerFromEvidencePacket,validationTiming} from './quote-evidence.js';
 import {SESSION_KEY,sessionPayload,restoreSession} from './quote-session.js';
+import {quoteRequestTiming} from './quote-timing.js';
 const $=id=>document.getElementById(id);
 const recovery='Quote request could not reach the private service. Open Brokerage review and sign in, then retry. If already signed in, check your connection.';
 const failure=e=>e instanceof TypeError||e.name==='AbortError'||e.name==='TimeoutError'?recovery:e.message;
 async function readPrivate(path,body){
+ const started=performance.now();
  const r=await fetch('/private/plaid/robinhood/'+path,{method:body?'POST':'GET',credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(120000),...(body?{headers:{'Content-Type':'application/json','X-Requested-With':'RobinhoodQuotes'},body:JSON.stringify(body)}:{})});
  if(!r.headers.get('content-type')?.includes('application/json'))throw Error('Open Brokerage review and sign in, then retry.');
- const d=await r.json();if(!r.ok)throw Error(r.status===401?'Private sign-in required. Open Brokerage review, sign in, then retry.':d.error||'Private request failed');return d;
+ const d=await r.json();if(!r.ok)throw Error(r.status===401?'Private sign-in required. Open Brokerage review, sign in, then retry.':d.error||'Private request failed');
+ if(path==='quotes')d.request_timing=quoteRequestTiming({...d.request_timing,browser_ms:performance.now()-started});
+ return d;
 }
 let scanner=null,observations=[],evidenceHistory=[],busy=false,scannerSource='No snapshot';
 let recoveryMessage='Tab recovery ready. Export observations for durable retention.';
@@ -80,10 +84,10 @@ $('refresh').onclick=async()=>{
  const prior=observations;observations=[];render();$('status').textContent='Fetching matched quotes…';
  try{const data=await readPrivate('quotes',{kind:'option',instrument_ids:ids});
  if(!Array.isArray(data.observations))throw Error('Quote response is incomplete. Retry the private request.');
- const seen=new Set();observations=data.observations.map(x=>{const id=x.quote.instrument_id;if(!ids.includes(id)||seen.has(id))throw Error('Unexpected quote identity');seen.add(id);const old=prior.find(p=>p.instrument.id===id);return {instrument:old.instrument,quote:x.quote,received_at:data.received_at};});
+ const seen=new Set();observations=data.observations.map(x=>{const id=x.quote.instrument_id;if(!ids.includes(id)||seen.has(id))throw Error('Unexpected quote identity');seen.add(id);const old=prior.find(p=>p.instrument.id===id);return {instrument:old.instrument,quote:x.quote,received_at:data.received_at,request_timing:data.request_timing};});
  observations.push(...prior.filter(x=>!seen.has(x.instrument.id)).map(x=>({...x,quote:{instrument_id:x.instrument.id},received_at:null})));
  evidenceHistory=appendQuoteEvidence(scanner,observations,evidenceHistory);
- $('status').textContent=`Received ${data.received_at}. Missing contracts: ${ids.filter(id=>!seen.has(id)).length}.`;
+ $('status').textContent=`Received ${data.received_at}. Missing contracts: ${ids.filter(id=>!seen.has(id)).length}. Refresh request: ${(data.request_timing.browser_ms/1000).toFixed(1)} seconds.`;
  }catch(e){observations=prior.map(x=>({...x,quote:{instrument_id:x.instrument.id},received_at:null}));$('status').textContent=failure(e);}finally{busy=false;persist();render();}
 };
  $('verified-only').onchange=render;

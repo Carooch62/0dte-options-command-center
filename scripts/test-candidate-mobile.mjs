@@ -5,7 +5,7 @@ import {createServer} from 'node:http';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 await mkdir('test-results/mobile',{recursive:true});
 import assert from 'node:assert/strict';
-const server=createServer(async(req,res)=>{try{const path=req.url==='/'?'candidate-quotes.html':req.url.slice(1);if(!['candidate-quotes.html','candidate-quotes-panel.js','candidate-quotes.js','robinhood-review.js','quote-evidence.js','quote-session.js'].includes(path)){res.writeHead(404);res.end();return;}res.setHeader('Content-Type',path.endsWith('.js')?'text/javascript':'text/html');res.end(await readFile(new URL('../'+path,import.meta.url)));}catch{res.writeHead(500);res.end();}});
+const server=createServer(async(req,res)=>{try{const path=req.url==='/'?'candidate-quotes.html':req.url.slice(1);if(!['candidate-quotes.html','candidate-quotes-panel.js','candidate-quotes.js','robinhood-review.js','quote-evidence.js','quote-session.js','quote-timing.js'].includes(path)){res.writeHead(404);res.end();return;}res.setHeader('Content-Type',path.endsWith('.js')?'text/javascript':'text/html');res.end(await readFile(new URL('../'+path,import.meta.url)));}catch{res.writeHead(500);res.end();}});
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 let browser;
 try{
@@ -33,7 +33,7 @@ try{
  const now=new Date().toISOString(),id='22222222-2222-2222-2222-222222222222',contract={ticker:'TEST',strike:100,side:'call',expiry:'2099-01-01'};
  await page.route('**/private/plaid/robinhood/candidates',r=>r.fulfill({json:{snapshot:{generated_at:now,included_contracts:1,total_contracts:1,qualifying_contracts:1,omitted_contracts:0,candidates:[{ticker:'TEST',options:[{...contract,contract_id:'TEST20990101C00100000'}]}]}}}));
  await page.route('**/private/plaid/robinhood/resolve',r=>r.fulfill({json:{results:[{contract,status:'EXACT_METADATA_MATCH',instrument:{id,chain_symbol:'TEST',strike_price:100,type:'call',expiration_date:'2099-01-01',state:'active',tradability:'tradable',trade_value_multiplier:100,sellout_datetime:'2099-01-01T19:45:00Z'}}]}}));
- await page.route('**/private/plaid/robinhood/quotes',r=>r.fulfill({json:{received_at:new Date().toISOString(),observations:[{quote:{instrument_id:id,bid_price:'.30',ask_price:'.31',updated_at:now}}]}}));
+ await page.route('**/private/plaid/robinhood/quotes',r=>r.fulfill({json:{received_at:new Date().toISOString(),request_timing:{setup_ms:60,quote_ms:40,worker_ms:105},observations:[{quote:{instrument_id:id,bid_price:'.30',ask_price:'.31',updated_at:now}}]}}));
  await page.route('**/data/staging-shadow-evidence-latest.json',r=>r.fulfill({json:{format:'shadow-evidence-v1',packet_id:'a'.repeat(64),scan_id:'staging-test',generated_at:now,captured_at:now,market_session:'OPEN',candidates:[{candidate_id:'TEST20990101C00100000',ticker:'TEST',contract:{contract_id:'TEST20990101C00100000',strike:100,side:'call',expiry:'2099-01-01'}}]}}));
  await page.getByRole('button',{name:'Load staging validation batch',exact:true}).click();
  await page.getByText('Loaded 1 staging contracts',{exact:false}).waitFor();
@@ -49,6 +49,11 @@ try{
  assert.equal(exported.entries.length,1);
  assert.match(await page.locator('#validation-clock').innerText(),/5-min:.*10-min:.*15-min:/);assert.equal(exported.entries[0].quote.ask,.31);
  assert.deepEqual(exported.validation_policy.horizons_minutes,[5,10,15]);
+ assert.equal(exported.observations[0].request_timing.setup_ms,60);
+ assert.equal(exported.observations[0].request_timing.quote_ms,40);
+ assert.equal(exported.observations[0].request_timing.worker_ms,105);
+ assert.ok(exported.observations[0].request_timing.browser_ms>=0);
+ assert.equal(exported.observations[0].observed_at,now);
  await page.reload();await page.getByText('Restored this tab’s session',{exact:false}).first().waitFor();
  assert.ok(await page.getByRole('button',{name:'Refresh matched option quotes',exact:true}).isEnabled());
  await page.locator('#verified-only').check();assert.equal(await page.locator('#rows tr').count(),0);await page.locator('#verified-only').uncheck();
