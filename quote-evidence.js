@@ -1,4 +1,5 @@
 import {candidateQuotes} from './candidate-quotes.js';
+export const VALIDATION_MINUTES=Object.freeze([5,10,15]);
 const messages={
  NO_CONTRACT_MATCH:'Contract metadata has not been matched. Use Match contracts and fetch live quotes.',
  AMBIGUOUS_CONTRACT:'More than one contract identity matches. Reload the current batch and match again; keep this contract unverified.',
@@ -36,7 +37,8 @@ export function quoteEvidenceInput(snapshot,history,now=new Date().toISOString()
   limitations:['Private browser-local observations, exported only on request. No account or holdings data.',
    'Decision cutoff is first passing quote receipt, not the earlier scanner timestamp.',
    'Quotes are not executions; observations are collected only when you request refresh.',
-   'At most 2000 observations retained in this page session; reload clears them.']};
+   'At most 2000 observations retained; tab recovery expires after 24 hours. Export for durable retention.'],
+  validation_policy:{horizons_minutes:VALIDATION_MINUTES,window_tolerance_seconds:60,entry:'ask',exit:'bid'}};
 }
 export function scannerFromEvidencePacket(packet){
  const validClock=value=>typeof value==='string'&&/(Z|[+-]\d{2}:\d{2})$/.test(value)&&Number.isFinite(Date.parse(value));
@@ -53,7 +55,7 @@ export function scannerFromEvidencePacket(packet){
 export function validationTiming(history,now=Date.now()){
  const entries=quoteEvidenceInput(null,history).entries;
  if(!entries.length)return 'Validation clock starts after the first passing fetched quote. No automatic quote polling.';
- const windows=[5,15,30].map(minutes=>{
+ const windows=VALIDATION_MINUTES.map(minutes=>{
   let complete=0,due=0,missed=0;const targets=[];
   for(const entry of entries){
    const target=Date.parse(entry.decision_at)+minutes*60000;targets.push(target);
@@ -65,4 +67,5 @@ export function validationTiming(history,now=Date.now()){
  });
  return windows.join(' | ')+' · Refresh manually; export before leaving. Backgrounded phones may pause page updates.';
 }
+
 

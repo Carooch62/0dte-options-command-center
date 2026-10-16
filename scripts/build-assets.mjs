@@ -33,6 +33,7 @@ const assets = [
   "candidate-quotes.js",
   "candidate-quotes-panel.js",
   "quote-evidence.js",
+  "quote-session.js",
   "shadow-review.html",
   "shadow-review.js",
   "shadow-review-panel.js"
@@ -53,5 +54,6 @@ rmSync(output, { recursive: true, force: true });
 mkdirSync(output);
 for (const file of assets) copyFileSync(join(root, file), join(output, file));
 console.log('Prepared ' + assets.length + ' browser assets in public/');
+
 
 
