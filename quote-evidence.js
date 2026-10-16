@@ -1,4 +1,5 @@
 import {candidateQuotes} from './candidate-quotes.js';
+import {quoteRequestTiming} from './quote-timing.js';
 export const VALIDATION_MINUTES=Object.freeze([5,10,15]);
 const messages={
  NO_CONTRACT_MATCH:'Contract metadata has not been matched. Use Match contracts and fetch live quotes.',
@@ -25,6 +26,7 @@ export function appendQuoteEvidence(snapshot,observations,history,now=Date.now()
   const record={contract_id:row.contract,observed_at:q.updated_at,received_at:x.received_at,
    bid:row.bid??null,ask:row.ask??null,source:'Robinhood Quotes',
    multiplier:row.status==='QUOTE_CHECK_PASSED'?100:null,quote_check:row.status};
+  const timing=quoteRequestTiming(x.request_timing);if(Object.keys(timing).length)record.request_timing=timing;
   if(!next.some(p=>p.contract_id===record.contract_id&&p.observed_at===record.observed_at&&p.received_at===record.received_at))next.push(record);
  }
  return next.slice(-2000);

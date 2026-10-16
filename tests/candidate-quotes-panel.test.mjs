@@ -5,13 +5,14 @@ import {candidateQuotes} from '../candidate-quotes.js';
 import {validateRobinhoodPack} from '../robinhood-review.js';
 import {quoteGuidance,appendQuoteEvidence,quoteEvidenceInput,scannerFromEvidencePacket,validationTiming} from '../quote-evidence.js';
 import {SESSION_KEY,sessionPayload,restoreSession} from '../quote-session.js';
+import {quoteRequestTiming} from '../quote-timing.js';
 const source=(await readFile(new URL('../candidate-quotes-panel.js',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'');
 async function harness(responses=[],storage=new Map(),prime=true,consent=()=>true){
  const nodes=new Map(),node=()=>({children:[],disabled:false,textContent:'',append(x){this.children.push(x);},replaceChildren(){this.children=[];}});
  const get=id=>{if(!nodes.has(id))nodes.set(id,node());return nodes.get(id);};let tick;
  const calls=[];const fetch=async(...args)=>{calls.push(args);return responses.shift();};
  const sessionStorage={getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)};
- new Function('document','fetch','setInterval','candidateQuotes','validateRobinhoodPack','quoteGuidance','appendQuoteEvidence','quoteEvidenceInput','scannerFromEvidencePacket','validationTiming','SESSION_KEY','sessionPayload','restoreSession','sessionStorage','confirm',source)({getElementById:get,createElement:node},fetch,fn=>tick=fn,candidateQuotes,validateRobinhoodPack,quoteGuidance,appendQuoteEvidence,quoteEvidenceInput,scannerFromEvidencePacket,validationTiming,SESSION_KEY,sessionPayload,restoreSession,sessionStorage,consent);
+ new Function('document','fetch','setInterval','candidateQuotes','validateRobinhoodPack','quoteGuidance','appendQuoteEvidence','quoteEvidenceInput','scannerFromEvidencePacket','validationTiming','SESSION_KEY','sessionPayload','restoreSession','sessionStorage','confirm','quoteRequestTiming',source)({getElementById:get,createElement:node},fetch,fn=>tick=fn,candidateQuotes,validateRobinhoodPack,quoteGuidance,appendQuoteEvidence,quoteEvidenceInput,scannerFromEvidencePacket,validationTiming,SESSION_KEY,sessionPayload,restoreSession,sessionStorage,consent,quoteRequestTiming);
  const load=async(id,data)=>get(id).onchange({target:{files:[{size:100,text:async()=>JSON.stringify(data)}]}});
  const id='bbdbf613-f3e0-4f68-9cc7-fc090ca84e24';const now=new Date().toISOString();
  if(prime){await load('scanner',{candidates:[{ticker:'SPY',options:[{strike:778,side:'call',expiry:'2026-10-12'}]}]});
@@ -73,6 +74,18 @@ test('fresh-only filter hides above-limit quotes without losing refresh mappings
 test('blocked tab storage does not prevent quote rendering and warns to export',async()=>{
  const storage={get(){throw Error('blocked');},set(){throw Error('quota');},delete(){}};
  const h=await harness([],storage);assert.equal(h.get('rows').children.length,1);assert.equal(h.get('refresh').disabled,false);assert.match(h.get('session-info').textContent,/unavailable.*Export/);
+});
+test('request timings survive export and reload while provider clocks remain unchanged',async()=>{
+ const id='bbdbf613-f3e0-4f68-9cc7-fc090ca84e24',received=new Date().toISOString(),observed=new Date(Date.parse(received)-1000).toISOString();
+ const h=await harness([Response.json({received_at:received,request_timing:{setup_ms:40,quote_ms:20,worker_ms:65,access_token:'secret'},observations:[{quote:{instrument_id:id,bid_price:'.29',ask_price:'.30',updated_at:observed}}]})]);
+ await h.get('refresh').onclick();
+ const saved=JSON.parse(h.storage.get(SESSION_KEY)),q=saved.history[0];
+ assert.equal(q.observed_at,observed);assert.equal(q.received_at,received);
+ assert.equal(q.request_timing.setup_ms,40);assert.equal(q.request_timing.quote_ms,20);assert.equal(q.request_timing.worker_ms,65);assert.ok(q.request_timing.browser_ms>=0);
+ assert.ok(!JSON.stringify(saved).includes('secret'));assert.match(h.get('status').textContent,/Refresh request:/);
+ const exported=quoteEvidenceInput(saved.scanner,saved.history,received);assert.deepEqual(exported.observations[0].request_timing,q.request_timing);
+ const resumed=await harness([],h.storage,false);assert.equal(resumed.calls.length,0);
+ assert.deepEqual(JSON.parse(h.storage.get(SESSION_KEY)).history[0],q);
 });
 
 

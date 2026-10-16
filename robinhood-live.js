@@ -1,6 +1,7 @@
 // Separate, private OAuth client. Never inherits the ChatGPT connection.
 import {contractRequest,resolveContracts,readSnapshot} from './private-candidates.js';
 import {verifyAccess} from './plaid-sync.js';
+import {quoteRequestTiming} from './quote-timing.js';
 const MCP='https://agent.robinhood.com/mcp/trading';
 const ISSUER=MCP;
 const TOKEN='https://api.robinhood.com/oauth2/token/';
@@ -83,6 +84,7 @@ async function marketClient(token,required){
  return async(name,args)=>{if(!required.includes(name)||++calls>100||Date.now()>deadline)throw Error('Private lookup limit exceeded');return quoteData((await rpc(token,'tools/call',{name,arguments:args},init.session)).result);};
 }
 export async function handleRobinhood(request,env){
+ const requestStarted=performance.now();
  const url=new URL(request.url),path=url.pathname;
  if(!await verifyAccess(request,env))return reply({ok:false,error:'Private sign in required'},401);
  if(!configured(env))return reply({ok:false,status:'SETUP_REQUIRED',error:'Robinhood hosted sign-in is paused after authorization failed. Callback compatibility must be verified before reconnecting.'},503);
@@ -131,13 +133,18 @@ export async function handleRobinhood(request,env){
   let operation;try{if(Number(request.headers.get('Content-Length'))>10000)throw Error();const raw=await request.text();if(raw.length>10000)throw Error();operation=quoteRequest(JSON.parse(raw));}catch{return reply({ok:false,error:'Invalid quote request'},400);}
   const saved=await connection(env);if(!saved||saved.expires_at<=Date.now()+15000)return reply({ok:false,error:'Reconnect Robinhood before collecting quotes'},409);
   try{
+   const setupStarted=performance.now();
    const call=await marketClient(saved.access_token,[operation.name]);
+   const setupFinished=performance.now();
    const data=await call(operation.name,operation.arguments),receivedAt=Date.now();
+   const quoteFinished=performance.now();
    // Extract only quote pairs; never expose arbitrary tool content or account data.
    const normalized=normalizeQuotes(data,operation,receivedAt);
-   return reply({ok:true,source:'Robinhood MCP',received_at:new Date(receivedAt).toISOString(),...normalized,latency_verified:false,greek_calculation_time:null,scanner_feed:'DELAYED_RESEARCH'});
+   const request_timing=quoteRequestTiming({setup_ms:setupFinished-setupStarted,quote_ms:quoteFinished-setupFinished,worker_ms:performance.now()-requestStarted});
+   return reply({ok:true,source:'Robinhood MCP',received_at:new Date(receivedAt).toISOString(),...normalized,request_timing,latency_verified:false,greek_calculation_time:null,scanner_feed:'DELAYED_RESEARCH'});
   }catch{return reply({ok:false,error:'Robinhood quote verification failed; reconnect or check client setup'},502);}
  }
  return reply({ok:false,error:'Not found'},404);
 }
+
 
