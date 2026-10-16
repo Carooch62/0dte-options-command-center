@@ -17,7 +17,7 @@ jobs:
     env:
       PYTHONUNBUFFERED: '1'
       SCAN_MODE: manual
-      SCAN_REQUEST_ID: staging-${{ github.run_id }}
+      SCAN_REQUEST_ID: staging-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
         with:
