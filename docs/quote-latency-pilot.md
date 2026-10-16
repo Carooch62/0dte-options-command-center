@@ -27,6 +27,10 @@ These intervals overlap; do not add them. Worker timing stops before final respo
 
 Production scoring remains unchanged. Fixed 40/38/10/7/5 versus adaptive comparison requires completed, provenance-backed component reviews available at the declared decision cutoff and matching prospective outcomes. Later review cannot be backdated into an earlier scan.
 
+## Local baseline report
+
+Run `python quote_latency.py session-one.json session-two.json > private-latency-report.json` on one or more private exports. The report counts each receipt batch once, deduplicates overlapping exports, calculates nearest-rank p50/p95, excludes invalid clocks at each source's original cutoff, and withholds incomplete or conflicting timing batches. Inputs are bounded to 100 exports and 2000 combined unique observations. Old exports yield no invented duration samples. The request/date collection threshold is only a diagnostic count: verify open-market sessions, foreground collection, failures and missing contracts separately. Quotes captured before the timing update cannot establish a transport baseline. Keep both inputs and report private.
+
 ## Outcome collection and recovery
 
 Current browser exports declare `validation_policy.horizons_minutes: [5,10,15]`. The staging outcome CLI honors this policy; archives without a policy retain the legacy 5/15/30 default. For an older cohort explicitly agreed as 5/10/15, call the evaluator with that policy and disclose the override without rewriting the source export. Each target has a 60-second observation window and uses the first eligible provider timestamp. Missing windows stay missing.
