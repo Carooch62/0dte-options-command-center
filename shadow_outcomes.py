@@ -35,7 +35,11 @@ def stock_valid(observation, cutoff):
             and isinstance(observation.get('source'), str) and bool(observation['source'].strip()))
 
 
-def evaluate_outcomes(entries, observations, as_of, stock_observations=None):
+def evaluate_outcomes(entries, observations, as_of, stock_observations=None, horizons_minutes=HORIZONS):
+    # Legacy archives retain 5/15/30. New browser exports explicitly select 5/10/15.
+    if not isinstance(horizons_minutes, (list, tuple)) or any(type(x) is not int for x in horizons_minutes) or tuple(horizons_minutes) not in ((5, 10, 15), (5, 15, 30)):
+        raise ValueError('Expected a supported 5/10/15 or legacy 5/15/30 policy')
+    horizons_minutes = tuple(horizons_minutes)
     now = clock(as_of)
     if now is None or not isinstance(entries, list) or not isinstance(observations, list):
         raise ValueError('Entries, observations and timezone-aware as_of required')
@@ -56,7 +60,7 @@ def evaluate_outcomes(entries, observations, as_of, stock_observations=None):
         valid_entry = decision <= now and start.get('contract_id') == ident and quote_valid(start, decision)
         row = {'candidate_id': ident, 'decision_at': decision.isoformat(), 'windows': [],
                'entry_status': 'QUOTE_ESTIMATE' if valid_entry else 'WITHHELD_ENTRY_QUOTE'}
-        for minutes in HORIZONS:
+        for minutes in horizons_minutes:
             target = decision + timedelta(minutes=minutes)
             end = target + timedelta(seconds=TOLERANCE_SECONDS)
             window = {'minutes': minutes, 'target_at': target.isoformat(), 'status': 'PENDING'}
@@ -101,7 +105,7 @@ def evaluate_outcomes(entries, observations, as_of, stock_observations=None):
                                    if valid_entry and samples else {'samples': 0, 'status': 'UNAVAILABLE'})
         stock = entry.get('stock', {})
         row['underlying_windows'] = []
-        for minutes in HORIZONS:
+        for minutes in horizons_minutes:
             target = decision+timedelta(minutes=minutes)
             window = {'minutes': minutes, 'status': 'PENDING'}
             if not stock.get('ticker') or not stock_valid(stock, decision):
@@ -124,7 +128,7 @@ def evaluate_outcomes(entries, observations, as_of, stock_observations=None):
             row['underlying_windows'].append(window)
         results.append(row)
     return {'format': 'shadow-outcomes-v1', 'mode': 'OFFLINE_SHADOW', 'as_of': now.isoformat(),
-            'policy': {'horizons_minutes': HORIZONS, 'window_tolerance_seconds': TOLERANCE_SECONDS,
+            'policy': {'horizons_minutes': horizons_minutes, 'window_tolerance_seconds': TOLERANCE_SECONDS,
                        'maximum_quote_age_seconds': MAX_QUOTE_AGE_SECONDS, 'entry': 'ask', 'exit': 'bid'},
             'results': results, 'ranking_effect': 'NONE',
             'limitations': ['Quotes are not fills; fees, slippage and available size are not modeled.',
@@ -138,4 +142,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
     with open(args.input) as handle:
         data = json.load(handle)
-    print(json.dumps(evaluate_outcomes(data['entries'], data['observations'], data['as_of'], data.get('stock_observations')), indent=2))
+    print(json.dumps(evaluate_outcomes(data['entries'], data['observations'], data['as_of'], data.get('stock_observations'), data.get('validation_policy', {}).get('horizons_minutes', HORIZONS)), indent=2))
+
