@@ -4,17 +4,19 @@ import {readFile} from 'node:fs/promises';
 import {candidateQuotes} from '../candidate-quotes.js';
 import {validateRobinhoodPack} from '../robinhood-review.js';
 import {quoteGuidance,appendQuoteEvidence,quoteEvidenceInput,scannerFromEvidencePacket,validationTiming} from '../quote-evidence.js';
+import {SESSION_KEY,sessionPayload,restoreSession} from '../quote-session.js';
 const source=(await readFile(new URL('../candidate-quotes-panel.js',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'');
-async function harness(responses=[]){
+async function harness(responses=[],storage=new Map(),prime=true,consent=()=>true){
  const nodes=new Map(),node=()=>({children:[],disabled:false,textContent:'',append(x){this.children.push(x);},replaceChildren(){this.children=[];}});
  const get=id=>{if(!nodes.has(id))nodes.set(id,node());return nodes.get(id);};let tick;
  const calls=[];const fetch=async(...args)=>{calls.push(args);return responses.shift();};
- new Function('document','fetch','setInterval','candidateQuotes','validateRobinhoodPack','quoteGuidance','appendQuoteEvidence','quoteEvidenceInput','scannerFromEvidencePacket','validationTiming',source)({getElementById:get,createElement:node},fetch,fn=>tick=fn,candidateQuotes,validateRobinhoodPack,quoteGuidance,appendQuoteEvidence,quoteEvidenceInput,scannerFromEvidencePacket,validationTiming);
+ const sessionStorage={getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)};
+ new Function('document','fetch','setInterval','candidateQuotes','validateRobinhoodPack','quoteGuidance','appendQuoteEvidence','quoteEvidenceInput','scannerFromEvidencePacket','validationTiming','SESSION_KEY','sessionPayload','restoreSession','sessionStorage','confirm',source)({getElementById:get,createElement:node},fetch,fn=>tick=fn,candidateQuotes,validateRobinhoodPack,quoteGuidance,appendQuoteEvidence,quoteEvidenceInput,scannerFromEvidencePacket,validationTiming,SESSION_KEY,sessionPayload,restoreSession,sessionStorage,consent);
  const load=async(id,data)=>get(id).onchange({target:{files:[{size:100,text:async()=>JSON.stringify(data)}]}});
  const id='bbdbf613-f3e0-4f68-9cc7-fc090ca84e24';const now=new Date().toISOString();
- await load('scanner',{candidates:[{ticker:'SPY',options:[{strike:778,side:'call',expiry:'2026-10-12'}]}]});
+ if(prime){await load('scanner',{candidates:[{ticker:'SPY',options:[{strike:778,side:'call',expiry:'2026-10-12'}]}]});
  await load('research',{format:'robinhood-research-v1',retrieved_at:now,accounts:[],bars:[],observations:[{instrument:{id,chain_symbol:'SPY',strike_price:778,type:'call',expiration_date:'2026-10-12',trade_value_multiplier:100,state:'active',tradability:'tradable',sellout_datetime:'2099-01-01T00:00:00Z'},quote:{instrument_id:id,bid_price:'.80',ask_price:'.81',updated_at:now},received_at:now}]});
- return {get,load,tick,calls};
+ }return {get,load,tick,calls,storage};
 }
 test('imports render a matching quote and invalid scanner clears the table',async()=>{
  const h=await harness();assert.equal(h.get('rows').children.length,1);assert.equal(h.get('refresh').disabled,false);
@@ -54,5 +56,24 @@ test('resolved metadata triggers quotes, preserves unresolved contracts, and eva
  const h=await harness([Response.json({results:[{contract:c,status:'EXACT_METADATA_MATCH',instrument:{id,chain_symbol:'SPY',strike_price:778,type:'call',expiration_date:c.expiry,state:'active',tradability:'tradable',trade_value_multiplier:100,sellout_datetime:'2099-01-01T00:00:00Z'}}]}),Response.json({received_at:now,observations:[{quote:{instrument_id:id,bid_price:'.29',ask_price:'.30',updated_at:now}}]})]);
  await h.get('resolve').onclick();assert.deepEqual(h.calls.map(x=>x[0]),['/private/plaid/robinhood/resolve','/private/plaid/robinhood/quotes']);assert.equal(h.get('rows').children[0].children[3].textContent,'WITHIN_LIMIT');
 });
+test('reload restores history and mapping without fetching or resetting timestamps',async()=>{
+ const id='bbdbf613-f3e0-4f68-9cc7-fc090ca84e24',now=new Date().toISOString();
+ const h=await harness([Response.json({received_at:now,observations:[{quote:{instrument_id:id,bid_price:'.29',ask_price:'.30',updated_at:now}}]})]);
+ await h.get('refresh').onclick();const saved=JSON.parse(h.storage.get(SESSION_KEY));
+ assert.equal(saved.history.length,1);
+ const resumed=await harness([],h.storage,false,()=>false);
+ assert.match(resumed.get('session-info').textContent,/Restored/);assert.equal(resumed.calls.length,0);assert.equal(resumed.get('refresh').disabled,false);
+ await resumed.get('load-validation').onclick();assert.equal(resumed.calls.length,0);assert.equal(JSON.parse(h.storage.get(SESSION_KEY)).history[0].received_at,now);
+ await resumed.get('clear-session').onclick();assert.ok(h.storage.has(SESSION_KEY));
+ const cleared=await harness([],h.storage,false);await cleared.get('clear-session').onclick();assert.equal(h.storage.has(SESSION_KEY),false);
+});
+test('fresh-only filter hides above-limit quotes without losing refresh mappings',async()=>{
+ const h=await harness();h.get('verified-only').checked=true;h.get('verified-only').onchange();assert.equal(h.get('rows').children.length,0);assert.equal(h.get('refresh').disabled,false);assert.match(h.get('quote-summary').textContent,/1 fresh quotes above limit/);
+});
+test('blocked tab storage does not prevent quote rendering and warns to export',async()=>{
+ const storage={get(){throw Error('blocked');},set(){throw Error('quota');},delete(){}};
+ const h=await harness([],storage);assert.equal(h.get('rows').children.length,1);assert.equal(h.get('refresh').disabled,false);assert.match(h.get('session-info').textContent,/unavailable.*Export/);
+});
+
 
 

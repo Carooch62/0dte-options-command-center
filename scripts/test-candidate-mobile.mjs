@@ -5,7 +5,7 @@ import {createServer} from 'node:http';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 await mkdir('test-results/mobile',{recursive:true});
 import assert from 'node:assert/strict';
-const server=createServer(async(req,res)=>{try{const path=req.url==='/'?'candidate-quotes.html':req.url.slice(1);if(!['candidate-quotes.html','candidate-quotes-panel.js','candidate-quotes.js','robinhood-review.js','quote-evidence.js'].includes(path)){res.writeHead(404);res.end();return;}res.setHeader('Content-Type',path.endsWith('.js')?'text/javascript':'text/html');res.end(await readFile(new URL('../'+path,import.meta.url)));}catch{res.writeHead(500);res.end();}});
+const server=createServer(async(req,res)=>{try{const path=req.url==='/'?'candidate-quotes.html':req.url.slice(1);if(!['candidate-quotes.html','candidate-quotes-panel.js','candidate-quotes.js','robinhood-review.js','quote-evidence.js','quote-session.js'].includes(path)){res.writeHead(404);res.end();return;}res.setHeader('Content-Type',path.endsWith('.js')?'text/javascript':'text/html');res.end(await readFile(new URL('../'+path,import.meta.url)));}catch{res.writeHead(500);res.end();}});
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 let browser;
 try{
@@ -47,7 +47,13 @@ try{
  await page.getByRole('button',{name:'Export private quote observations',exact:true}).click();
  const download=await downloadPromise,exported=JSON.parse(await readFile(await download.path(),'utf8'));
  assert.equal(exported.entries.length,1);
- assert.match(await page.locator('#validation-clock').innerText(),/5-min:.*15-min:.*30-min:/);assert.equal(exported.entries[0].quote.ask,.31);
+ assert.match(await page.locator('#validation-clock').innerText(),/5-min:.*10-min:.*15-min:/);assert.equal(exported.entries[0].quote.ask,.31);
+ assert.deepEqual(exported.validation_policy.horizons_minutes,[5,10,15]);
+ await page.reload();await page.getByText('Restored this tab’s session',{exact:false}).first().waitFor();
+ assert.ok(await page.getByRole('button',{name:'Refresh matched option quotes',exact:true}).isEnabled());
+ await page.locator('#verified-only').check();assert.equal(await page.locator('#rows tr').count(),0);await page.locator('#verified-only').uncheck();
+ page.once('dialog',d=>d.dismiss());await page.getByRole('button',{name:'Load staging validation batch',exact:true}).click();
+ assert.equal(await page.locator('#rows tr').count(),1);
  assert.equal(exported.entries[0].decision_at,exported.entries[0].quote.received_at);
  assert.ok(!JSON.stringify(exported).includes('account_id'));
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'private results overflow');
@@ -64,6 +70,7 @@ try{
  }finally{await page.screenshot({path:`test-results/mobile/${width}-final.png`,fullPage:true});await writeFile(`test-results/mobile/${width}-errors.json`,JSON.stringify(errors));await context.tracing.stop({path:`test-results/mobile/${width}-trace.zip`});await context.close();}
  }
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}
+
 
 
 

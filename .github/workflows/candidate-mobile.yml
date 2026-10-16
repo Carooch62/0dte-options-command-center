@@ -2,9 +2,9 @@ name: Candidate Mobile QA
 on:
   push:
     branches: [release/private-candidate-workflow-20261014]
-    paths: ['candidate-quotes*', 'quote-evidence.js', 'tests/quote-evidence.test.mjs', 'robinhood-review.js', 'robinhood-live.js', 'private-candidates.js', 'tests/candidate-quotes*', 'tests/private-candidates.test.mjs', 'scripts/test-candidate-mobile.mjs', '.github/workflows/candidate-mobile.yml']
+    paths: ['candidate-quotes*', 'quote-evidence.js', 'quote-session.js', 'tests/quote-session.test.mjs', 'tests/validation-setup.test.mjs', 'tests/quote-evidence.test.mjs', 'robinhood-review.js', 'robinhood-live.js', 'private-candidates.js', 'tests/candidate-quotes*', 'tests/private-candidates.test.mjs', 'scripts/test-candidate-mobile.mjs', '.github/workflows/candidate-mobile.yml']
   pull_request:
-    paths: ['candidate-quotes*', 'quote-evidence.js', 'tests/quote-evidence.test.mjs', 'robinhood-review.js', 'robinhood-live.js', 'private-candidates.js', 'tests/candidate-quotes*', 'tests/private-candidates.test.mjs', 'scripts/test-candidate-mobile.mjs', '.github/workflows/candidate-mobile.yml']
+    paths: ['candidate-quotes*', 'quote-evidence.js', 'quote-session.js', 'tests/quote-session.test.mjs', 'tests/validation-setup.test.mjs', 'tests/quote-evidence.test.mjs', 'robinhood-review.js', 'robinhood-live.js', 'private-candidates.js', 'tests/candidate-quotes*', 'tests/private-candidates.test.mjs', 'scripts/test-candidate-mobile.mjs', '.github/workflows/candidate-mobile.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -19,6 +19,8 @@ jobs:
           node-version: '22'
       - name: Verify browser asset bundle
         run: node scripts/build-assets.mjs
+      - name: Verify Worker bundle without deploying or using credentials
+        run: npx wrangler@4 deploy --dry-run --outdir test-results/worker-dry-run
       - name: Install pinned browser test dependency
         run: npm install --no-save --package-lock=false playwright@1.56.1
       - name: Install matching Chromium
@@ -33,5 +35,6 @@ jobs:
           path: test-results/mobile/
           if-no-files-found: warn
           retention-days: 7
+
 
 
