@@ -8,7 +8,10 @@ const recovery='Quote request could not reach the private service. Open Brokerag
 const failure=e=>e instanceof TypeError||e.name==='AbortError'||e.name==='TimeoutError'?recovery:e.message;
 async function readPrivate(path,body){
  const started=performance.now();
- const r=await fetch('/private/plaid/robinhood/'+path,{method:body?'POST':'GET',credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(120000),...(body?{headers:{'Content-Type':'application/json','X-Requested-With':'RobinhoodQuotes'},body:JSON.stringify(body)}:{})});
+ let r;
+ try{r=await fetch('/private/plaid/robinhood/'+path,{method:body?'POST':'GET',credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(120000),...(body?{headers:{'Content-Type':'application/json','X-Requested-With':'RobinhoodQuotes'},body:JSON.stringify(body)}:{})});}
+ catch(e){$('connection-state').textContent='Private service could not be reached. Review Connections, then retry here.';throw e;}
+ $('connection-state').textContent=r.status===401||!r.headers.get('content-type')?.includes('application/json')?'Private sign-in required. Open Connections, sign in, then return here.':r.ok?'Private service reached. Robinhood authorization is checked when matching or fetching quotes.':'Private request failed. See the request message below; review Connections if authorization has expired.';
  if(!r.headers.get('content-type')?.includes('application/json'))throw Error('Open Brokerage review and sign in, then retry.');
  const d=await r.json();if(!r.ok)throw Error(r.status===401?'Private sign-in required. Open Brokerage review, sign in, then retry.':d.error||'Private request failed');
  if(path==='quotes')d.request_timing=quoteRequestTiming({...d.request_timing,browser_ms:performance.now()-started});
@@ -26,9 +29,16 @@ try{const raw=sessionStorage.getItem(SESSION_KEY);if(raw){const d=restoreSession
 catch{recoveryMessage='No usable saved session. Load a batch; expired or damaged recovery is not used.';try{sessionStorage.removeItem(SESSION_KEY);}catch{}}
 function render(){
  $('session-info').textContent=recoveryMessage;$('clear-session').disabled=busy||!scanner;
- $('load-scanner').disabled=busy;$('load-current').disabled=busy;$('resolve').disabled=busy||!scanner;
+ $('load-scanner').disabled=busy;$('load-current').disabled=busy;$('resolve').disabled=busy||!scanner?.candidates?.length;
  $('load-validation').disabled=busy;$('validation-clock').textContent=validationTiming(evidenceHistory);
  $('export-evidence').disabled=busy||!evidenceHistory.length;
+ $('resolve-help').textContent=busy?'A request is in progress. Wait for it to finish.':!scanner?'Load a batch first.':!scanner.candidates?.length?'This batch has no candidates. Load a current batch with eligible research contracts.':'Ready to match exact contracts and fetch their first quotes.';
+ $('export-help').textContent=busy?'Wait for the current request to finish.':evidenceHistory.length?'Ready to export captured observations, including failed quote checks.':'Fetch quotes before exporting observations.';
+ $('refresh-help').textContent=busy?'A request is in progress. Wait for it to finish.':'Load a batch, then match contracts to enable refresh. Waiting five minutes does not enable this button.';
+ const latest=observations.filter(x=>Number.isFinite(Date.parse(x.received_at))).sort((a,b)=>Date.parse(b.received_at)-Date.parse(a.received_at))[0];
+ $('last-receipt').textContent=latest?.received_at||'No current quote response';
+ const duration=latest?.request_timing?.browser_ms;
+ $('request-duration').textContent=Number.isFinite(duration)?`${(duration/1000).toFixed(2)} seconds`:'Not measured for this response';
  const generated=Date.parse(scanner?.generated_at),age=(Date.now()-generated)/60000;
  $('snapshot-info').textContent=scanner?`${scannerSource} · Generated: ${scanner.generated_at||'unknown'} · Age: ${Number.isFinite(age)&&age>=0?age.toFixed(1)+' minutes':'unknown'} · Coverage: ${scanner.included_contracts??'unknown'} included / ${scanner.total_contracts??'unknown'} total; ${scanner.omitted_contracts??'unknown'} omitted${scanner.research_rejected_contracts!==undefined?' · '+scanner.research_rejected_contracts+' price-only matches rejected by research screens':''}${scanner.scanned_contracts!==undefined?' · '+scanner.scanned_contracts+' identities examined; batch requires published research screens':''} · Snapshot freshness is separate from quote freshness.`:'No scanner snapshot loaded.';
  $('scanner').disabled=busy;$('research').disabled=busy;
@@ -37,7 +47,10 @@ function render(){
  const within=rows.filter(r=>r.status==='QUOTE_CHECK_PASSED'&&r.premium_status==='WITHIN_LIMIT').length,above=rows.filter(r=>r.status==='QUOTE_CHECK_PASSED'&&r.premium_status==='ABOVE_LIMIT').length;
  $('quote-summary').textContent=`${within} fresh quotes within $0.30 · ${above} fresh quotes above limit · ${rows.length-within-above} unverified or requires recheck. Quote checks are not setup eligibility or trade recommendations.`;
  for(const row of rows.filter(r=>!$('verified-only').checked||r.status==='QUOTE_CHECK_PASSED'&&r.premium_status==='WITHIN_LIMIT')){const tr=document.createElement('tr');for(const value of [row.contract,row.bid===undefined?'Unknown':`${row.bid} / ${row.ask}`,Number.isFinite(row.age_seconds)?row.age_seconds.toFixed(1):'Unknown',row.premium_status,quoteGuidance(row)]){const td=document.createElement('td');td.textContent=value;td.setAttribute?.('data-label',['Contract','Bid / ask','Age (seconds)','$0.30 live ask','Quote check'][tr.children.length]);tr.append(td);}$('rows').append(tr);}
- $('refresh').disabled=busy||!rows.some(r=>r.instrument_id);return rows;
+ const matched=rows.some(r=>r.instrument_id);
+ $('refresh').disabled=busy||!matched;
+ if(!busy&&matched)$('refresh-help').textContent='Ready to refresh manually. Use the validation clock for 5 / 10 / 15-minute captures; there is no automatic polling.';
+ return rows;
 }
 for(const id of ['scanner','research'])$(id).onchange=async e=>{if(busy||id==='scanner'&&!mayReplace())return;try{const f=e.target.files[0];if(!f)return;if(f.size>10000000)throw Error('Maximum file size is 10 MB');const data=JSON.parse(await f.text());if(id==='scanner'){evidenceHistory=[];if(!Array.isArray(data.candidates))throw Error('Expected scanner candidates');candidateQuotes(data,[]);scanner=data;observations=[];scannerSource='Imported file; environment unverified';}else observations=validateRobinhoodPack(data).observations;render();persist();$('status').textContent='Snapshot checks updated. No scanner rankings changed.';}catch(e){if(id==='scanner'){scanner=null;evidenceHistory=[];}else observations=[];render();persist();$('refresh').disabled=true;$('status').textContent=e.message;}};
 $('load-scanner').onclick=async()=>{

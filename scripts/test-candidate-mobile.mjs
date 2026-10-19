@@ -5,7 +5,7 @@ import {createServer} from 'node:http';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 await mkdir('test-results/mobile',{recursive:true});
 import assert from 'node:assert/strict';
-const server=createServer(async(req,res)=>{try{const path=req.url==='/'?'candidate-quotes.html':req.url.slice(1);if(!['candidate-quotes.html','candidate-quotes-panel.js','candidate-quotes.js','robinhood-review.js','quote-evidence.js','quote-session.js','quote-timing.js'].includes(path)){res.writeHead(404);res.end();return;}res.setHeader('Content-Type',path.endsWith('.js')?'text/javascript':'text/html');res.end(await readFile(new URL('../'+path,import.meta.url)));}catch{res.writeHead(500);res.end();}});
+const server=createServer(async(req,res)=>{try{const path=req.url==='/'?'candidate-quotes.html':req.url.slice(1).split('?')[0];if(!['candidate-quotes.html','candidate-quotes-panel.js','candidate-quotes.js','robinhood-review.js','quote-evidence.js','quote-session.js','quote-timing.js','connection-ui.css','brokerage.html','dashboard-broker.js','dashboard-broker-logic.js','brokerage-history.js','execution-evidence.js','robinhood-panel.js','robinhood-connect.js'].includes(path)){res.writeHead(404);res.end();return;}res.setHeader('Content-Type',path.endsWith('.js')?'text/javascript':path.endsWith('.css')?'text/css':'text/html');res.end(await readFile(new URL('../'+path,import.meta.url)));}catch{res.writeHead(500);res.end();}});
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 let browser;
 try{
@@ -18,6 +18,10 @@ try{
  await page.route('**/health',r=>r.fulfill({json:{environment:'staging'}}));
  await page.route('**/data/candidate-snapshot.json',r=>r.fulfill({json:{generated_at:'2026-10-12T14:00:00Z',candidates:[{ticker:'TEST',options:[{contract_id:'SYNTHETIC-LONG-CONTRACT-NAME-261012C00100000',strike:100,side:'call',expiry:'2026-10-12'}]}]}}));
  await page.goto(`http://127.0.0.1:${server.address().port}/`);
+ assert.equal(await page.locator('link[href="./connection-ui.css"]').count(),1);
+ assert.equal(await page.locator('.project-nav a').count(),3);
+ assert.equal(await page.locator('.project-nav a[aria-current=page]').innerText(),'Quotes');
+ assert.equal(await page.locator('.project-nav').evaluate(el=>getComputedStyle(el).display),'flex');
  await page.locator('summary').click();
  await page.getByRole('button',{name:'Load staging scanner snapshot',exact:true}).click();
  await page.getByText('Contract metadata has not been matched.',{exact:false}).waitFor();
@@ -79,13 +83,46 @@ try{
  assert.equal(wide.entries.length,1); // Failed refresh cannot replace the earlier passing entry.
  await page.route('**/private/plaid/robinhood/quotes',r=>r.fulfill({status:401,json:{error:'Private sign in required'}}));
  await page.getByRole('button',{name:'Refresh matched option quotes',exact:true}).click();
- await page.getByText('Private sign-in required.',{exact:false}).waitFor();
+ await page.locator('#status').filter({hasText:'Private sign-in required.'}).waitFor();
+ assert.match(await page.locator('#connection-state').innerText(),/Private sign-in required/);
  assert.equal(await page.locator('td[data-label="Bid / ask"]').innerText(),'Unknown');
  assert.ok(await page.getByRole('button',{name:'Refresh matched option quotes',exact:true}).isEnabled());
  assert.ok(await page.getByRole('link',{name:'Open private sign-in and connection setup',exact:true}).isVisible());
  console.log(`${width}px: loader, source timestamp, no overflow, button sizing, production rejection passed`);
  assert.deepEqual(errors,[]);
  }finally{await page.screenshot({path:`test-results/mobile/${width}-final.png`,fullPage:true});await writeFile(`test-results/mobile/${width}-errors.json`,JSON.stringify(errors));await context.tracing.stop({path:`test-results/mobile/${width}-trace.zip`});await context.close();}
+ }
+ // Connection states use synthetic data only; never reach real providers.
+ for(const width of [390,430,1280]){
+ const context=await browser.newContext({viewport:{width,height:900}});
+ const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.route('https://**/*',r=>r.request().url().includes('scan-history')?r.fulfill({json:[]}):r.abort());
+ let mode='connected';
+ await page.route('**/private/plaid/status',r=>r.fulfill({json:{connected:mode==='connected'}}));
+ await page.route('**/private/plaid/snapshot',r=>r.fulfill({json:{snapshot:null}}));
+ await page.route('**/private/plaid/robinhood/status',r=>mode==='failed'?r.fulfill({status:401,json:{error:'Private sign-in required'}}):r.fulfill({json:{connected:mode==='connected',status:mode==='expired'?'RECONNECT_REQUIRED':'READY',expires_at:mode==='connected'?'2099-01-01T00:00:00Z':null}}));
+ try{
+ for(const state of ['connected','expired','failed']){
+ mode=state;await page.goto(`http://127.0.0.1:${server.address().port}/brokerage.html`);
+ await page.waitForFunction(()=>!document.getElementById('rh-connect-help').textContent.startsWith('Checking'));
+ await page.waitForFunction(()=>!document.getElementById('plaid-connect-help').textContent.startsWith('Checking'));
+ assert.equal(await page.locator('.project-nav a[aria-current=page]').innerText(),'Connections');
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'connections page overflow');
+ if(state==='connected'){
+ assert.ok(await page.locator('#rh-live-connect').isDisabled());assert.ok(await page.locator('#rh-live-test').isEnabled());
+ assert.match(await page.locator('#rh-connect-help').innerText(),/Already connected/);
+ assert.ok(await page.locator('#plaid-connect').isDisabled());assert.ok(await page.locator('#plaid-sync').isEnabled());
+ }else if(state==='expired'){
+ assert.ok(await page.locator('#rh-live-connect').isEnabled());assert.ok(await page.locator('#rh-live-test').isDisabled());
+ assert.match(await page.locator('#rh-connect-help').innerText(),/expired/);
+ }else{
+ assert.ok(await page.locator('#rh-live-connect').isDisabled());assert.ok(await page.locator('#rh-live-test').isDisabled());
+ assert.match(await page.locator('#rh-connect-help').innerText(),/could not be checked/);
+ }
+ await page.screenshot({path:`test-results/mobile/${width}-connections-${state}.png`,fullPage:true});
+ }
+ assert.deepEqual(errors,[]);console.log(`${width}px: connected, expired and failed connection states passed`);
+ }finally{await context.close();}
  }
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}
 

@@ -90,3 +90,23 @@ test('request timings survive export and reload while provider clocks remain unc
 
 
 
+
+
+test('empty current batch disables matching and explains how to proceed',async()=>{
+ const h=await harness([Response.json({snapshot:{generated_at:new Date().toISOString(),candidates:[],included_contracts:0,qualifying_contracts:0}})],new Map(),false);
+ await h.get('load-current').onclick();
+ assert.equal(h.get('resolve').disabled,true);
+ assert.equal(h.get('refresh').disabled,true);
+ assert.match(h.get('resolve-help').textContent,/no candidates/);
+ assert.match(h.get('connection-state').textContent,/Private service reached/);
+ assert.equal(h.calls.length,1);
+});
+
+test('private sign-in failure is visible beside connection and request controls',async()=>{
+ const h=await harness([new Response('<html>Sign in</html>',{status:200,headers:{'content-type':'text/html'}})],new Map(),false);
+ await h.get('load-current').onclick();
+ assert.match(h.get('connection-state').textContent,/Private sign-in required/);
+ assert.match(h.get('status').textContent,/sign in/);
+ assert.equal(h.get('resolve').disabled,true);
+ assert.equal(h.get('load-current').disabled,false);
+});

@@ -46,7 +46,7 @@ const privateApi=async(path,body)=>{
  const data=await r.json();if(!r.ok)throw Error(data.error||`HTTP ${r.status}`);return data;
 };
 const plaidStatus=$('plaid-status'),plaidView=$('plaid-snapshot');
-function plaidButtons(connected){$('plaid-connect').disabled=connected;$('plaid-sync').disabled=!connected;$('plaid-disconnect').disabled=!connected;}
+function plaidButtons(connected){$('plaid-connect-help').textContent=connected?'Already connected to Plaid. Connect is disabled; use Sync now to collect account records. This does not refresh Robinhood quotes.':'Connect an account to enable account sync. Robinhood quote authorization is separate.';$('plaid-connect').disabled=connected;$('plaid-sync').disabled=!connected;$('plaid-disconnect').disabled=!connected;}
 function renderPlaid(snapshot){
  if(!snapshot){plaidView.textContent='No synced snapshot yet.';return;}
  syncedPack=plaidReviewPack(snapshot);pack=syncedPack;render();
@@ -59,7 +59,7 @@ function renderPlaid(snapshot){
 }
 async function loadPlaid(){
  try{const s=await privateApi('status');plaidButtons(s.connected);plaidStatus.textContent=s.connected?`Connected. Last collected: ${s.last_updated||'waiting for first sync'}.${s.sync_error?` Latest error: ${s.sync_error.message}`:''}`:'Ready to connect through Plaid.';if(s.connected)renderPlaid((await privateApi('snapshot')).snapshot);else {plaidView.textContent='';if(pack===syncedPack){pack=null;for(const id of ['summary','trades','issues','holdings'])$(id).textContent='';$('export').disabled=true;$('status').textContent='No active brokerage snapshot.';}syncedPack=null;}}
- catch(e){plaidButtons(false);$('plaid-connect').disabled=true;plaidStatus.textContent=`Automatic sync unavailable: ${e.message}. Manual import still works.`;}
+ catch(e){plaidButtons(false);$('plaid-connect').disabled=true;$('plaid-connect-help').textContent='Account sync is unavailable. Review the error below and reload after private sign-in.';plaidStatus.textContent=`Automatic sync unavailable: ${e.message}. Manual import still works.`;}
 }
 $('plaid-connect').onclick=async()=>{
  try{
