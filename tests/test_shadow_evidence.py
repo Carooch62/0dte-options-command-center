@@ -56,14 +56,22 @@ class EvidenceTests(unittest.TestCase):
         with self.assertRaises(ValueError): make_packet(snapshot(), '2026-10-14T14:59:59Z')
 
     def test_template_is_unrated_not_fabricated_evidence(self):
-        template = review_template(make_packet(snapshot(), NOW))
+        source = snapshot()
+        source['candidates'][0].update(news_status='SUCCESS', news_checked_at=NOW,
+                                       news_items=[{'title': 'Synthetic fixture headline'}])
+        template = review_template(make_packet(source, NOW))
         row = template['records'][0]
         self.assertIsNone(row['reviewed_at'])
         self.assertIsNone(row['component_reviews']['news']['dimensions']['novelty']['rating'])
         self.assertEqual(row['evidence_set_id'], template['packet_id'])
+        self.assertEqual(row['news_status'], 'SUCCESS')
+        self.assertEqual(row['news_checked_at'], NOW)
+        self.assertEqual(row['news_items'], source['candidates'][0]['news_items'])
+        self.assertEqual(row['component_reviews']['news']['event_ids'], [])
 
     def test_followups_capture_tracked_contract_even_above_price_limit(self):
         s = snapshot(); o = s['candidates'][0]['options'][0]; o['ask'] = .50
         p = make_packet(s, NOW, tracked_ids={o['contract_id']})
         self.assertEqual(p['candidates'], [])
         self.assertEqual(p['followup_quotes'][0]['ask'], .50)
+

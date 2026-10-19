@@ -7,6 +7,27 @@ from pathlib import Path
 REFERENCE = {'news':40.0,'patterns':38.0,'volume':10.0,'options':7.0,'risk_reward':5.0}
 DIMENSIONS = {'materiality':.45,'surprise':.25,'credibility':.15,'novelty':.15}
 HORIZONS = {'INTRADAY':(6,24),'MULTIDAY':(48,120)}
+# Research coverage freshness, independent of event decay or quote freshness.
+COVERAGE_MAX_AGE_SECONDS = {'INTRADAY': 900, 'MULTIDAY': 3600}
+COVERAGE_POLICY = 'news-coverage-v1'
+
+
+def coverage(row, now, horizon):
+    checked = clock(row.get('news_checked_at'))
+    limit = COVERAGE_MAX_AGE_SECONDS[horizon]
+    result = {'status': 'UNKNOWN', 'policy_version': COVERAGE_POLICY,
+              'checked_at': row.get('news_checked_at'), 'max_age_seconds': limit,
+              'age_seconds': None}
+    if row.get('news_status') != 'SUCCESS':
+        result['reason'] = 'SOURCE_NOT_SUCCESSFUL'
+    elif checked is None or checked > now:
+        result['reason'] = 'CHECK_TIME_UNKNOWN_OR_FUTURE'
+    else:
+        age = (now - checked).total_seconds()
+        result['age_seconds'] = round(age, 3)
+        result.update(status='CURRENT' if age < limit else 'STALE',
+                      reason='RECENT_SUCCESSFUL_FETCH' if age < limit else 'CHECK_EXPIRED')
+    return result
 
 
 def clock(value):
@@ -74,12 +95,18 @@ def evaluate(row,now=None,horizon='INTRADAY'):
             'duplicates_removed':0,'ranking_effect':'NONE','eligibility_effect':'NONE',
             'note':'Experimental allocation, not win probability. Reviews cover only the documented events; no missing weight is redistributed.'}
     if horizon not in HORIZONS:result['status']='UNSUPPORTED_HORIZON';return result
-    if row.get('news_status')!='SUCCESS':result['status']='COVERAGE_UNKNOWN';return result
+    result['coverage'] = coverage(row, now, horizon)
+    if result['coverage']['status'] != 'CURRENT':
+        result['status'] = 'COVERAGE_STALE' if result['coverage']['status'] == 'STALE' else 'COVERAGE_UNKNOWN'
+        return result
     events=row.get('news_event_evidence')
     if not isinstance(events,list) or not events:
         result['status']='NEEDS_REVIEW' if row.get('news_items') else 'NO_REPORTED_NEWS'
         return result
     seen={};unique=[];conflict=False
+    # Validate every supplied review before deduplication. A second copy with
+    # missing evidence, unresolved blockers or future clocks must not disappear.
+    assessments = [assess(e if isinstance(e, dict) else {}, row.get('ticker'), now, horizon) for e in events]
     for event in events:
         if not isinstance(event,dict):unique.append({});continue
         # Explicit event IDs group syndication. URL/title catch simple duplicate submissions.
@@ -87,7 +114,7 @@ def evaluate(row,now=None,horizon='INTRADAY'):
         title=' '.join(str(event.get('title','')).lower().split())
         if title:keys.append(('title',title))
         keys=[k for k in keys if isinstance(k[1],str) and k[1]]
-        signature=json.dumps({k:event.get(k) for k in ('ticker','scores','direction','relevance','horizon','event_at')},sort_keys=True)
+        signature=json.dumps({k:event.get(k) for k in ('ticker','scores','direction','relevance','horizon','event_at','evidence')},sort_keys=True)
         overlap=[seen[k] for k in keys if k in seen]
         if overlap:
             result['duplicates_removed']+=1
@@ -95,6 +122,11 @@ def evaluate(row,now=None,horizon='INTRADAY'):
         else:unique.append(event)
         for k in keys:seen[k]=signature
     result['events']=[assess(e,row.get('ticker'),now,horizon) for e in unique]
+    invalid = [e for e in assessments if e['status'] in ('NEEDS_REVIEW', 'LOW_CONFIDENCE')]
+    if invalid:
+        result['events'] = assessments
+        result['status'] = 'NEEDS_REVIEW'
+        return result
     if conflict:result['status']='CONFLICTING_REVIEWS';return result
     if any(e['status'] in ('NEEDS_REVIEW','LOW_CONFIDENCE') for e in result['events']):result['status']='NEEDS_REVIEW';return result
     active=[e for e in result['events'] if e['status']=='ASSESSED']
@@ -119,3 +151,4 @@ def load_reviews():
     data=json.loads(path.read_text())
     if not isinstance(data,dict):raise ValueError('News reviews must map tickers to event lists')
     return data
+

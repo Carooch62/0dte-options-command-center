@@ -28,8 +28,10 @@ def report():
     assessment = evaluate(case['row'], datetime.fromisoformat(case['evaluation_at']))
     return {'mode': 'OFFLINE_RESEARCH', 'production_effect': 'NONE',
             'real_case': {'ticker': 'EMAT', 'as_of': case['evaluation_at'],
+                          'status': assessment['status'],
                           'importance': assessment['importance'],
-                          'original': {**REFERENCE, 'news': round(40+15*assessment['importance'],2), 'patterns': round(38-15*assessment['importance'],2)},
+                          'original': ({**REFERENCE, 'news': round(40+15*assessment['importance'],2), 'patterns': round(38-15*assessment['importance'],2)}
+                                       if assessment['status'] == 'ASSESSED' else None),
                           'current_shadow': assessment['proposed_weights'],
                           'alternatives': compare(assessment)},
             'synthetic_sensitivity': [
@@ -42,3 +44,4 @@ def report():
 
 if __name__ == '__main__':
     print(json.dumps(report(), indent=2))
+

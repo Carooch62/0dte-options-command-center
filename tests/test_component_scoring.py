@@ -41,6 +41,7 @@ class ComponentTests(unittest.TestCase):
         from shadow_replay import replay
         from test_news_research import row as news_row, NOW as news_now
         candidate=fixture(); candidate.update(news_row());candidate['candidate_id']='test-contract'
+        candidate['component_reviews']['news']['event_ids']=['contract-1']
         for review in candidate['component_reviews'].values():
             for dim in review['dimensions'].values():
                 dim['observed_at']=dim['available_at']=news_now.isoformat()
@@ -51,3 +52,4 @@ class ComponentTests(unittest.TestCase):
         self.assertEqual(result['scored'][0]['reference_score'],50)
         candidate['eligibility_evidence']['risk']['passed']=False
         self.assertEqual(replay({'as_of':news_now.isoformat(),'candidates':[candidate]})['scored'],[])
+

@@ -173,9 +173,12 @@ def review_template(packet):
          'reviewer_id': '', 'evidence_set_id': packet['packet_id'],
          'eligibility_evidence': {k: {'passed': None, 'policy_version': '', 'source': '', 'evidence': '',
                                      'observed_at': None, 'available_at': None} for k in ('liquidity', 'risk')},
-         'component_reviews': {k: {'candidate_id': c['candidate_id'], 'dimensions': {
+         'component_reviews': {k: {'candidate_id': c['candidate_id'], **({'event_ids': []} if k == 'news' else {}), 'dimensions': {
              d: {'rating': None, 'source': '', 'evidence': '', 'observed_at': None, 'available_at': None}
              for d in dimensions}} for k, dimensions in RUBRIC.items()},
+         'news_status': c['stock'].get('news_status'),
+         'news_checked_at': c['stock'].get('news_checked_at'),
+         'news_items': copy.deepcopy(c['stock'].get('news_items', [])),
          'news_event_evidence': copy.deepcopy(c['stock'].get('news_event_evidence', []))}
         for c in packet['candidates']]}
 
@@ -190,3 +193,4 @@ if __name__ == '__main__':
         print(json.dumps(review_template(json.loads(Path(args.prepare_reviews).read_text())), indent=2))
     else:
         print(json.dumps(capture(args.data_dir, source_commit=args.source_commit)))
+

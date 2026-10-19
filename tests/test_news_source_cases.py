@@ -16,6 +16,7 @@ class SourceCaseTests(unittest.TestCase):
             with self.subTest(title=case['event']['title']):
                 event = case['event']
                 row = {'ticker': event['ticker'], 'news_status': 'SUCCESS',
+                       'news_checked_at': now.isoformat(),  # Synthetic coverage for abstention test only.
                        'news_items': [{'title': event['title']}],
                        'news_event_evidence': [event], 'score': 9,
                        'setup_qualified': False}
@@ -28,3 +29,4 @@ class SourceCaseTests(unittest.TestCase):
                 self.assertEqual(result['ranking_effect'], 'NONE')
                 self.assertEqual(result['eligibility_effect'], 'NONE')
                 self.assertEqual(row, before)
+

@@ -26,6 +26,7 @@ def event(**changes):
 
 def row(events=None,**changes):
     value={'ticker':'TEST','direction':'UP','score':9,'news_status':'SUCCESS',
+           'news_checked_at':NOW.isoformat(),
            'news_items':[{'title':'TEST announces contract'}],
            'news_event_evidence':[event()] if events is None else events}
     value.update(changes);return value
@@ -116,7 +117,7 @@ class NewsResearchTests(unittest.TestCase):
 
     def test_no_change_to_existing_ranking_or_eligibility(self):
         original,_=fixtures('call')
-        enriched=copy.deepcopy(original);enriched['candidates'][0].update(news_status='SUCCESS',news_event_evidence=[event()])
+        enriched=copy.deepcopy(original);enriched['candidates'][0].update(news_status='SUCCESS',news_checked_at=NOW.isoformat(),news_event_evidence=[event()])
         # Match coverage metadata in both inputs so only reviews differ.
         original['candidates'][0]['news_status']='SUCCESS';baseline=normalize(original,NOW)
         actual=normalize(enriched,NOW)
@@ -129,3 +130,4 @@ class NewsResearchTests(unittest.TestCase):
         b=enrich(baseline,copy.deepcopy(previous))['candidates'][0]
         for key in ('execution_state','execution_score','setup_qualified','second_wave_event'):
             self.assertEqual(a.get(key),b.get(key),key)
+
