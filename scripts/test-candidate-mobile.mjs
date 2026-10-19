@@ -54,6 +54,8 @@ try{
  assert.equal(exported.observations[0].request_timing.worker_ms,105);
  assert.ok(exported.observations[0].request_timing.browser_ms>=0);
  assert.equal(exported.observations[0].observed_at,now);
+ assert.equal(exported.observations[0].metadata_multiplier,100);
+ assert.deepEqual(exported.observations[0].quote_check_reasons,[]);
  await page.reload();await page.getByText('Restored this tab’s session',{exact:false}).first().waitFor();
  assert.ok(await page.getByRole('button',{name:'Refresh matched option quotes',exact:true}).isEnabled());
  await page.locator('#verified-only').check();assert.equal(await page.locator('#rows tr').count(),0);await page.locator('#verified-only').uncheck();
@@ -64,6 +66,17 @@ try{
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'private results overflow');
  assert.equal(await page.locator('td[data-label="$0.30 live ask"]').innerText(),'ABOVE_LIMIT');
  await page.screenshot({path:`test-results/mobile/${width}-private-live.png`,fullPage:true});
+ await page.route('**/private/plaid/robinhood/quotes',r=>r.fulfill({json:{received_at:new Date().toISOString(),observations:[{quote:{instrument_id:id,bid_price:'.02',ask_price:'.03',updated_at:now}}]}}));
+ await page.getByRole('button',{name:'Refresh matched option quotes',exact:true}).click();
+ await page.getByText('The spread exceeds the quote-check limit.',{exact:false}).waitFor();
+ await page.reload();await page.getByText('Restored this tab’s session',{exact:false}).first().waitFor();
+ const wideDownload=page.waitForEvent('download');
+ await page.getByRole('button',{name:'Export private quote observations',exact:true}).click();
+ const wide=JSON.parse(await readFile(await (await wideDownload).path(),'utf8'));
+ const failed=wide.observations.at(-1);
+ assert.equal(failed.metadata_multiplier,100);assert.equal(failed.multiplier,null);
+ assert.deepEqual(failed.quote_check_reasons,['WIDE_SPREAD']);
+ assert.equal(wide.entries.length,1); // Failed refresh cannot replace the earlier passing entry.
  await page.route('**/private/plaid/robinhood/quotes',r=>r.fulfill({status:401,json:{error:'Private sign in required'}}));
  await page.getByRole('button',{name:'Refresh matched option quotes',exact:true}).click();
  await page.getByText('Private sign-in required.',{exact:false}).waitFor();
@@ -75,6 +88,7 @@ try{
  }finally{await page.screenshot({path:`test-results/mobile/${width}-final.png`,fullPage:true});await writeFile(`test-results/mobile/${width}-errors.json`,JSON.stringify(errors));await context.tracing.stop({path:`test-results/mobile/${width}-trace.zip`});await context.close();}
  }
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}
+
 
 
 

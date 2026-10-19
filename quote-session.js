@@ -1,6 +1,7 @@
 // Tab-scoped recovery only: never persist credentials, accounts or holdings.
 import {candidateQuotes} from './candidate-quotes.js';
 import {quoteRequestTiming} from './quote-timing.js';
+import {quoteDiagnostics} from './quote-evidence.js';
 export const SESSION_KEY='private-quote-session-v1';
 export const SESSION_MAX_AGE=24*60*60*1000;
 const pick=(value,keys)=>Object.fromEntries(keys.filter(k=>value?.[k]!==undefined).map(k=>[k,value[k]]));
@@ -11,7 +12,7 @@ export function sessionPayload(scanner,observations,history,source,now=Date.now(
  if(snapshot.candidates.reduce((n,c)=>n+c.options.length,0)>20)throw Error('Recovery supports bounded batches of at most 20 contracts. Export observations before leaving.');
  const withTiming=x=>{const timing=quoteRequestTiming(x.request_timing);return Object.keys(timing).length?{request_timing:timing}:{};};
  const mapped=observations.map(x=>({instrument:pick(x.instrument,['id','chain_symbol','strike_price','type','expiration_date','trade_value_multiplier','state','tradability','sellout_datetime']),quote:pick(x.quote,['instrument_id','bid_price','ask_price','updated_at']),received_at:x.received_at,...withTiming(x)}));
- const evidence=history.slice(-2000).map(q=>({...pick(q,['contract_id','observed_at','received_at','bid','ask','source','multiplier','quote_check']),...withTiming(q)}));
+ const evidence=history.slice(-2000).map(q=>({...pick(q,['contract_id','observed_at','received_at','bid','ask','source','multiplier','quote_check']),...quoteDiagnostics(q),...withTiming(q)}));
  return {format:'private-quote-session-v1',saved_at:now,scanner:snapshot,observations:mapped,history:evidence,source:String(source).slice(0,200)};
 }
 export function restoreSession(raw,now=Date.now()){
@@ -23,3 +24,4 @@ export function restoreSession(raw,now=Date.now()){
  for(const q of safe.history)if(typeof q.contract_id!=='string'||!Number.isFinite(Date.parse(q.received_at))||!Number.isFinite(Date.parse(q.observed_at))||Date.parse(q.observed_at)>Date.parse(q.received_at)||Date.parse(q.received_at)>now)throw Error('Invalid saved observation clock');
  return safe;
 }
+
