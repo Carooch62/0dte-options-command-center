@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 from news_research import clock
 from shadow_outcomes import evaluate_outcomes
 from component_scoring import RUBRIC
+from pattern_tracking import snapshot_observations, prospective_report
 
 STOCK_FIELDS = ('price', 'price_source', 'price_received_at', 'bar_end', 'bar_timestamp',
                 'research_bars', 'session_bar_count', 'direction', 'rank', 'score', 'day_move',
@@ -88,6 +89,7 @@ def make_packet(snapshot, captured_at, source_commit=None, tracked_ids=()):
                'generated_at': snapshot['generated_at'], 'captured_at': captured.isoformat(),
                'market_date': snapshot.get('market_date'), 'market_session': snapshot.get('market_session'),
                'source_commit': source_commit, 'ranking_effect': 'NONE', 'candidates': selected,
+               'pattern_observations': snapshot_observations(snapshot),
                'followup_quotes': followups,
                'stock_observations': [stock_record(row) for row in snapshot.get('candidates', [])],
                'coverage': {'examined': scanned, 'qualifying': qualifying,
@@ -156,6 +158,7 @@ def capture(data_dir, captured_at=None, source_commit=None):
     atomic_json(data/'shadow-evidence-latest.json', packet)
     atomic_json(data/'shadow-review-queue.json', review_queue(packet))
     packets = previous+[packet]
+    atomic_json(data/'pattern-prospective.json', prospective_report(packets, captured_at))
     entries = [{'candidate_id': c['candidate_id'], 'decision_at': p['captured_at'], 'quote': quote_record(c['contract']),
                 'stock': stock_record({**c['stock'], 'ticker': c['ticker']})}
                for p in packets for c in p['candidates']]
