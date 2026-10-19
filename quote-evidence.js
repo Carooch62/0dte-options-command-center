@@ -5,7 +5,7 @@ const messages={
  NO_CONTRACT_MATCH:'Contract metadata has not been matched. Use Match contracts and fetch live quotes.',
  AMBIGUOUS_CONTRACT:'More than one contract identity matches. Reload the current batch and match again; keep this contract unverified.',
  QUOTE_ID_MISMATCH:'Quote identity does not match the contract. Match again before using this price.',
- NONSTANDARD_OR_UNKNOWN_MULTIPLIER:'The standard 100-share multiplier is unverified. Check contract metadata; refreshing the price cannot resolve this.',
+ NONSTANDARD_OR_UNKNOWN_MULTIPLIER:'The standard 100 price multiplier is unverified. Check contract metadata; refreshing the price cannot resolve this.',
  CONTRACT_NOT_ACTIVE:'The contract is inactive or not tradable. Load a current scanner batch.',
  DEADLINE_UNKNOWN_OR_PASSED:'The trading deadline is missing or has passed. Check the expiration and load a current batch.',
  INVALID_QUOTE_CLOCK:'The quote time is missing or inconsistent. Refresh; keep the price unverified if its clock remains unknown.',
@@ -13,6 +13,12 @@ const messages={
  INVALID_BOOK:'The bid or ask is missing, zero, or crossed. Refresh and wait for a valid two-sided quote.',
  WIDE_SPREAD:'The spread exceeds the quote-check limit. Refresh to recheck; the current book fails this screen.'
 };
+export function quoteDiagnostics(record){
+ const result={};
+ if(Object.hasOwn(record,'metadata_multiplier'))result.metadata_multiplier=typeof record.metadata_multiplier==='number'&&Number.isFinite(record.metadata_multiplier)&&record.metadata_multiplier>0?record.metadata_multiplier:null;
+ if(Array.isArray(record.quote_check_reasons))result.quote_check_reasons=[...new Set(record.quote_check_reasons.filter(r=>typeof r==='string'&&Object.hasOwn(messages,r)))].slice(0,10);
+ return result;
+}
 export function quoteGuidance(row){
  if(row.reasons.length)return row.reasons.map(reason=>messages[reason]||reason).join(' ');
  return row.premium_status==='ABOVE_LIMIT'?'Live ask is above $0.30. This contract is outside the price limit; reload the batch or recheck later.':'Quote check passed and live ask is within $0.30. Setup and market-session checks remain separate.';
@@ -25,7 +31,8 @@ export function appendQuoteEvidence(snapshot,observations,history,now=Date.now()
   if(!q?.updated_at||!x.received_at)continue;
   const record={contract_id:row.contract,observed_at:q.updated_at,received_at:x.received_at,
    bid:row.bid??null,ask:row.ask??null,source:'Robinhood Quotes',
-   multiplier:row.status==='QUOTE_CHECK_PASSED'?100:null,quote_check:row.status};
+   multiplier:row.status==='QUOTE_CHECK_PASSED'?100:null,quote_check:row.status,
+   ...quoteDiagnostics({metadata_multiplier:row.metadata_multiplier??null,quote_check_reasons:row.reasons})};
   const timing=quoteRequestTiming(x.request_timing);if(Object.keys(timing).length)record.request_timing=timing;
   if(!next.some(p=>p.contract_id===record.contract_id&&p.observed_at===record.observed_at&&p.received_at===record.received_at))next.push(record);
  }
@@ -39,6 +46,7 @@ export function quoteEvidenceInput(snapshot,history,now=new Date().toISOString()
   limitations:['Private browser-local observations, exported only on request. No account or holdings data.',
    'Decision cutoff is first passing quote receipt, not the earlier scanner timestamp.',
    'Quotes are not executions; observations are collected only when you request refresh.',
+   'multiplier is set only for passing quote checks; metadata_multiplier and quote_check_reasons are diagnostic evidence, not eligibility.',
    'At most 2000 observations retained; tab recovery expires after 24 hours. Export for durable retention.'],
   validation_policy:{horizons_minutes:VALIDATION_MINUTES,window_tolerance_seconds:60,entry:'ask',exit:'bid'}};
 }
@@ -69,5 +77,6 @@ export function validationTiming(history,now=Date.now()){
  });
  return windows.join(' | ')+' · Refresh manually; export before leaving. Backgrounded phones may pause page updates.';
 }
+
 
 

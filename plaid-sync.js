@@ -4,7 +4,11 @@ const decoder = new TextDecoder();
 const privateHeaders = {'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'};
 const reply = (value,status=200)=>new Response(JSON.stringify(value),{status,headers:privateHeaders});
 const decode = s=>Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
-const encode = bytes=>btoa(String.fromCharCode(...bytes));
+const encode = bytes=>{
+  let binary='';
+  for(let start=0;start<bytes.length;start+=32768)binary+=String.fromCharCode(...bytes.subarray(start,start+32768));
+  return btoa(binary);
+};
 const required = env=>Boolean(env.PLAID_CLIENT_ID&&env.PLAID_SECRET&&env.PLAID_STORE&&env.PLAID_ENCRYPTION_KEY&&env.PLAID_ENV&&env.CF_ACCESS_TEAM_DOMAIN&&env.CF_ACCESS_AUD&&env.CF_ACCESS_EMAIL);
 
 export async function verifyAccess(request,env,now=Date.now()) {
@@ -88,4 +92,5 @@ export async function handlePlaid(request,env){
   }
   return reply({ok:false,error:'Not found'},404);
 }
+
 

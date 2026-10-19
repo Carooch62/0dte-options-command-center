@@ -15,7 +15,9 @@ export function candidateQuotes(snapshot,observations,now=Date.now()){
  const x=[...matches].sort((a,b)=>millis(b.received_at)-millis(a.received_at))[0],i=x.instrument,q=x.quote||{};
  row.instrument_id=i.id;
  if(!uuid.test(i.id)||q.instrument_id!==i.id)row.reasons.push('QUOTE_ID_MISMATCH');
- if(number(i.trade_value_multiplier)!==100)row.reasons.push('NONSTANDARD_OR_UNKNOWN_MULTIPLIER');
+ const multiplier=number(i.trade_value_multiplier);
+ row.metadata_multiplier=Number.isFinite(multiplier)&&multiplier>0?multiplier:null;
+ if(multiplier!==100)row.reasons.push('NONSTANDARD_OR_UNKNOWN_MULTIPLIER');
  if(i.state!=='active'||i.tradability!=='tradable')row.reasons.push('CONTRACT_NOT_ACTIVE');
  const end=millis(i.sellout_datetime);
  if(!Number.isFinite(end)||end<=now)row.reasons.push('DEADLINE_UNKNOWN_OR_PASSED');
@@ -31,4 +33,5 @@ export function candidateQuotes(snapshot,observations,now=Date.now()){
  rows.push(row);
  }}return rows;
 }
+
 
