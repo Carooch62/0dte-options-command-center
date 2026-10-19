@@ -24,9 +24,11 @@ class AllocationResearchTests(unittest.TestCase):
 
     def test_real_case_and_saturation_tradeoff(self):
         real = report()['real_case']
-        self.assertEqual(real['alternatives']['linear_2_5']['news'], 40.30)
-        self.assertEqual(real['alternatives']['capped_original']['news'], real['original']['news'])
+        self.assertEqual(real['status'], 'COVERAGE_UNKNOWN')
+        self.assertIsNone(real['original'])
+        self.assertTrue(all(v is None for v in real['alternatives'].values()))
         low = compare({'status':'ASSESSED','importance':.25})
         high = compare({'status':'ASSESSED','importance':1})
         self.assertEqual(low['capped_original'], high['capped_original'])
         self.assertLess(low['linear_2_5']['news'], high['linear_2_5']['news'])
+

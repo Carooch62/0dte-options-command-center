@@ -8,9 +8,9 @@ from shadow_replay import replay
 NOW='2026-10-14T15:00:00+00:00'
 def reviewed():
     evidence={'observed_at':NOW,'available_at':NOW,'source':'synthetic fixture','evidence':'Synthetic admission check only'}
-    return {'candidate_id':'TEST:2026-10-16:call:100','eligibility_evidence':{k:{**evidence,'passed':True,'policy_version':'synthetic'} for k in ('liquidity','risk')},'component_reviews':{k:{'candidate_id':'TEST:2026-10-16:call:100','dimensions':{d:{**evidence,'rating':2} for d in dims}} for k,dims in RUBRIC.items()}}
+    return {'candidate_id':'TEST:2026-10-16:call:100','eligibility_evidence':{k:{**evidence,'passed':True,'policy_version':'synthetic'} for k in ('liquidity','risk')},'component_reviews':{k:{'candidate_id':'TEST:2026-10-16:call:100',**({'event_ids':['synthetic-event']} if k == 'news' else {}),'dimensions':{d:{**evidence,'rating':2} for d in dims}} for k,dims in RUBRIC.items()}}
 def run(row):
-    with patch('shadow_replay.evaluate',return_value={'status':'ASSESSED','proposed_weights':REFERENCE,'allocation_policy':'synthetic'}):
+    with patch('shadow_replay.evaluate',return_value={'status':'ASSESSED','proposed_weights':REFERENCE,'allocation_policy':'synthetic','events':[{'event_id':'synthetic-event','status':'ASSESSED','reviewed_at':NOW}]}):
         return replay({'as_of':NOW,'candidates':[row]})
 class ShadowAdmissionTests(unittest.TestCase):
     def test_actual_review_time_cannot_be_backdated_by_dimension_clocks(self):
@@ -37,3 +37,4 @@ class ShadowAdmissionTests(unittest.TestCase):
         for field in ('source','method_version'):
             for value in (True,17,'   '):
                 invalid=copy.deepcopy(row);invalid['research_components']['news'][field]=value;self.assertEqual(run(invalid)['scored'],[])
+

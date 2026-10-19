@@ -55,6 +55,24 @@ def replay(snapshot):
         assessment = evaluate(row, now)
         if assessment['status'] != 'ASSESSED':
             reasons.append('NEWS:' + assessment['status'])
+        if reviewed_input:
+            reviews = row.get('component_reviews')
+            news_review = reviews.get('news', {}) if isinstance(reviews, dict) else {}
+            linked = news_review.get('event_ids') if isinstance(news_review, dict) else None
+            active = {e['event_id']: e for e in assessment.get('events', []) if e['status'] == 'ASSESSED'}
+            if (not isinstance(linked, list) or not linked
+                    or any(not isinstance(ident, str) or not ident.strip() for ident in linked)
+                    or len(set(linked)) != len(linked)):
+                reasons.append('NEWS:EVENT_LINKS_REQUIRED')
+            elif any(ident not in active for ident in linked):
+                reasons.append('NEWS:LINKED_EVENT_NOT_ASSESSED')
+            else:
+                dims = news_review.get('dimensions', {})
+                for dim in dims.values() if isinstance(dims, dict) else []:
+                    available = clock(dim.get('available_at')) if isinstance(dim, dict) else None
+                    if available is not None and any(clock(active[ident]['reviewed_at']) > available for ident in linked):
+                        reasons.append('NEWS:SCORE_PRECEDES_EVENT_REVIEW')
+                        break
         if reasons:
             withheld.append({'candidate_id': ident, 'reasons': reasons})
             continue
@@ -62,7 +80,9 @@ def replay(snapshot):
             return round(sum(values[k]*weights[k]/100 for k in REFERENCE), 6)
         scored.append({'candidate_id': ident, 'reference_score': score(REFERENCE),
                        'adaptive_score': score(assessment['proposed_weights']),
-                       'allocation_policy': assessment['allocation_policy']})
+                       'allocation_policy': assessment['allocation_policy'],
+                       'news_event_ids': list(linked) if reviewed_input else [],
+                       'news_directional_support': assessment.get('directional_support')})
     ranks = {}
     for kind in ('reference', 'adaptive'):
         # Competition ranks preserve ties; identifier ordering is display-only.
@@ -89,5 +109,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     with open(args.input) as handle:
         print(json.dumps(replay(json.load(handle)), indent=2))
+
 
 

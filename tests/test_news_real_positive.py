@@ -13,13 +13,20 @@ class RealPositiveNewsTests(unittest.TestCase):
         row = case['row']
         before = copy.deepcopy(row)
         now = datetime.fromisoformat(case['evaluation_at'])
+        # The historical fixture did not retain its collection clock.
+        self.assertEqual(evaluate(row, now)['status'], 'COVERAGE_UNKNOWN')
+        # Synthetic current coverage exercises event scoring; never save it as
+        # historical evidence or backdate the source fixture.
+        row = copy.deepcopy(row)
+        row['news_checked_at'] = now.isoformat()
+        current = copy.deepcopy(row)
         result = evaluate(row, now)
         self.assertEqual(result['status'], 'ASSESSED')
         self.assertGreater(result['proposed_weights']['news'], 40)
         self.assertLess(result['proposed_weights']['news'], 43)
         self.assertEqual(result['eligibility_effect'], 'NONE')
         self.assertEqual(result['ranking_effect'], 'NONE')
-        self.assertEqual(row, before)
+        self.assertEqual(row, current)
         # Positive evidence expires; a later publication cannot renew the event.
         later = now + timedelta(days=1)
         row['news_event_evidence'][0]['published_at'] = later.isoformat()
@@ -28,3 +35,4 @@ class RealPositiveNewsTests(unittest.TestCase):
         missing = copy.deepcopy(before)
         missing['news_event_evidence'][0]['scores']['surprise'] = None
         self.assertIsNone(evaluate(missing, now)['proposed_weights'])
+
