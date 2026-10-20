@@ -35,6 +35,8 @@ class CheckoutTests(unittest.TestCase):
                 write_gzip(data/'archive'/day/'scans'/'old.json.gz', rolled)
             write_gzip(data/'archive/2026-10-19/scans/old.json.gz', rolled)
             write_gzip(data/'archive/2026-10-18/option-observations.json.gz', [old])
+            write_gzip(data/'archive/2026-10-18/scans/unneeded.json.gz', rolled)
+            (data/'archive/2026-10-18/brokerage-scans.json').write_text('{"historical":"untouched"}')
             self.git(root, 'init', '-q')
             self.git(root, 'add', '.')
             self.git(root, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.com', 'commit', '-qm', 'fixture')
@@ -43,6 +45,8 @@ class CheckoutTests(unittest.TestCase):
             self.assertFalse((data/'archive/2026-10-19/scans/old.json.gz').exists())
             self.assertEqual(checkout.hydrate(root, NOW), ['2026-10-18','2026-10-19','2026-10-20'])
             self.assertFalse((data/'archive/2026-10-17/scans/old.json.gz').exists())
+            self.assertFalse((data/'archive/2026-10-18/scans/unneeded.json.gz').exists())
+            self.assertFalse((data/'archive/2026-10-18/brokerage-scans.json').exists())
             self.assertTrue((root/'scanner.py').exists())
             self.assertTrue((data/'archive/2026-10-20/scans/old.json.gz').exists())
             archive_research(data, data/'archive')
@@ -54,6 +58,7 @@ class CheckoutTests(unittest.TestCase):
             self.assertEqual(self.git(root, 'ls-files', '--deleted'), '')
             self.git(root, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.com', 'commit', '-qm', 'update')
             self.assertEqual(self.git(root, 'rev-parse', 'HEAD:data/archive/2026-10-17/scans/old.json.gz'), untouched)
+            self.assertEqual(self.git(root, 'show', 'HEAD:data/archive/2026-10-18/brokerage-scans.json'), '{"historical":"untouched"}')
 
     def test_bad_evidence_aborts_before_changing_checkout(self):
         with tempfile.TemporaryDirectory() as folder:
