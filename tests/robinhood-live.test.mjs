@@ -2,10 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {handleRobinhood,quoteRequest,quoteAge,normalizeQuotes,rpc} from '../robinhood-live.js';
 import worker from '../worker.js';
+import {marketSessions} from '../market-session.js';
 const host='https://example.workers.dev';
 const request=(path,method='GET',headers={},body)=>new Request(`${host}/private/plaid/robinhood/${path}`,{method,headers,...(body===undefined?{}:{body:JSON.stringify(body)})});
 const base={ROBINHOOD_CONNECTION_ENABLED:'true',ROBINHOOD_CLIENT_ID:'client-test',ROBINHOOD_REDIRECT_URI:host+'/private/plaid/robinhood/callback',PLAID_ENCRYPTION_KEY:Buffer.alloc(32,17).toString('base64'),CF_ACCESS_TEAM_DOMAIN:'test.cloudflareaccess.com',CF_ACCESS_AUD:'aud',CF_ACCESS_EMAIL:'me@example.com'};
 async function harness(run){
+ marketSessions.clear();
  const pair=await crypto.subtle.generateKey({name:'RSASSA-PKCS1-v1_5',modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'},true,['sign','verify']);
  const jwk=await crypto.subtle.exportKey('jwk',pair.publicKey);jwk.kid='test';
  const enc=x=>Buffer.from(JSON.stringify(x)).toString('base64url');
@@ -75,7 +77,7 @@ test('authenticated quote path measures setup and retrieval without changing fre
  setUpstream(async()=>Response.json({access_token:'secret',token_type:'Bearer',expires_in:3600}));
  await handleRobinhood(new Request(cb,{headers:{...auth,Cookie:started.headers.get('Set-Cookie').split(';')[0]}}),env);
  const methods=[];
- setUpstream(async(url,options)=>{
+ const upstream=async(url,options)=>{
   assert.equal(url,'https://agent.robinhood.com/mcp/trading');assert.equal(options.headers.Authorization,'Bearer secret');
   const body=JSON.parse(options.body);methods.push(body.method);
   elapsed+=({'initialize':10,'notifications/initialized':20,'tools/list':30,'tools/call':40})[body.method];
@@ -85,11 +87,26 @@ test('authenticated quote path measures setup and retrieval without changing fre
   if(body.method==='tools/list')return Response.json({jsonrpc:'2.0',id:body.id,result:{tools:[{name:'place_option_order'},{name:'get_equity_quotes'}]}});
   assert.equal(body.params.name,'get_equity_quotes');
   return new Response(`event: message\ndata: ${JSON.stringify({jsonrpc:'2.0',id:body.id,result:{structuredContent:{data:{results:[{quote:{symbol:'JD',bid_price:'27.00',ask_price:'27.02',venue_bid_time:new Date().toISOString(),venue_ask_time:new Date().toISOString(),account_number:'never-return'}}]}}}})}\n\n`,{headers:{'Content-Type':'text/event-stream'}});
- });
+ };setUpstream(upstream);
  const result=await handleRobinhood(request('quotes','POST',auth,{kind:'equity',symbols:['JD']}),env),text=await result.text();
  assert.equal(result.status,200);assert.ok(!text.includes('secret'));assert.ok(!text.includes('never-return'));assert.equal(JSON.parse(text).latency_verified,false);assert.equal(JSON.parse(text).scanner_feed,'DELAYED_RESEARCH');
  assert.deepEqual(methods,['initialize','notifications/initialized','tools/list','tools/call']);
- assert.deepEqual(JSON.parse(text).request_timing,{setup_ms:60,quote_ms:40,worker_ms:100});
+ assert.deepEqual(JSON.parse(text).request_timing,{setup_ms:60,quote_ms:40,worker_ms:100,setup_reused:false});
+ const second=await handleRobinhood(request('quotes','POST',auth,{kind:'equity',symbols:['JD']}),env),secondData=await second.json();
+ assert.equal(second.status,200);assert.deepEqual(methods,['initialize','notifications/initialized','tools/list','tools/call','tools/call']);
+ assert.deepEqual(secondData.request_timing,{setup_ms:0,quote_ms:40,worker_ms:40,setup_reused:true});
+ assert.equal(secondData.latency_verified,false);
+ setUpstream(async()=>new Response(null,{status:503}));
+ const failed=await handleRobinhood(request('quotes','POST',auth,{kind:'equity',symbols:['JD']}),env);
+ assert.equal(failed.status,502);
+ setUpstream(upstream);const beforeRecovery=methods.length;
+ const recovered=await handleRobinhood(request('quotes','POST',auth,{kind:'equity',symbols:['JD']}),env),recoveredData=await recovered.json();
+ assert.equal(recovered.status,200);assert.equal(recoveredData.request_timing.setup_reused,false);
+ assert.deepEqual(methods.slice(beforeRecovery),['initialize','notifications/initialized','tools/list','tools/call']);
+ await handleRobinhood(request('disconnect','POST',auth,{}),env);
+ const beforeDenied=methods.length;
+ assert.equal((await handleRobinhood(request('quotes','POST',auth,{kind:'equity',symbols:['JD']}),env)).status,409);
+ assert.equal(methods.length,beforeDenied);
  assert.equal(result.headers.get('Cache-Control'),'no-store');
 }));
 
