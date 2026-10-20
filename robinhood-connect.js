@@ -1,8 +1,8 @@
+import {requestJSON} from './private-request.js';
 const $=id=>document.getElementById(id);
 const status=$('rh-live-status');
 async function api(path,body){
- const r=await fetch(`/private/plaid/robinhood/${path}`,{method:body===undefined?'GET':'POST',credentials:'same-origin',cache:'no-store',headers:body===undefined?{}:{'Content-Type':'application/json','X-Requested-With':'RobinhoodQuotes'},...(body===undefined?{}:{body:JSON.stringify(body)})});
- const data=await r.json();if(!r.ok)throw Error(data.error||`HTTP ${r.status}`);return data;
+ return requestJSON(`/private/plaid/robinhood/${path}`,{method:body===undefined?'GET':'POST',headers:body===undefined?{}:{'Content-Type':'application/json','X-Requested-With':'RobinhoodQuotes'},...(body===undefined?{}:{body:JSON.stringify(body)})},30000);
 }
 async function load(){
  $('rh-live-connect').disabled=true;$('rh-live-disconnect').disabled=true;$('rh-live-test').disabled=true;

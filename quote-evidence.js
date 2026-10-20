@@ -1,5 +1,6 @@
 import {candidateQuotes} from './candidate-quotes.js';
 import {quoteRequestTiming} from './quote-timing.js';
+import {safeRequestAttempts} from './private-request.js';
 export const VALIDATION_MINUTES=Object.freeze([5,10,15]);
 const messages={
  CONFLICTING_QUOTE_OBSERVATIONS:'Conflicting quotes share the latest collection time. Refresh matched quotes; neither copy is accepted as evidence.',
@@ -38,10 +39,10 @@ export function appendQuoteEvidence(snapshot,observations,history,now=Date.now()
  }
  return next.slice(-2000);
 }
-export function quoteEvidenceInput(snapshot,history,now=new Date().toISOString()){
+export function quoteEvidenceInput(snapshot,history,now=new Date().toISOString(),attempts=[]){
  const entries=[],seen=new Set();
  for(const quote of history){if(quote.multiplier!==100||seen.has(quote.contract_id))continue;seen.add(quote.contract_id);entries.push({candidate_id:quote.contract_id,decision_at:quote.received_at,quote});}
- return {format:'shadow-outcome-input-v1',as_of:now,entries,observations:history,
+ return {format:'shadow-outcome-input-v1',as_of:now,entries,observations:history,requests:safeRequestAttempts(attempts),
   scanner_context:{scan_id:snapshot?.scan_id??null,generated_at:snapshot?.generated_at??null,packet_id:snapshot?.packet_id??null,captured_at:snapshot?.captured_at??null},
   limitations:['Private browser-local observations, exported only on request. No account or holdings data.',
    'Decision cutoff is first passing quote receipt, not the earlier scanner timestamp.',
@@ -62,18 +63,21 @@ export function scannerFromEvidencePacket(packet){
  });
  return {generated_at:packet.generated_at,captured_at:packet.captured_at,scan_id:packet.scan_id,packet_id:packet.packet_id,market_session:packet.market_session,candidates,included_contracts:candidates.length,total_contracts:packet.coverage?.qualifying??candidates.length,omitted_contracts:packet.coverage?.omitted??0};
 }
+export function captureWindows(history,now=Date.now()){
+ return quoteEvidenceInput(null,history).entries.flatMap(entry=>VALIDATION_MINUTES.map(minutes=>{
+  const target=Date.parse(entry.decision_at)+minutes*60000,closes=target+60000;
+  const samples=history.filter(q=>q.contract_id===entry.candidate_id&&Date.parse(q.observed_at)>=target&&Date.parse(q.observed_at)<=closes&&Date.parse(q.received_at)<=now);
+  const captured=samples.some(q=>q.multiplier===100&&(!q.quote_check||q.quote_check==='QUOTE_CHECK_PASSED'));
+  return {contract:entry.candidate_id,minutes,target,closes,state:captured?'CAPTURED':now>closes?'MISSING':now>=target?'OPEN':'UPCOMING',seconds:Math.max(0,Math.ceil(((now<target?target:closes)-now)/1000)),failed_checks:samples.length>0&&!captured};
+ }));
+}
 export function validationTiming(history,now=Date.now()){
  const entries=quoteEvidenceInput(null,history).entries;
  if(!entries.length)return 'Validation clock starts after the first passing fetched quote. No automatic quote polling.';
+ const details=captureWindows(history,now),clock=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
  const windows=VALIDATION_MINUTES.map(minutes=>{
-  let complete=0,due=0,missed=0;const targets=[];
-  for(const entry of entries){
-   const target=Date.parse(entry.decision_at)+minutes*60000;targets.push(target);
-   const captured=history.some(q=>q.contract_id===entry.candidate_id&&q.multiplier===100&&Date.parse(q.observed_at)>=target&&Date.parse(q.observed_at)<=target+60000&&Date.parse(q.received_at)<=now);
-   if(captured)complete++;else if(now>target+60000)missed++;else if(now>=target)due++;
-  }
-  const wait=Math.max(0,Math.ceil((Math.min(...targets)-now)/1000));
-  return `${minutes}-min: ${complete}/${entries.length} captured${due?' · refresh now':wait?' · next in '+Math.floor(wait/60)+':'+String(wait%60).padStart(2,'0'):''}${missed?' · '+missed+' missing windows':''}`;
+  const rows=details.filter(w=>w.minutes===minutes),complete=rows.filter(w=>w.state==='CAPTURED').length,due=rows.filter(w=>w.state==='OPEN'),missed=rows.filter(w=>w.state==='MISSING').length,upcoming=rows.filter(w=>w.state==='UPCOMING');
+  return `${minutes}-min: ${complete}/${entries.length} captured${due.length?' · refresh now · closes in '+clock(Math.min(...due.map(w=>w.seconds))):upcoming.length?' · next in '+clock(Math.min(...upcoming.map(w=>w.seconds))):''}${missed?' · '+missed+' missing windows':''}`;
  });
  return windows.join(' | ')+' · Refresh manually; export before leaving. Backgrounded phones may pause page updates.';
 }

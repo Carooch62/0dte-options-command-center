@@ -5,7 +5,7 @@ import {createServer} from 'node:http';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 await mkdir('test-results/mobile',{recursive:true});
 import assert from 'node:assert/strict';
-const server=createServer(async(req,res)=>{try{const path=req.url==='/'?'candidate-quotes.html':req.url.slice(1).split('?')[0];if(!['candidate-quotes.html','candidate-quotes-panel.js','candidate-quotes.js','robinhood-review.js','quote-evidence.js','quote-session.js','quote-timing.js','connection-ui.css','brokerage.html','dashboard-broker.js','dashboard-broker-logic.js','brokerage-history.js','execution-evidence.js','robinhood-panel.js','robinhood-connect.js'].includes(path)){res.writeHead(404);res.end();return;}res.setHeader('Content-Type',path.endsWith('.js')?'text/javascript':path.endsWith('.css')?'text/css':'text/html');res.end(await readFile(new URL('../'+path,import.meta.url)));}catch{res.writeHead(500);res.end();}});
+const server=createServer(async(req,res)=>{try{const path=req.url==='/'?'candidate-quotes.html':req.url.slice(1).split('?')[0];if(!['private-request.js','candidate-quotes.html','candidate-quotes-panel.js','candidate-quotes.js','robinhood-review.js','quote-evidence.js','quote-session.js','quote-timing.js','connection-ui.css','brokerage.html','dashboard-broker.js','dashboard-broker-logic.js','brokerage-history.js','execution-evidence.js','robinhood-panel.js','robinhood-connect.js'].includes(path)){res.writeHead(404);res.end();return;}res.setHeader('Content-Type',path.endsWith('.js')?'text/javascript':path.endsWith('.css')?'text/css':'text/html');res.end(await readFile(new URL('../'+path,import.meta.url)));}catch{res.writeHead(500);res.end();}});
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 let browser;
 try{
@@ -13,7 +13,7 @@ try{
  for(const width of [390,430]){
  const context=await browser.newContext({viewport:{width,height:844}});
  await context.tracing.start({screenshots:true,snapshots:true});
- const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ const page=await context.newPage();await page.clock.install();const errors=[];page.on('pageerror',e=>errors.push(e.message));
  try{
  await page.route('**/health',r=>r.fulfill({json:{environment:'staging'}}));
  await page.route('**/data/candidate-snapshot.json',r=>r.fulfill({json:{generated_at:'2026-10-12T14:00:00Z',candidates:[{ticker:'TEST',options:[{contract_id:'SYNTHETIC-LONG-CONTRACT-NAME-261012C00100000',strike:100,side:'call',expiry:'2026-10-12'}]}]}}));
@@ -22,7 +22,7 @@ try{
  assert.equal(await page.locator('.project-nav a').count(),3);
  assert.equal(await page.locator('.project-nav a[aria-current=page]').innerText(),'Quotes');
  assert.equal(await page.locator('.project-nav').evaluate(el=>getComputedStyle(el).display),'flex');
- await page.locator('summary').click();
+ await page.getByText('Snapshot imports and staging fallback',{exact:true}).click();
  await page.getByRole('button',{name:'Load staging scanner snapshot',exact:true}).click();
  await page.getByText('Contract metadata has not been matched.',{exact:false}).waitFor();
  assert.match(await page.locator('#snapshot-info').innerText(),/Staging.*2026-10-12T14:00:00Z/);
@@ -45,7 +45,7 @@ try{
  await page.getByRole('button',{name:'Load current $0.30 scanner batch',exact:true}).click();
  await page.getByText('Loaded 1 contracts',{exact:false}).waitFor();
  await page.getByRole('button',{name:'Match contracts and fetch live quotes',exact:true}).click();
- await page.getByText('ABOVE_LIMIT',{exact:true}).waitFor();
+ await page.getByText('Above $0.30 · outside budget',{exact:true}).waitFor();
  await page.getByText('Live ask is above $0.30.',{exact:false}).waitFor();
  const downloadPromise=page.waitForEvent('download');
  await page.getByRole('button',{name:'Export private quote observations',exact:true}).click();
@@ -68,7 +68,7 @@ try{
  assert.equal(exported.entries[0].decision_at,exported.entries[0].quote.received_at);
  assert.ok(!JSON.stringify(exported).includes('account_id'));
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'private results overflow');
- assert.equal(await page.locator('td[data-label="$0.30 live ask"]').innerText(),'ABOVE_LIMIT');
+ assert.equal(await page.locator('td[data-label="$0.30 live ask"]').innerText(),'Above $0.30 · outside budget');
  await page.screenshot({path:`test-results/mobile/${width}-private-live.png`,fullPage:true});
  await page.route('**/private/plaid/robinhood/quotes',r=>r.fulfill({json:{received_at:new Date().toISOString(),observations:[{quote:{instrument_id:id,bid_price:'.02',ask_price:'.03',updated_at:now}}]}}));
  await page.getByRole('button',{name:'Refresh matched option quotes',exact:true}).click();
@@ -88,7 +88,22 @@ try{
  assert.equal(await page.locator('td[data-label="Bid / ask"]').innerText(),'Unknown');
  assert.ok(await page.getByRole('button',{name:'Refresh matched option quotes',exact:true}).isEnabled());
  assert.ok(await page.getByRole('link',{name:'Open private sign-in and connection setup',exact:true}).isVisible());
- console.log(`${width}px: loader, source timestamp, no overflow, button sizing, production rejection passed`);
+ await page.clock.setSystemTime(new Date(Date.parse(exported.entries[0].decision_at)+5*60000+1000));
+ await page.clock.runFor(1000);
+ await page.getByText('Capture countdowns by contract',{exact:true}).click();
+ await page.waitForFunction(()=>document.getElementById('capture-windows').textContent.includes('REFRESH NOW'));
+ assert.match(await page.locator('#validation-clock').innerText(),/closes in/);
+ await page.clock.setSystemTime(new Date(Date.parse(exported.entries[0].decision_at)+6*60000+1000));
+ await page.clock.runFor(1000);
+ await page.waitForFunction(()=>document.getElementById('capture-windows').textContent.includes('MISSING'));
+ assert.match(await page.locator('#capture-windows').innerText(),/MISSING/);
+ await page.route('**/private/plaid/robinhood/candidates',r=>r.abort('failed'));
+ page.once('dialog',d=>d.accept());await page.locator('#load-current').click();
+ await page.locator('#status').filter({hasText:'Check your network and retry'}).waitFor();
+ assert.ok(await page.locator('#retry-request').isEnabled());
+ assert.ok(await page.locator('#export-evidence').isEnabled());
+ assert.equal(await page.locator('#rows tr').count(),1,'failed batch replacement must preserve cohort');
+ console.log(`${width}px: loader, capture countdown, failure recovery, evidence preservation, no overflow passed`);
  assert.deepEqual(errors,[]);
  }finally{await page.screenshot({path:`test-results/mobile/${width}-final.png`,fullPage:true});await writeFile(`test-results/mobile/${width}-errors.json`,JSON.stringify(errors));await context.tracing.stop({path:`test-results/mobile/${width}-trace.zip`});await context.close();}
  }

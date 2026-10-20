@@ -36,6 +36,7 @@ const assets = [
   "quote-evidence.js",
   "quote-session.js",
   "quote-timing.js",
+  "private-request.js",
   "shadow-review.html",
   "shadow-review.js",
   "shadow-review-panel.js"
