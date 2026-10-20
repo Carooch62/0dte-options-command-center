@@ -14,6 +14,9 @@ export function candidateQuotes(snapshot,observations,now=Date.now()){
  if(ids.size!==1){row.reasons.push(ids.size?'AMBIGUOUS_CONTRACT':'NO_CONTRACT_MATCH');rows.push(row);continue;}
  const x=[...matches].sort((a,b)=>millis(b.received_at)-millis(a.received_at))[0],i=x.instrument,q=x.quote||{};
  row.instrument_id=i.id;
+ const latestCopies=matches.filter(value=>millis(value.received_at)===millis(x.received_at));
+ const signature=value=>JSON.stringify([value.instrument?.id,value.instrument?.state,value.instrument?.tradability,number(value.instrument?.trade_value_multiplier),value.instrument?.sellout_datetime,value.quote?.instrument_id,value.quote?.updated_at,number(value.quote?.bid_price),number(value.quote?.ask_price)]);
+ if(new Set(latestCopies.map(signature)).size>1){row.reasons.push('CONFLICTING_QUOTE_OBSERVATIONS');row.status='REQUIRES_RECHECK';rows.push(row);continue;}
  if(!uuid.test(i.id)||q.instrument_id!==i.id)row.reasons.push('QUOTE_ID_MISMATCH');
  if(number(i.trade_value_multiplier)!==100)row.reasons.push('NONSTANDARD_OR_UNKNOWN_MULTIPLIER');
  if(i.state!=='active'||i.tradability!=='tradable')row.reasons.push('CONTRACT_NOT_ACTIVE');
