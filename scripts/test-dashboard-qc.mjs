@@ -19,7 +19,7 @@ let browser;
 try{
  browser=await chromium.launch({headless:true});
  for(const width of [390,430,1280]){
-  const context=await browser.newContext({viewport:{width,height:900}}),page=await context.newPage(),errors=[];
+  const context=await browser.newContext({viewport:{width,height:900},timezoneId:'UTC'}),page=await context.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(e.message));
   await page.clock.install({time:new Date('2026-10-19T14:00:00Z')});
   let fail=false;
@@ -35,6 +35,7 @@ try{
    await page.locator('#shown').filter({hasText:'1 candidates'}).waitFor();
    assert.equal(await page.locator('.project-nav a[aria-current=page]').innerText(),'Scanner');
    assert.match(await page.locator('#freshness').innerText(),/Research snapshot/);
+   assert.match(await page.locator('#freshness').innerText(),/10:00:00 AM ET/);
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'scanner page overflow');
    await page.locator('#tickerSearch').fill('MISSING');assert.equal(await page.locator('#board article').count(),0);
    await page.locator('#clearSearch').click();assert.equal(await page.locator('#board article').count(),1);

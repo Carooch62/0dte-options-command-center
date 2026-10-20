@@ -17,7 +17,7 @@ let premiumHistory=read('0dtePremiumHistory',{});
 if(!premiumHistory||Array.isArray(premiumHistory)||typeof premiumHistory!=='object')premiumHistory={};
 let settings=read('0dteRisk',{}),stars=read('0dteStars',[]);
 if(!Array.isArray(stars))stars=[];
-const money=n=>finite(n)===null?'—':'$'+Number(n).toFixed(2),value=(n,d=2)=>finite(n)===null?'—':Number(n).toFixed(d),time=ts=>ts&&Number.isFinite(new Date(ts).getTime())?new Date(ts).toLocaleString():'Unknown';
+const money=n=>finite(n)===null?'—':'$'+Number(n).toFixed(2),value=(n,d=2)=>finite(n)===null?'—':Number(n).toFixed(d),time=ts=>ts&&Number.isFinite(new Date(ts).getTime())?new Date(ts).toLocaleString('en-US',{timeZone:'America/New_York'})+' ET':'Unknown';
 function notice(id,text,kind='warn'){$(id).innerHTML=`<div class="notice ${kind}">${esc(text)}</div>`;}
 async function json(url,timeout=20000){const r=await fetch(url,{cache:'no-store',signal:AbortSignal.timeout(timeout)});if(!r.ok)throw Error(`HTTP ${r.status}`);return r.json();}
 function movePercent(v){const n=finite(v);return `<span class="move ${n>0?'up':n<0?'down':''}">${n===null?'—':(n>0?'+':'')+value(n)+'%'}</span>`;}
