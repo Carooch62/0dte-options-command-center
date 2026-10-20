@@ -32,7 +32,7 @@ try{
  await page.route('**/health',r=>r.fulfill({json:{environment:'production'}}));
  await page.getByRole('button',{name:'Load staging scanner snapshot',exact:true}).click();
  await page.getByText('This loader requires the staging environment.',{exact:false}).waitFor();
- assert.equal(await page.locator('#rows tr').count(),0);
+ assert.equal(await page.locator('#rows tr').count(),1,'failed staging load must preserve the prior cohort');
  // Validate the automatic private workflow using sanitized synthetic responses.
  const now=new Date().toISOString(),id='22222222-2222-2222-2222-222222222222',contract={ticker:'TEST',strike:100,side:'call',expiry:'2099-01-01'};
  await page.route('**/private/plaid/robinhood/candidates',r=>r.fulfill({json:{snapshot:{generated_at:now,included_contracts:1,total_contracts:1,qualifying_contracts:1,omitted_contracts:0,candidates:[{ticker:'TEST',options:[{...contract,contract_id:'TEST20990101C00100000'}]}]}}}));
