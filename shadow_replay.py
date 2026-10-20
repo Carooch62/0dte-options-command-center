@@ -79,6 +79,9 @@ def replay(snapshot):
         def score(weights):
             return round(sum(values[k]*weights[k]/100 for k in REFERENCE), 6)
         scored.append({'candidate_id': ident, 'reference_score': score(REFERENCE),
+                       'reference_components': {k: {'score': values[k], 'weight_pct': REFERENCE[k],
+                                                  'contribution': round(values[k]*REFERENCE[k]/100, 6)}
+                                                for k in REFERENCE},
                        'adaptive_score': score(assessment['proposed_weights']),
                        'allocation_policy': assessment['allocation_policy'],
                        'news_event_ids': list(linked) if reviewed_input else [],

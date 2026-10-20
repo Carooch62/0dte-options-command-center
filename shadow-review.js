@@ -18,7 +18,19 @@ export function buildReviewRows(q,corpus,replay){
   if(Date.parse(cutoff)>Date.parse(q.captured_at))r.reasons.push('Later declared decision cutoff: '+cutoff);
   if(records.length){r.review_status='REVIEW_SUPPLIED_UNVALIDATED';for(const x of records){if(x.evidence_set_id!==q.packet_id||Date.parse(x.as_of)!==Date.parse(cutoff)){r.reasons.push('REVIEW_PACKET_OR_CUTOFF_MISMATCH');continue;}if(!stamp(x.reviewed_at)||Date.parse(x.reviewed_at)>Date.parse(cutoff))r.reasons.push('REVIEW_AFTER_CUTOFF');}}
   const withheld=replay?.withheld.find(x=>x.candidate_id===c.candidate_id),scored=replay?.scored.find(x=>x.candidate_id===c.candidate_id);
-  if(withheld){r.replay_status='WITHHELD';r.reasons.push(...withheld.reasons);}else if(scored)r.replay_status='ADMITTED_OFFLINE';
+  if(withheld){r.replay_status='WITHHELD';r.reasons.push(...withheld.reasons);}else if(scored){
+   r.replay_status='ADMITTED_OFFLINE';
+   if(scored.reference_components){
+    const weights={news:40,patterns:38,volume:10,options:7,risk_reward:5};let total=0;
+    r.fixed_components=Object.entries(weights).map(([name,weight])=>{
+     const c=scored.reference_components[name];
+     if(!c||!Number.isFinite(c.score)||c.score<0||c.score>100||c.weight_pct!==weight||!Number.isFinite(c.contribution)||Math.abs(c.contribution-c.score*weight/100)>0.000001)throw Error('Invalid fixed component contributions');
+     total+=c.contribution;return `${name.replace('_',' ')} ${c.contribution.toFixed(2)} (${weight}%)`;
+    }).join(' · ');
+    if(!Number.isFinite(scored.reference_score)||Math.abs(total-scored.reference_score)>0.00001)throw Error('Fixed score does not match contributions');
+    r.fixed_score=scored.reference_score;
+   }
+  }
   return r;
  });
 }

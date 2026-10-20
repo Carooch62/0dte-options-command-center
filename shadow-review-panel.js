@@ -6,7 +6,7 @@ function render(){
  $('info').textContent=`Scan: ${queue.generated_at} · Captured: ${queue.captured_at} · Session: ${queue.market_session||'unknown'} · ${queue.coverage.included} included / ${queue.coverage.qualifying} eligible · Packet: ${queue.packet_id}`;
  for(const row of buildReviewRows(queue,reviews,replay)){
   const tr=document.createElement('tr');
-  for(const [index,value] of [row.candidate_id,row.ask??'Unknown',row.review_status,row.replay_status,row.reasons.join('; ')].entries()){
+  for(const [index,value] of [row.candidate_id,row.ask??'Unknown',row.review_status,row.replay_status+(Number.isFinite(row.fixed_score)?` · fixed ${row.fixed_score.toFixed(2)} / 100 · ${row.fixed_components}`:''),row.reasons.join('; ')].entries()){
    const td=document.createElement('td');td.textContent=String(value);td.setAttribute('data-label',['Contract','Research ask','Review','Replay','Evidence gaps / reasons'][index]);tr.append(td);
   }$('rows').append(tr);
  }
