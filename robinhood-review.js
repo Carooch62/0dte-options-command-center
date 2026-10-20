@@ -15,7 +15,7 @@ export function quoteReview(o,now=Date.now()){
  const valid=bid!==null&&ask!==null&&bid>0&&ask>0&&bid<=ask;
  const flags=[];
  if(!valid)flags.push('Missing, zero or crossed bid/ask');
- if(age===null||age<0||ageAtCollection<0)flags.push('Missing or inconsistent quote clock');
+ if(!Number.isFinite(now)||!Number.isFinite(t)||!Number.isFinite(received)||age<0||ageAtCollection<0||received>now)flags.push('Missing or inconsistent quote clock');
  else if(age>60)flags.push('Quote older than 60 seconds');
  if(o.session_status!=='open')flags.push('Open market session not verified');
  const delta=num(q.delta),theta=num(q.theta);
@@ -72,6 +72,13 @@ export function orderReview(accounts){
 export function barReview(series,receivedAt){
  if(series.interval!=='5minute'||series.bounds!=='regular')return {symbol:series.symbol,status:'Unsupported interval/session'};
  const bars=(series.bars||[]).filter(b=>b&&!b.interpolated&&Number.isFinite(millis(b.begins_at))&&millis(b.begins_at)+300000<=millis(receivedAt)&&num(b.volume)>0&&['open_price','high_price','low_price','close_price'].every(k=>num(b[k])>0)).sort((a,b)=>millis(a.begins_at)-millis(b.begins_at));
+ const byTime=new Map();
+ for(const bar of bars){
+  const stamp=millis(bar.begins_at),prior=byTime.get(stamp);
+  if(prior&&['open_price','high_price','low_price','close_price','volume'].some(k=>Number(prior[k])!==Number(bar[k])))return {symbol:series.symbol,status:'Conflicting duplicate bars; research withheld'};
+  byTime.set(stamp,bar);
+ }
+ bars.splice(0,bars.length,...byTime.values());
  const days=new Set(bars.map(b=>new Date(millis(b.begins_at)).toLocaleDateString('en-CA',{timeZone:'America/New_York'})));
  if(!bars.length||days.size!==1)return {symbol:series.symbol,status:'Single session bars required'};
  const first=bars[0],last=bars.at(-1),prior=bars.at(-2),base=bars.slice(-7,-1),volume=bars.reduce((s,b)=>s+Number(b.volume),0);

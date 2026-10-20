@@ -26,3 +26,9 @@ test('UUID mismatch, adjusted contracts and expired deadlines fail',()=>{
 test('latest collection supersedes older successful quote even when newest is invalid',()=>{
  const a=observation(),b=observation();b.received_at='2026-10-12T15:00:00Z';b.quote.bid_price=null;assert.ok(candidateQuotes(scanner(),[a,b],now)[0].reasons.includes('INVALID_BOOK'));
 });
+
+test('conflicting copies at the newest receipt stay unverified in either order',()=>{
+ const a=observation(),b=observation();b.quote.bid_price='.79';
+ for(const rows of [[a,b],[b,a]]){const result=candidateQuotes(scanner(),rows,now)[0];assert.equal(result.status,'REQUIRES_RECHECK');assert.deepEqual(result.reasons,['CONFLICTING_QUOTE_OBSERVATIONS']);assert.equal(result.bid,undefined);}
+ assert.equal(candidateQuotes(scanner(),[a,structuredClone(a)],now)[0].status,'QUOTE_CHECK_PASSED');
+});

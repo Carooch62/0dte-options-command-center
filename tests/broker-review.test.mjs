@@ -12,3 +12,12 @@ test('comparison cannot use a later publication or previous session',()=>{
  const h=[{scan_id:'prior',generated_at:'2026-10-06T14:50:00Z',dashboard_generated_at:'2026-10-06T14:51:00Z',candidate_state:[{ticker:'TEST',direction:'UP',rank:3}]},{scan_id:'future',generated_at:'2026-10-06T14:59:00Z',dashboard_generated_at:'2026-10-06T15:01:00Z',candidate_state:[]}];
  assert.equal(scannerComparison(t,h).scan_id,'prior');assert.equal(scannerComparison(t,h).direction_aligned,true);assert.equal(scannerComparison({...t,time:'2026-10-07T15:00:00Z'},h).status,'NO_PRIOR_SNAPSHOT');assert.equal(researchDataset(pack([buy,sell]),h).ml_ready,false);
 });
+
+test('conflicting transaction identity across symbols invalidates both affected groups in any order',()=>{
+ const otherBuy={...buy,investment_transaction_id:'ob',ticker_symbol:'OTHR261006C00100000'},otherSell={...sell,investment_transaction_id:'os',ticker_symbol:otherBuy.ticker_symbol};
+ const conflict={...buy,ticker_symbol:otherBuy.ticker_symbol};
+ for(const rows of [[buy,sell,otherBuy,otherSell,conflict],[conflict,otherBuy,otherSell,buy,sell],[buy,conflict,sell,otherBuy,otherSell]]){
+  const r=reconcile(pack(rows));assert.equal(r.trades.length,0);assert.match(r.issues.map(i=>i.reason).join(),/Conflicting duplicate/);
+ }
+ assert.equal(reconcile(pack([buy,sell,{...buy,account_key:'separate'}])).trades.length,1);
+});

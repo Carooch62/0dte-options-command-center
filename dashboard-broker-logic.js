@@ -17,19 +17,19 @@ export function validatePack(p){
 }
 export function reconcile(p){
  validatePack(p);
- const groups=new Map(),seen=new Map(),issues=[],ignored=[];
+ const groups=new Map(),seen=new Map(),ambiguousGroups=new Set(),issues=[],ignored=[];
  for(const r of p.transactions){
   const id=r.investment_transaction_id,key=`${r.account_key||r.account_id||''}|${r.ticker_symbol||''}`;
   if(!id||!(r.account_key||r.account_id)){issues.push({reason:'Missing account or transaction ID',symbol:r.ticker_symbol});continue;}
   const uid=`${r.account_key||r.account_id}|${id}`;
   if(seen.has(uid)){
-   if(JSON.stringify(seen.get(uid))!==JSON.stringify(r)){issues.push({reason:'Conflicting duplicate transaction',symbol:r.ticker_symbol});const g=groups.get(key);if(g)g.invalid=true;}
+   if(JSON.stringify(seen.get(uid))!==JSON.stringify(r)){issues.push({reason:'Conflicting duplicate transaction',symbol:r.ticker_symbol});const original=seen.get(uid),originalKey=`${original.account_key||original.account_id||''}|${original.ticker_symbol||''}`;for(const affected of [key,originalKey]){ambiguousGroups.add(affected);const g=groups.get(affected);if(g)g.invalid=true;}}
    continue;
   }
   seen.set(uid,r);
   const option=parseOption(r.ticker_symbol);
   if(!option){if(/\b(call|put)\b.*\bstrike\b/i.test(r.name||''))issues.push({symbol:r.ticker_symbol||r.security_name||r.security_id||'Unknown option',source_id:id,reason:'Option description present but a standard contract symbol is missing; expiry and contract identity require review'});else ignored.push(r);continue;}
-  if(!groups.has(key))groups.set(key,{option,symbol:r.ticker_symbol,rows:[],invalid:false});
+  if(!groups.has(key))groups.set(key,{option,symbol:r.ticker_symbol,rows:[],invalid:ambiguousGroups.has(key)});
   groups.get(key).rows.push(r);
  }
  const cycles=[];
