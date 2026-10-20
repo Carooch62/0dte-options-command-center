@@ -37,7 +37,15 @@ export function appendQuoteEvidence(snapshot,observations,history,now=Date.now()
   const timing=quoteRequestTiming(row.request_timing);if(Object.keys(timing).length)record.request_timing=timing;
   if(!next.some(p=>p.contract_id===record.contract_id&&p.observed_at===record.observed_at&&p.received_at===record.received_at))next.push(record);
  }
- return next.slice(-2000);
+ if(next.length<=2000)return next;
+ // Keep the first passing receipt immutable even when recent diagnostics roll off.
+ const keep=new Set(),contracts=new Set();
+ for(let index=0;index<next.length;index++){
+  const quote=next[index];
+  if(quote.multiplier===100&&!contracts.has(quote.contract_id)){contracts.add(quote.contract_id);keep.add(index);}
+ }
+ for(let index=next.length-1;index>=0&&keep.size<2000;index--)keep.add(index);
+ return next.filter((_,index)=>keep.has(index));
 }
 export function quoteEvidenceInput(snapshot,history,now=new Date().toISOString(),attempts=[]){
  const entries=[],seen=new Set();
