@@ -232,7 +232,7 @@ def execution_state(x, previous):
     crossed=crossing(x,previous) and bool(x.get('direction_confirmed'))
     confirmation=bool(x.get('momentum_confirmed') or x.get('acceleration_confirmed'))
     strong=x.get('execution_readiness')=='VERIFIED_DELAYED'
-    state='CONFIRMED' if crossed and strong and confirmation else 'TRIGGERED' if crossed else 'SECOND-WAVE' if x.get('second_wave_event') else 'WATCH' if x.get('setup_bucket')!='PASS' else 'PASS'
+    state='CONFIRMED' if crossed and strong and confirmation and x.get('setup_qualified') is True else 'TRIGGERED' if crossed else 'SECOND-WAVE' if x.get('second_wave_event') else 'WATCH' if x.get('setup_bucket')!='PASS' else 'PASS'
     if state in ('CONFIRMED','TRIGGERED') and x.get('momentum_state')=='DECAYING': state='DECAYING'
     return state,crossed
 

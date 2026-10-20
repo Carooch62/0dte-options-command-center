@@ -21,9 +21,9 @@ async function harness(responses=[],storage=new Map(),prime=true,consent=()=>tru
  await load('research',{format:'robinhood-research-v1',retrieved_at:now,accounts:[],bars:[],observations:[{instrument:{id,chain_symbol:'SPY',strike_price:778,type:'call',expiration_date:'2026-10-12',trade_value_multiplier:100,state:'active',tradability:'tradable',sellout_datetime:'2099-01-01T00:00:00Z'},quote:{instrument_id:id,bid_price:'.80',ask_price:'.81',updated_at:now},received_at:now}]});
  }return {get,load,tick,calls,storage};
 }
-test('imports render a matching quote and invalid scanner clears the table',async()=>{
+test('invalid scanner import preserves the existing snapshot and mapping',async()=>{
  const h=await harness();assert.equal(h.get('rows').children.length,1);assert.equal(h.get('refresh').disabled,false);
- await h.load('scanner',{wrong:true});h.tick();assert.equal(h.get('rows').children.length,0);assert.equal(h.get('refresh').disabled,true);
+ await h.load('scanner',{wrong:true});h.tick();assert.equal(h.get('rows').children.length,1);assert.equal(h.get('refresh').disabled,false);assert.match(h.get('status').textContent,/Expected scanner candidates/);
 });
 test('staging denial clears old prices and permits a later retry',async()=>{
  const h=await harness([Response.json({error:'Private routes disabled in staging'},{status:403})]);await h.get('refresh').onclick();assert.match(h.get('status').textContent,/access was denied/);assert.equal(h.get('rows').children[0].children[1].textContent,'Unknown');assert.equal(h.get('refresh').disabled,false);assert.equal(h.calls[0][1].cache,'no-store');
@@ -37,8 +37,8 @@ test('unexpected quote ID is rejected without retaining previous price',async()=
 test('loader checks environment before data and displays source timestamp',async()=>{
  const h=await harness([Response.json({environment:'staging'}),Response.json({generated_at:'2026-10-12T14:00:00Z',candidates:[]})]);await h.get('load-scanner').onclick();assert.deepEqual(h.calls.map(x=>x[0]),['/health','/data/candidate-snapshot.json']);assert.match(h.get('snapshot-info').textContent,/Staging.*2026-10-12/);
 });
-test('production loader rejection clears prior snapshot without fetching data',async()=>{
- const h=await harness([Response.json({environment:'production'})]);await h.get('load-scanner').onclick();assert.equal(h.calls.length,1);assert.equal(h.get('rows').children.length,0);assert.match(h.get('status').textContent,/requires the staging/);
+test('production loader rejection preserves prior snapshot without fetching staging data',async()=>{
+ const h=await harness([Response.json({environment:'production'})]);await h.get('load-scanner').onclick();assert.equal(h.calls.length,1);assert.equal(h.get('rows').children.length,1);assert.equal(h.get('refresh').disabled,false);assert.match(h.get('status').textContent,/requires the staging/);
 });
 
 test('private current loader clears previous mapping and reports current source',async()=>{
@@ -129,4 +129,21 @@ test('a failed replacement load retains the original batch and captured evidence
  const h=await harness([Response.json({received_at:now,observations:[{quote:{instrument_id:id,bid_price:'.29',ask_price:'.30',updated_at:now}}]}),Response.json({},{status:502})]);
  await h.get('refresh').onclick();const before=JSON.parse(h.storage.get(SESSION_KEY));await h.get('load-current').onclick();const after=JSON.parse(h.storage.get(SESSION_KEY));
  assert.deepEqual(after.history,before.history);assert.deepEqual(after.scanner,before.scanner);assert.equal(h.get('refresh').disabled,false);
+});
+
+test('failed imports and staging loads preserve captured evidence and recovery timestamps',async()=>{
+ const id='bbdbf613-f3e0-4f68-9cc7-fc090ca84e24',now=new Date().toISOString();
+ const h=await harness([Response.json({received_at:now,observations:[{quote:{instrument_id:id,bid_price:'.29',ask_price:'.30',updated_at:now}}]}),Response.json({environment:'staging'}),Response.json({candidates:[]}),Response.json({format:'wrong'})]);
+ await h.get('refresh').onclick();const before=JSON.parse(h.storage.get(SESSION_KEY));
+ const unchanged=()=>{const after=JSON.parse(h.storage.get(SESSION_KEY));for(const key of ['scanner','observations','history','source'])assert.deepEqual(after[key],before[key]);assert.equal(h.get('refresh').disabled,false);};
+ await h.load('scanner',{wrong:true});unchanged();
+ await h.load('research',{wrong:true});unchanged();
+ await h.get('load-scanner').onclick();assert.match(h.get('status').textContent,/timestamp/);unchanged();
+ await h.get('load-validation').onclick();assert.match(h.get('status').textContent,/evidence packet/);unchanged();
+});
+test('successful staging replacement clears captured history only after validation',async()=>{
+ const id='bbdbf613-f3e0-4f68-9cc7-fc090ca84e24',now=new Date().toISOString();
+ const h=await harness([Response.json({received_at:now,observations:[{quote:{instrument_id:id,bid_price:'.29',ask_price:'.30',updated_at:now}}]}),Response.json({environment:'staging'}),Response.json({generated_at:now,candidates:[]})]);
+ await h.get('refresh').onclick();assert.equal(JSON.parse(h.storage.get(SESSION_KEY)).history.length,1);
+ await h.get('load-scanner').onclick();const after=JSON.parse(h.storage.get(SESSION_KEY));assert.deepEqual(after.history,[]);assert.deepEqual(after.observations,[]);assert.equal(h.get('refresh').disabled,true);
 });

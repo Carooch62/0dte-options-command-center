@@ -83,3 +83,18 @@ test('conflicting latest observations never create an entry estimate in either o
  const other={...observation,quote:{...observation.quote,bid_price:'.28'}};
  for(const rows of [[observation,other],[other,observation]])assert.equal(quoteEvidenceInput(snapshot,appendQuoteEvidence(snapshot,rows,[],now)).entries.length,0);
 });
+
+test('history rollover preserves first passing decisions and newest evidence through recovery',()=>{
+ const first='2026-10-14T14:00:00.000Z',contract=snapshot.candidates[0].options[0].contract_id;
+ const history=Array.from({length:2000},(_,index)=>({contract_id:contract,observed_at:new Date(Date.parse(first)+index*1000).toISOString(),received_at:new Date(Date.parse(first)+index*1000).toISOString(),bid:.29,ask:.30,multiplier:100,quote_check:'QUOTE_CHECK_PASSED'}));
+ history[1]={...history[1],contract_id:'OTHER'};
+ const next=appendQuoteEvidence(snapshot,[observation],history,now);
+ assert.equal(next.length,2000);
+ assert.equal(history.length,2000);assert.equal(history[0].received_at,first);
+ assert.equal(next.at(-1).received_at,observation.received_at);
+ const entries=quoteEvidenceInput(snapshot,next).entries;
+ assert.equal(entries.find(e=>e.candidate_id===contract).decision_at,first);
+ assert.equal(entries.find(e=>e.candidate_id==='OTHER').decision_at,history[1].received_at);
+ const recovered=restoreSession(JSON.stringify(sessionPayload(snapshot,[observation],next,'test',now)),now);
+ assert.deepEqual(quoteEvidenceInput(recovered.scanner,recovered.history).entries,entries);
+});

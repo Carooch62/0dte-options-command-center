@@ -32,7 +32,7 @@ try{
  await page.route('**/health',r=>r.fulfill({json:{environment:'production'}}));
  await page.getByRole('button',{name:'Load staging scanner snapshot',exact:true}).click();
  await page.getByText('This loader requires the staging environment.',{exact:false}).waitFor();
- assert.equal(await page.locator('#rows tr').count(),0);
+ assert.equal(await page.locator('#rows tr').count(),1,'failed staging load must preserve the prior cohort');
  // Validate the automatic private workflow using sanitized synthetic responses.
  const now=new Date().toISOString(),id='22222222-2222-2222-2222-222222222222',contract={ticker:'TEST',strike:100,side:'call',expiry:'2099-01-01'};
  await page.route('**/private/plaid/robinhood/candidates',r=>r.fulfill({json:{snapshot:{generated_at:now,included_contracts:1,total_contracts:1,qualifying_contracts:1,omitted_contracts:0,candidates:[{ticker:'TEST',options:[{...contract,contract_id:'TEST20990101C00100000'}]}]}}}));
@@ -103,6 +103,12 @@ try{
  assert.ok(await page.locator('#retry-request').isEnabled());
  assert.ok(await page.locator('#export-evidence').isEnabled());
  assert.equal(await page.locator('#rows tr').count(),1,'failed batch replacement must preserve cohort');
+ const historyBefore=await page.evaluate(()=>JSON.parse(sessionStorage.getItem('private-quote-session-v1')).history);
+ page.once('dialog',d=>d.accept());
+ await page.locator('#scanner').setInputFiles({name:'invalid-snapshot.json',mimeType:'application/json',buffer:Buffer.from('{"wrong":true}')});
+ await page.locator('#status').filter({hasText:'Expected scanner candidates'}).waitFor();
+ assert.deepEqual(await page.evaluate(()=>JSON.parse(sessionStorage.getItem('private-quote-session-v1')).history),historyBefore);
+ assert.equal(await page.locator('#rows tr').count(),1,'invalid file replacement must preserve cohort');
  console.log(`${width}px: loader, capture countdown, failure recovery, evidence preservation, no overflow passed`);
  assert.deepEqual(errors,[]);
  }finally{await page.screenshot({path:`test-results/mobile/${width}-final.png`,fullPage:true});await writeFile(`test-results/mobile/${width}-errors.json`,JSON.stringify(errors));await context.tracing.stop({path:`test-results/mobile/${width}-trace.zip`});await context.close();}
