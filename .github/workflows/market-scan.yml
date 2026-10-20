@@ -37,6 +37,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
+          # Fetch code and current JSON first, then hydrate only referenced archive days.
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !/data/
+            /data/*.json
+      - name: Hydrate archives required by retained evidence
+        run: python scripts/prepare_scan_checkout.py
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

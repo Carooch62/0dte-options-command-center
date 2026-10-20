@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from datetime import datetime, timezone, timedelta
 from market_clock import session_info
 from scan_archive import archive_research, archive_receipt
@@ -29,13 +30,21 @@ def validate(stage):
             'coverage':raw['coverage'],'core_missing':raw.get('core_missing',[]),'scan_id':raw['scan_id']}
 
 def run():
+    started = time.perf_counter()
+    timings = {}
+    def measure(name, action):
+        before = time.perf_counter()
+        try:
+            return action()
+        finally:
+            timings[name] = round((time.perf_counter() - before) * 1000)
     dest=ROOT/'data';dest.mkdir(exist_ok=True)
     health={'updated_at':datetime.now(timezone.utc).isoformat(),'run_id':os.getenv('GITHUB_RUN_ID'),
             'request_id':os.getenv('SCAN_REQUEST_ID') or None,'status':'RUNNING'}
     try:
         if (dest/'scan-history.json').exists() and (dest/'option-observations.json').exists():
             health['stage']='ARCHIVE_EXISTING'
-            archive_research(dest, dest/'archive')
+            measure('archive_existing', lambda: archive_research(dest, dest/'archive'))
         now=datetime.now(timezone.utc)
         info=session_info(now)
         first_bar_at=datetime.fromisoformat(info['open_at'])+timedelta(minutes=5) if info.get('open_at') else None
@@ -69,7 +78,7 @@ def run():
             for name in ('scanner.py','trend_context.py','option_expander.py','core_0dte.py','schema_normalizer.py','execution_normalizer.py'):
                 health['stage']=name
                 try:
-                    subprocess.run([sys.executable,str(ROOT/name)],cwd=stage,check=True,timeout=300 if name in ('scanner.py','option_expander.py') else 120)
+                    measure(name, lambda: subprocess.run([sys.executable,str(ROOT/name)],cwd=stage,check=True,timeout=300 if name in ('scanner.py','option_expander.py') else 120))
                 except (subprocess.SubprocessError, OSError):
                     if name != 'trend_context.py':
                         raise
@@ -81,9 +90,9 @@ def run():
                     (stage/'data/market.json').write_text(json.dumps(raw,separators=(',',':')))
                     cache_path=stage/'data/trend-cache.json'
                     if not cache_path.exists():cache_path.write_text('{}')
-            health.update(validate(stage))
+            health.update(measure('validate', lambda: validate(stage)))
             health['stage']='ARCHIVE'
-            archive_research(stage/'data', dest/'archive')
+            measure('archive_new', lambda: archive_research(stage/'data', dest/'archive'))
             # The complete retained history is archived before bounding the live file.
             history_path=stage/'data/scan-history.json'
             history_path.write_text(json.dumps(json.loads(history_path.read_text())[-50:],separators=(',',':')))
@@ -104,6 +113,8 @@ def run():
         return 1
     finally:
         health['updated_at']=datetime.now(timezone.utc).isoformat()
+        health['stage_timings_ms'] = timings
+        health['pipeline_ms'] = round((time.perf_counter() - started) * 1000)
         try:
             receipt_path=dest/'scan-receipts.json'
             archive_receipt(dest/'archive', health, json.loads(receipt_path.read_text()) if receipt_path.exists() else [])

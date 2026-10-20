@@ -16,14 +16,17 @@ def day_of(timestamp):
 
 def write_gzip(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
+    payload = gzip.compress(json.dumps(value, separators=(',', ':')).encode(), mtime=0)
+    if path.exists() and path.read_bytes() == payload:
+        return
     temporary = path.with_suffix('.tmp')
-    temporary.write_bytes(gzip.compress(json.dumps(value, separators=(',', ':')).encode(), mtime=0))
+    temporary.write_bytes(payload)
     temporary.replace(path)
 
 def archive_research(source, destination):
     """Backfill retained rows; absent earlier scans remain absent, never reconstructed."""
     source, destination = Path(source), Path(destination)
-    affected_days = set()
+    affected_days, changed_days = set(), set()
     for row in json.loads((source / 'scan-history.json').read_text()):
         timestamp = row['generated_at']
         affected_days.add(day_of(timestamp))
@@ -31,8 +34,10 @@ def archive_research(source, destination):
         path = destination / day_of(timestamp) / 'scans' / (key + '.json.gz')
         if not path.exists():
             write_gzip(path, row)
+            changed_days.add(day_of(timestamp))
     for day in affected_days:
-        rebuild_brokerage_index(destination / day)
+        if day in changed_days or not (destination / day / 'brokerage-scans.json').exists():
+            rebuild_brokerage_index(destination / day)
     groups = {}
     for row in json.loads((source / 'option-observations.json').read_text()):
         groups.setdefault(day_of(row['observed_at']), []).append(row)
@@ -42,7 +47,9 @@ def archive_research(source, destination):
         # Later markouts update an existing event; rolled-off events survive.
         merged = {(r['scan_id'], r['contract_id']): r for r in previous}
         merged.update({(r['scan_id'], r['contract_id']): r for r in rows})
-        write_gzip(path, sorted(merged.values(), key=lambda r: r['observed_at']))
+        updated = sorted(merged.values(), key=lambda r: r['observed_at'])
+        if updated != previous:
+            write_gzip(path, updated)
 
 def archive_receipt(destination, health, receipts):
     key = hashlib.sha256(str(health.get('request_id') or health.get('run_id') or health['updated_at']).encode()).hexdigest()[:24]
