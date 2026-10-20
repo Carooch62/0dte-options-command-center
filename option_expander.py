@@ -21,8 +21,12 @@ def main():
     path=Path('data/market.json');data=json.loads(path.read_text());rows=data['candidates']
     budget=max(0,MAX_OPTIONS-sum(bool(x.get('chain_attempted')) for x in rows))
     extra,pinned,rotation=select_candidates(rows,budget,int(__import__('time').time()//300))
-    scanner.scan_options(extra)
-    data['option_expansion']={'additional_attempted':len(extra),'priority_attempted':pinned,'rotating_revisits':rotation,'target':MAX_OPTIONS}
+    selected={x['ticker'] for x in extra}
+    # Core ETFs were previously fetched in the next subprocess. Queue them first
+    # in this same bounded pool, keeping the exact expansion cohort and budget.
+    core_extra=[x for x in rows if x['ticker'] in scanner.CORE_TICKERS and not x.get('chain_attempted') and x['ticker'] not in selected]
+    scanner.scan_options(core_extra+extra)
+    data['option_expansion']={'additional_attempted':len(extra),'core_prefetch_attempted':len(core_extra),'priority_attempted':pinned,'rotating_revisits':rotation,'target':MAX_OPTIONS}
     scanner.coverage(data);path.write_text(json.dumps(data,separators=(',',':'),allow_nan=False))
 
 if __name__=='__main__':main()
