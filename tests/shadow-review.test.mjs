@@ -20,3 +20,10 @@ test('later prospective cutoff is displayed and cannot precede capture',()=>{
  assert.ok(rows[0].reasons.some(x=>x.includes('Later declared decision cutoff')));assert.ok(!rows[0].reasons.includes('REVIEW_AFTER_CUTOFF'));
  assert.throws(()=>buildReviewRows(q,{...corpus,as_of:'2026-10-14T14:59:00Z'},null));
 });
+test('fixed score contributions are displayed only when weights and totals agree',()=>{
+ const q=queue(),components=Object.fromEntries(Object.entries({news:40,patterns:38,volume:10,options:7,risk_reward:5}).map(([k,w])=>[k,{score:50,weight_pct:w,contribution:w/2}]));
+ const r={packet_id:q.packet_id,as_of:q.captured_at,scored:[{candidate_id:'TEST',reference_score:50,reference_components:components}],withheld:[]};
+ const row=buildReviewRows(q,null,r)[0];assert.equal(row.fixed_score,50);assert.match(row.fixed_components,/news 20.00 \(40%\)/);
+ components.news.contribution=40;assert.throws(()=>buildReviewRows(q,null,r),/contributions/);
+ components.news.contribution=20;r.scored[0].reference_score=99;assert.throws(()=>buildReviewRows(q,null,r),/does not match/);
+});

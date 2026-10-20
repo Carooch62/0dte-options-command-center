@@ -28,6 +28,12 @@ try{
    await page.locator('#replay').setInputFiles({name:'replay.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({packet_id:queue.packet_id,as_of:queue.captured_at,scored:[],withheld:[{candidate_id:'TEST261016C00100000',reasons:['NEWS:UNKNOWN']}]}))});
    await page.getByText('WITHHELD',{exact:true}).waitFor();
    assert.match(await page.locator('#rows').innerText(),/NEWS:UNKNOWN/);
+   const components=Object.fromEntries(Object.entries({news:40,patterns:38,volume:10,options:7,risk_reward:5}).map(([k,w])=>[k,{score:50,weight_pct:w,contribution:w/2}]));
+   await page.locator('#replay').setInputFiles({name:'fixed.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({format:'fixed-composite-shadow-v1',packet_id:queue.packet_id,as_of:queue.captured_at,scored:[{candidate_id:'TEST261016C00100000',reference_score:50,reference_components:components}],withheld:[]}))});
+   await page.getByText('ADMITTED_OFFLINE · fixed 50.00 / 100',{exact:false}).waitFor();
+   assert.match(await page.locator('#rows').innerText(),/news 20.00 \(40%\)/);
+   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'fixed contributions overflow');
+   await page.screenshot({path:`test-results/shadow-mobile/${width}-fixed.png`,fullPage:true});
    assert.deepEqual(errors,[]);console.log(`${width}px: queue, missing windows, withheld reasons, timestamps and no overflow passed`);
   }finally{await context.close();}
  }
