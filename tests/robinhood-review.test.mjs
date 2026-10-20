@@ -26,3 +26,19 @@ test('export source pack can be reimported',()=>{
  const p={format:'robinhood-research-v1',retrieved_at:'2026-10-07T18:00:00Z',accounts:[],observations:[],bars:[]};
  assert.equal(validateRobinhoodPack({format:'robinhood-review-export-v1',source_pack:p}),p);
 });
+
+test('future, missing and invalid receipt clocks cannot be recent snapshots',()=>{
+ for(const stamp of ['2026-10-08T18:00:00Z',undefined,'invalid','2026-10-07T17:59:00Z']){
+  const o=observation();o.received_at=stamp;
+  assert.equal(quoteReview(o,now).status,'REQUIRES_RECHECK');assert.match(quoteReview(o,now).flags.join(),/clock/);
+ }
+ const o=observation();assert.equal(quoteReview(o,NaN).status,'REQUIRES_RECHECK');
+});
+test('duplicate completed bars are counted once and conflicting copies withhold research',()=>{
+ const bar=(stamp,price)=>({begins_at:stamp,open_price:price,high_price:price,low_price:price,close_price:price,volume:100});
+ const a=bar('2026-10-07T17:40:00Z',100),b=bar('2026-10-07T17:45:00Z',200),series={symbol:'TEST',interval:'5minute',bounds:'regular'};
+ const base=barReview({...series,bars:[a,b]},'2026-10-07T18:00:00Z');
+ assert.deepEqual(barReview({...series,bars:[a,b,{...a,volume:'100'}]},'2026-10-07T18:00:00Z'),base);
+ const result=barReview({...series,bars:[a,b,{...a,close_price:101}]},'2026-10-07T18:00:00Z');
+ assert.match(result.status,/Conflicting/);assert.equal(result.approximate_bar_vwap,undefined);
+});

@@ -25,7 +25,13 @@ const assets = [
   "execution-evidence.js",
   "robinhood-review.js",
   "robinhood-panel.js",
-  "robinhood-connect.js"
+  "robinhood-connect.js",
+  "candidate-quotes.html",
+  "candidate-quotes.js",
+  "candidate-quotes-panel.js",
+  "shadow-review.html",
+  "shadow-review.js",
+  "shadow-review-panel.js"
 ];
 for (const file of assets) {
   if (!statSync(join(root, file)).isFile()) throw new Error('Missing browser asset: ' + file);
@@ -43,3 +49,4 @@ rmSync(output, { recursive: true, force: true });
 mkdirSync(output);
 for (const file of assets) copyFileSync(join(root, file), join(output, file));
 console.log('Prepared ' + assets.length + ' browser assets in public/');
+

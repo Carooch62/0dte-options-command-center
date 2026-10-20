@@ -415,6 +415,7 @@ def update_history(data, path="data/scan-history.json", limit=200):
                 "qualification_checks": x.get("qualification_checks"),
                 "news_status": x.get("news_status"),
                 "news_checked_at": x.get("news_checked_at"),
+                "news_research": x.get("news_research"),
                 "pattern_research": x.get("pattern_research"),
                 "relative_volume_research": x.get("relative_volume_research"),
                 "early_watch": x.get("early_watch"),

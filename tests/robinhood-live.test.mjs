@@ -88,4 +88,12 @@ test('authenticated quote path completes MCP initialization and returns only san
  assert.equal(result.status,200);assert.ok(!text.includes('secret'));assert.ok(!text.includes('never-return'));assert.equal(JSON.parse(text).latency_verified,false);assert.equal(JSON.parse(text).scanner_feed,'DELAYED_RESEARCH');
  assert.deepEqual(methods,['initialize','notifications/initialized','tools/list','tools/call']);
  assert.equal(result.headers.get('Cache-Control'),'no-store');
+ setUpstream(async()=>new Response(null,{status:401}));
+ const rejected=await handleRobinhood(request('quotes','POST',auth,{kind:'equity',symbols:['JD']}),env);
+ assert.equal(rejected.status,409);assert.equal((await rejected.json()).code,'RECONNECT_REQUIRED');
+}));
+
+test('missing authorization returns reconnect without contacting provider',async()=>harness(async({env,auth,calls})=>{
+ const result=await handleRobinhood(request('quotes','POST',auth,{kind:'equity',symbols:['SPY']}),env);
+ assert.equal(result.status,409);assert.equal((await result.json()).code,'RECONNECT_REQUIRED');assert.equal(calls.length,0);
 }));

@@ -1,0 +1,202 @@
+{
+  "mode": "OFFLINE_RESEARCH",
+  "production_effect": "NONE",
+  "real_case": {
+    "ticker": "EMAT",
+    "as_of": "2026-10-10T04:23:53.082117+00:00",
+    "importance": 0.12184,
+    "original": {
+      "news": 41.83,
+      "patterns": 36.17,
+      "volume": 10.0,
+      "options": 7.0,
+      "risk_reward": 5.0
+    },
+    "alternatives": {
+      "linear_2": {
+        "news": 40.24,
+        "patterns": 37.76,
+        "volume": 10.0,
+        "options": 7.0,
+        "risk_reward": 5.0
+      },
+      "linear_2_5": {
+        "news": 40.3,
+        "patterns": 37.7,
+        "volume": 10.0,
+        "options": 7.0,
+        "risk_reward": 5.0
+      },
+      "capped_original": {
+        "news": 41.83,
+        "patterns": 36.17,
+        "volume": 10.0,
+        "options": 7.0,
+        "risk_reward": 5.0
+      }
+    }
+  },
+  "synthetic_sensitivity": [
+    {
+      "importance": 0,
+      "alternatives": {
+        "linear_2": {
+          "news": 40.0,
+          "patterns": 38.0,
+          "volume": 10.0,
+          "options": 7.0,
+          "risk_reward": 5.0
+        },
+        "linear_2_5": {
+          "news": 40.0,
+          "patterns": 38.0,
+          "volume": 10.0,
+          "options": 7.0,
+          "risk_reward": 5.0
+        },
+        "capped_original": {
+          "news": 40.0,
+          "patterns": 38.0,
+          "volume": 10.0,
+          "options": 7.0,
+          "risk_reward": 5.0
+        }
+      }
+    },
+    {
+      "importance": 0.1,
+      "alternatives": {
+        "linear_2": {
+          "news": 40.2,
+          "patterns": 37.8,
+          "volume": 10.0,
+          "options": 7.0,
+          "risk_reward": 5.0
+        },
+        "linear_2_5": {
+          "news": 40.25,
+          "patterns": 37.75,
+          "volume": 10.0,
+          "options": 7.0,
+          "risk_reward": 5.0
+        },
+        "capped_original": {
+          "news": 41.5,
+          "patterns": 36.5,
+          "volume": 10.0,
+          "options": 7.0,
+          "risk_reward": 5.0
+        }
+      }
+    },
+    {
+      "importance": 0.25,
+      "alternatives": {
+        "linear_2": {
+          "news": 40.5,
+          "patterns": 37.5,
+          "volume": 10.0,
+          "options": 7.0,
+          "risk_reward": 5.0
+        },
+        "linear_2_5": {
+          "news": 40.62,
+          "patterns": 37.38,
+          "volume": 10.0,
+          "options": 7.0,
+          "risk_reward": 5.0
+        },
+        "capped_original": {
+          "news": 42.5,
+          "patterns": 35.5,
+          "volume": 10.0,
+          "options": 7.0,
+          "risk_reward": 5.0
+        }
+      }
+    },
+    {
+      "importance": 0.5,
+      "alternatives": {
+        "linear_2": {
+          "news": 41.0,
+          "patterns": 37.0,
+          "volume": 10.0,
+          "options": 7.0,
+          "risk_reward": 5.0
+        },
+        "linear_2_5": {
+          "news": 41.25,
+          "patterns": 36.75,
+          "volume": 10.0,
+          "options": 7.0,
+          "risk_reward": 5.0
+        },
+        "capped_original": {
+          "news": 42.5,
+          "patterns": 35.5,
+          "volume": 10.0,
+          "options": 7.0,
+          "risk_reward": 5.0
+        }
+      }
+    },
+    {
+      "importance": 0.75,
+      "alternatives": {
+        "linear_2": {
+          "news": 41.5,
+          "patterns": 36.5,
+          "volume": 10.0,
+          "options": 7.0,
+          "risk_reward": 5.0
+        },
+        "linear_2_5": {
+          "news": 41.88,
+          "patterns": 36.12,
+          "volume": 10.0,
+          "options": 7.0,
+          "risk_reward": 5.0
+        },
+        "capped_original": {
+          "news": 42.5,
+          "patterns": 35.5,
+          "volume": 10.0,
+          "options": 7.0,
+          "risk_reward": 5.0
+        }
+      }
+    },
+    {
+      "importance": 1,
+      "alternatives": {
+        "linear_2": {
+          "news": 42.0,
+          "patterns": 36.0,
+          "volume": 10.0,
+          "options": 7.0,
+          "risk_reward": 5.0
+        },
+        "linear_2_5": {
+          "news": 42.5,
+          "patterns": 35.5,
+          "volume": 10.0,
+          "options": 7.0,
+          "risk_reward": 5.0
+        },
+        "capped_original": {
+          "news": 42.5,
+          "patterns": 35.5,
+          "volume": 10.0,
+          "options": 7.0,
+          "risk_reward": 5.0
+        }
+      }
+    }
+  ],
+  "limitations": [
+    "No return or ranking backtest.",
+    "Ratings and decay remain experimental.",
+    "No alternative has been selected for live use."
+  ]
+}
