@@ -2,9 +2,9 @@ name: Candidate Mobile QA
 on:
   push:
     branches: [release/private-candidate-workflow-20261014]
-    paths: ['connection-ui.css', 'brokerage.html', 'dashboard-broker.js', 'robinhood-connect.js', 'candidate-quotes*', 'quote-evidence.js', 'quote-session.js', 'quote-timing.js', 'tests/quote-timing.test.mjs', 'tests/quote-session.test.mjs', 'tests/validation-setup.test.mjs', 'tests/quote-evidence.test.mjs', 'robinhood-review.js', 'robinhood-live.js', 'private-candidates.js', 'tests/candidate-quotes*', 'tests/private-candidates.test.mjs', 'scripts/test-candidate-mobile.mjs', '.github/workflows/candidate-mobile.yml']
+    paths: ['dashboard_glass.html', 'dashboard-app.js', 'dashboard-logic.js', 'dashboard-mobile.css', 'trade-review.js', 'signal-checklist.js', 'scripts/test-dashboard-qc.mjs', 'connection-ui.css', 'brokerage.html', 'dashboard-broker.js', 'robinhood-connect.js', 'candidate-quotes*', 'quote-evidence.js', 'quote-session.js', 'quote-timing.js', 'tests/quote-timing.test.mjs', 'tests/quote-session.test.mjs', 'tests/validation-setup.test.mjs', 'tests/quote-evidence.test.mjs', 'robinhood-review.js', 'robinhood-live.js', 'private-candidates.js', 'tests/candidate-quotes*', 'tests/private-candidates.test.mjs', 'scripts/test-candidate-mobile.mjs', '.github/workflows/candidate-mobile.yml']
   pull_request:
-    paths: ['connection-ui.css', 'brokerage.html', 'dashboard-broker.js', 'robinhood-connect.js', 'candidate-quotes*', 'quote-evidence.js', 'quote-session.js', 'quote-timing.js', 'tests/quote-timing.test.mjs', 'tests/quote-session.test.mjs', 'tests/validation-setup.test.mjs', 'tests/quote-evidence.test.mjs', 'robinhood-review.js', 'robinhood-live.js', 'private-candidates.js', 'tests/candidate-quotes*', 'tests/private-candidates.test.mjs', 'scripts/test-candidate-mobile.mjs', '.github/workflows/candidate-mobile.yml']
+    paths: ['dashboard_glass.html', 'dashboard-app.js', 'dashboard-logic.js', 'dashboard-mobile.css', 'trade-review.js', 'signal-checklist.js', 'scripts/test-dashboard-qc.mjs', 'connection-ui.css', 'brokerage.html', 'dashboard-broker.js', 'robinhood-connect.js', 'candidate-quotes*', 'quote-evidence.js', 'quote-session.js', 'quote-timing.js', 'tests/quote-timing.test.mjs', 'tests/quote-session.test.mjs', 'tests/validation-setup.test.mjs', 'tests/quote-evidence.test.mjs', 'robinhood-review.js', 'robinhood-live.js', 'private-candidates.js', 'tests/candidate-quotes*', 'tests/private-candidates.test.mjs', 'scripts/test-candidate-mobile.mjs', '.github/workflows/candidate-mobile.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -26,7 +26,9 @@ jobs:
       - name: Install matching Chromium
         run: npx playwright install --with-deps chromium
       - name: Run phone-width checks
-        run: node scripts/test-candidate-mobile.mjs
+        run: |
+          node scripts/test-candidate-mobile.mjs
+          node scripts/test-dashboard-qc.mjs
       - name: Preserve screenshots and traces
         if: always()
         uses: actions/upload-artifact@v4

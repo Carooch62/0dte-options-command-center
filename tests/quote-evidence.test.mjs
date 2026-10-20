@@ -56,3 +56,30 @@ test('legacy diagnostics stay unknown and unrecognized diagnostic content is not
  assert.equal(Object.hasOwn(restored.history[0],'quote_check_reasons'),false);
 });
 
+
+test('evidence values, clocks and timing come from the same newest observation in either order',()=>{
+ const old={...observation,received_at:'2026-10-14T14:00:00Z',quote:{...observation.quote,bid_price:'.10',ask_price:'.20',updated_at:'2026-10-14T14:00:00Z'},request_timing:{browser_ms:999}};
+ const fresh={...observation,request_timing:{browser_ms:123}};
+ for(const rows of [[old,fresh],[fresh,old]]){
+  const [q]=appendQuoteEvidence(snapshot,rows,[],now);
+  assert.equal(q.observed_at,fresh.quote.updated_at);assert.equal(q.received_at,fresh.received_at);
+  assert.equal(q.bid,.29);assert.equal(q.ask,.30);assert.equal(q.request_timing.browser_ms,123);
+ }
+});
+test('latest failed book is exported as failed rather than borrowing an earlier passing book',()=>{
+ const old={...observation,received_at:'2026-10-14T14:59:59Z',quote:{...observation.quote,updated_at:'2026-10-14T14:59:59Z'}};
+ const bad={...observation,quote:{...observation.quote,bid_price:'.02',ask_price:'.03'}};
+ for(const rows of [[old,bad],[bad,old]]){
+  const [q]=appendQuoteEvidence(snapshot,rows,[],now);assert.equal(q.bid,.02);assert.equal(q.multiplier,null);
+  assert.equal(q.received_at,bad.received_at);assert.deepEqual(q.quote_check_reasons,['WIDE_SPREAD']);
+ }
+});
+test('same provider clock and later receipt keep the later receipt timing',()=>{
+ const later={...observation,received_at:'2026-10-14T15:00:01Z',request_timing:{browser_ms:45}};
+ const [q]=appendQuoteEvidence(snapshot,[observation,later],[],now+1000);
+ assert.equal(q.observed_at,observation.quote.updated_at);assert.equal(q.received_at,later.received_at);assert.equal(q.request_timing.browser_ms,45);
+});
+test('conflicting latest observations never create an entry estimate in either ordering',()=>{
+ const other={...observation,quote:{...observation.quote,bid_price:'.28'}};
+ for(const rows of [[observation,other],[other,observation]])assert.equal(quoteEvidenceInput(snapshot,appendQuoteEvidence(snapshot,rows,[],now)).entries.length,0);
+});

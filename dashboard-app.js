@@ -125,12 +125,12 @@ const earlyPanel=document.createElement('section');earlyPanel.className='panel';
 earlyPanel.innerHTML='<h2>EARLY WATCH · shadow research</h2><p class="smallnote">Pre-breakout pattern hypotheses, not entry signals. Requires a company catalyst, compression, quiet volume, directional structure and proximity to a level. Uses completed bars only. Existing ranking and contract gates remain unchanged.</p><div id="earlyWatchList"></div>';
 $('candidateBoard').before(earlyPanel);
 function render(){if(!data)return;
- if($('board').contains(document.activeElement)&&document.activeElement.matches('input,textarea,select'))return;
  const anchor=boardAnchor();
  const age=minutes(data.generated_at),usable=!dataDownloadFailed&&snapshotUsable(data);
  const sessionKnown=Date.now()>=Date.parse(data.session_open_at)&&Date.now()<Date.parse(data.session_close_at);
  $('session').textContent=sessionKnown?'REGULAR SESSION':'OUTSIDE VERIFIED SESSION';
  notice('freshness',`${usable?'Research snapshot':'STALE / RESEARCH ONLY'} · generated ${time(data.generated_at)} · ${age===null?'unknown age':value(age,1)+' min old'}. Options remain delayed; unknown quote times cannot confirm an entry.`,usable?'warn':'bad');
+ if($('board').contains(document.activeElement)&&document.activeElement.matches('input,textarea,select'))return;
  const all=(data.candidates||[]).map(x=>({...expirationView(x,$('expiration').value),prefer_low_theta:$('thetaMax').value!=='off',theta_limit_pct:['prefer','off'].includes($('thetaMax').value)?null:Number($('thetaMax').value)})),counts={};for(const x of all){const s=recordedState(x);counts[s]=(counts[s]||0)+1;}
  const c=data.coverage||{};
  $('stats').innerHTML=[['STOCK ROWS',c.stocks_received??data.scanned_rows??0],['CHAIN ATTEMPTS',c.chains_attempted??'Unknown'],['WITH SAME-DAY CHAIN',c.chains_with_contracts??'Unknown'],['LAST TRIGGERED',counts.TRIGGERED||0],['LAST SECOND-WAVE',counts['SECOND-WAVE']||0],['LAST CONFIRMED',counts['CONFIRMED DELAYED']||0]].map(([a,b])=>`<div class="panel stat"><b>${esc(b)}</b><span>${a}</span></div>`).join('');

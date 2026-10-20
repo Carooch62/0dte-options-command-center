@@ -20,3 +20,11 @@ test('freshness warning updates during a focused entry-plan edit',()=>{
  const ctx={data:{generated_at:'old'},document:{activeElement:{matches:()=>true}},boardAnchor:()=>null,minutes:()=>25,dataDownloadFailed:false,snapshotUsable:()=>false,$:id=>id==='board'?board:session,notice:(id,text)=>warning=text,time:()=> 'old',value:n=>String(n)};
  vm.runInNewContext(prefix+'\nrender();',ctx);assert.match(warning,/STALE \/ RESEARCH ONLY/);
 });
+
+test('production scanner freshness still updates while an entry-plan input has focus',()=>{
+ const app=readFileSync(new URL('../dashboard-app.js',import.meta.url),'utf8');
+ const prefix=app.slice(app.indexOf('function render(){'),app.indexOf(' const all=',app.indexOf('function render(){')))+'\n}';
+ let warning;const board={contains:()=>true},session={};
+ const ctx={data:{generated_at:'old'},document:{activeElement:{matches:()=>true}},boardAnchor:()=>null,minutes:()=>25,dataDownloadFailed:false,snapshotUsable:()=>false,$:id=>id==='board'?board:session,notice:(id,text)=>warning=text,time:()=> 'old',value:n=>String(n)};
+ vm.runInNewContext(prefix+'\nrender();',ctx);assert.match(warning,/STALE \/ RESEARCH ONLY/);
+});
