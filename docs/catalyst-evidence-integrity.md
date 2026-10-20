@@ -1,6 +1,6 @@
 # Catalyst evidence integrity
 
-These safeguards apply to staging news assessment and offline replay. Fixed production weights remain news 40%, patterns 38%, volume 10%, options 7%, risk/reward 5%. Scanner ranking and trade eligibility are unchanged. No new news service, subscription, automatic ratings or fabricated reviews are introduced.
+These safeguards apply to staging news assessment and offline replay. The agreed news 40%, patterns 38%, volume 10%, options 7%, risk/reward 5% allocation is a reference for the shadow comparison, not an implemented production composite score. Production still computes a price/volume score and applies execution-state, catalyst, market-alignment and momentum ordering; this change does not replace that formula. Scanner ranking and trade eligibility are unchanged. No new news service, subscription, automatic ratings or fabricated reviews are introduced.
 
 ## Independent clocks
 

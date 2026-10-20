@@ -98,7 +98,8 @@ def evaluate_outcomes(entries, observations, as_of, stock_observations=None, hor
         for q in sample_quotes:
             books.setdefault(clock(q['observed_at']), set()).add((q['bid'], q['ask'], q['source']))
         conflicting = {stamp for stamp, values in books.items() if len(values) > 1}
-        samples = [q['bid'] for q in sample_quotes if clock(q['observed_at']) not in conflicting]
+        samples = list({(clock(q['observed_at']), clock(q['received_at']), q['bid'], q['ask'], q['source']): q['bid']
+                        for q in sample_quotes if clock(q['observed_at']) not in conflicting}.values())
         row['sampled_excursion'] = ({'samples': len(samples),
                                     'best_bid_change_dollars': round((max(samples)-start['ask'])*100, 6),
                                     'worst_bid_change_dollars': round((min(samples)-start['ask'])*100, 6)}
