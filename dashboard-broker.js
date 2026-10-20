@@ -1,4 +1,5 @@
 import {decodeArchive} from './brokerage-history.js?v=20261007-evidence';
+import {requestJSON} from './private-request.js';
 import {validateExecutionPack} from './execution-evidence.js?v=20261007-evidence';
 import {validatePack,researchDataset,plaidReviewPack,reconcile} from './dashboard-broker-logic.js?v=20261007-evidence';
 const $=id=>document.getElementById(id),esc=x=>String(x??'Unknown').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -10,14 +11,14 @@ async function ensureArchives(current){
  if(!days.length)return false;
  archiveBusy++;days.forEach(day=>archiveDays.add(day));
  await Promise.all(days.map(async day=>{try{
-  const r=await fetch(`https://raw.githubusercontent.com/Carooch62/0dte-options-command-center/main/data/archive/${day}/brokerage-scans.json`,{cache:'no-store'});
+  const r=await fetch(`https://raw.githubusercontent.com/Carooch62/0dte-options-command-center/main/data/archive/${day}/brokerage-scans.json`,{cache:'no-store',signal:AbortSignal.timeout(15000)});
   if(!r.ok)throw Error();const scans=decodeArchive(await r.json());history.push(...scans);
  }catch{archiveFailures.add(day);}}));
  archiveBusy--;return true;
 }
 function dataset(){const d=researchDataset(pack,history,executionRecords);d.scanner_history.archive_days_unavailable=[...archiveFailures];return d;}
-try{const r=await fetch('https://raw.githubusercontent.com/Carooch62/0dte-options-command-center/main/data/scan-history.json',{cache:'no-store'});if(!r.ok)throw Error();history=await r.json();if(!Array.isArray(history))throw Error();}catch{history=[];historyError='Scanner history could not be loaded. Comparisons are unavailable.';}
-try{const r=await fetch('https://raw.githubusercontent.com/Carooch62/0dte-options-command-center/main/data/scan-history-recovered.json',{cache:'no-store'});if(!r.ok)throw Error();const archived=await r.json();if(!Array.isArray(archived))throw Error();history.push(...archived);}catch{historyError+=' Recovered historical snapshots could not be loaded.';}
+try{const r=await fetch('https://raw.githubusercontent.com/Carooch62/0dte-options-command-center/main/data/scan-history.json',{cache:'no-store',signal:AbortSignal.timeout(15000)});if(!r.ok)throw Error();history=await r.json();if(!Array.isArray(history))throw Error();}catch{history=[];historyError='Scanner history could not be loaded. Comparisons are unavailable.';}
+try{const r=await fetch('https://raw.githubusercontent.com/Carooch62/0dte-options-command-center/main/data/scan-history-recovered.json',{cache:'no-store',signal:AbortSignal.timeout(15000)});if(!r.ok)throw Error();const archived=await r.json();if(!Array.isArray(archived))throw Error();history.push(...archived);}catch{historyError+=' Recovered historical snapshots could not be loaded.';}
 function comparison(s){
  if(s.status!=='RESEARCH_COMPARISON')return `<p>${s.status==='NO_PRIOR_SNAPSHOT'?'No preceding same-session snapshot retained.':'Ticker absent from the latest preceding snapshot.'}</p>`;
  const tr=s.trend_context;
@@ -42,8 +43,7 @@ $('export').onclick=()=>{const u=URL.createObjectURL(new Blob([JSON.stringify(da
 try{const saved=localStorage.getItem(key);if(saved){pack=validatePack(JSON.parse(saved));render();}}catch{$('status').textContent='Saved snapshot could not be read. Import a valid snapshot to replace it.';}
 
 const privateApi=async(path,body)=>{
- const r=await fetch(`/private/plaid/${path}`,{method:body===undefined?'GET':'POST',credentials:'same-origin',headers:body===undefined?{}:{'Content-Type':'application/json','X-Requested-With':'BrokerageReview'},...(body===undefined?{}:{body:JSON.stringify(body)})});
- const data=await r.json();if(!r.ok)throw Error(data.error||`HTTP ${r.status}`);return data;
+ return requestJSON(`/private/plaid/${path}`,{method:body===undefined?'GET':'POST',headers:body===undefined?{}:{'Content-Type':'application/json','X-Requested-With':'BrokerageReview'},...(body===undefined?{}:{body:JSON.stringify(body)})},path==='sync'?120000:20000);
 };
 const plaidStatus=$('plaid-status'),plaidView=$('plaid-snapshot');
 function plaidButtons(connected){$('plaid-connect-help').textContent=connected?'Already connected to Plaid. Connect is disabled; use Sync now to collect account records. This does not refresh Robinhood quotes.':'Connect an account to enable account sync. Robinhood quote authorization is separate.';$('plaid-connect').disabled=connected;$('plaid-sync').disabled=!connected;$('plaid-disconnect').disabled=!connected;}
