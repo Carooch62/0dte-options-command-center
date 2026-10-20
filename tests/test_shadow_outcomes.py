@@ -58,3 +58,16 @@ class OutcomeTests(unittest.TestCase):
         self.assertEqual(result['entry_status'], 'WITHHELD_ENTRY_QUOTE')
         self.assertEqual(result['underlying_windows'][0]['change_pct'], 1)
 
+
+    def test_identical_observations_do_not_inflate_excursion_sample_count(self):
+        quote = q('2026-10-14T15:05:10Z', .31, .32)
+        baseline = self.run_case([quote])
+        duplicate = self.run_case([quote, dict(quote), quote])
+        self.assertEqual(duplicate, baseline)
+        self.assertEqual(duplicate['sampled_excursion']['samples'], 1)
+        later_receipt = {**quote, 'received_at': '2026-10-14T15:05:11Z'}
+        self.assertEqual(self.run_case([quote, later_receipt])['sampled_excursion']['samples'], 2)
+        conflict = q(quote['observed_at'], .32, .33)
+        result = self.run_case([quote, quote, conflict, conflict])
+        self.assertEqual(result['windows'][0]['status'], 'WITHHELD_CONFLICTING_QUOTES')
+        self.assertEqual(result['sampled_excursion']['samples'], 0)
