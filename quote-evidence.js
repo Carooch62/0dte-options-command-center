@@ -2,6 +2,7 @@ import {candidateQuotes} from './candidate-quotes.js';
 import {quoteRequestTiming} from './quote-timing.js';
 export const VALIDATION_MINUTES=Object.freeze([5,10,15]);
 const messages={
+ CONFLICTING_QUOTE_OBSERVATIONS:'Conflicting quotes share the latest collection time. Refresh matched quotes; neither copy is accepted as evidence.',
  NO_CONTRACT_MATCH:'Contract metadata has not been matched. Use Match contracts and fetch live quotes.',
  AMBIGUOUS_CONTRACT:'More than one contract identity matches. Reload the current batch and match again; keep this contract unverified.',
  QUOTE_ID_MISMATCH:'Quote identity does not match the contract. Match again before using this price.',
@@ -27,13 +28,12 @@ export function appendQuoteEvidence(snapshot,observations,history,now=Date.now()
  const rows=candidateQuotes(snapshot,observations,now),next=[...history];
  for(const row of rows){
   if(!row.instrument_id)continue;
-  const x=observations.find(x=>x.instrument.id===row.instrument_id),q=x?.quote;
-  if(!q?.updated_at||!x.received_at)continue;
-  const record={contract_id:row.contract,observed_at:q.updated_at,received_at:x.received_at,
+  if(!row.observed_at||!row.received_at)continue;
+  const record={contract_id:row.contract,observed_at:row.observed_at,received_at:row.received_at,
    bid:row.bid??null,ask:row.ask??null,source:'Robinhood Quotes',
    multiplier:row.status==='QUOTE_CHECK_PASSED'?100:null,quote_check:row.status,
    ...quoteDiagnostics({metadata_multiplier:row.metadata_multiplier??null,quote_check_reasons:row.reasons})};
-  const timing=quoteRequestTiming(x.request_timing);if(Object.keys(timing).length)record.request_timing=timing;
+  const timing=quoteRequestTiming(row.request_timing);if(Object.keys(timing).length)record.request_timing=timing;
   if(!next.some(p=>p.contract_id===record.contract_id&&p.observed_at===record.observed_at&&p.received_at===record.received_at))next.push(record);
  }
  return next.slice(-2000);

@@ -20,3 +20,22 @@ test('freshness warning updates during a focused entry-plan edit',()=>{
  const ctx={data:{generated_at:'old'},document:{activeElement:{matches:()=>true}},boardAnchor:()=>null,minutes:()=>25,dataDownloadFailed:false,snapshotUsable:()=>false,$:id=>id==='board'?board:session,notice:(id,text)=>warning=text,time:()=> 'old',value:n=>String(n)};
  vm.runInNewContext(prefix+'\nrender();',ctx);assert.match(warning,/STALE \/ RESEARCH ONLY/);
 });
+
+test('production scanner freshness still updates while an entry-plan input has focus',()=>{
+ const app=readFileSync(new URL('../dashboard-app.js',import.meta.url),'utf8');
+ const prefix=app.slice(app.indexOf('function render(){'),app.indexOf(' const all=',app.indexOf('function render(){')))+'\n}';
+ let warning;const board={contains:()=>true},session={};
+ const ctx={data:{generated_at:'old'},document:{activeElement:{matches:()=>true}},boardAnchor:()=>null,minutes:()=>25,dataDownloadFailed:false,snapshotUsable:()=>false,$:id=>id==='board'?board:session,notice:(id,text)=>warning=text,time:()=> 'old',value:n=>String(n)};
+ vm.runInNewContext(prefix+'\nrender();',ctx);assert.match(warning,/STALE \/ RESEARCH ONLY/);
+});
+
+test('current scanner layouts label source timestamps in Eastern rather than browser-local time',()=>{
+ for(const file of ['dashboard-app.js','dashboard-clean-app.js']){
+  const app=readFileSync(new URL('../'+file,import.meta.url),'utf8');
+  const line=app.split('\n').find(l=>l.startsWith('const money='));
+  const format=new Function('finite',line+';return time;')(()=>null);
+  assert.match(format('2026-10-19T14:00:00Z'),/10:00:00 AM ET/);
+  assert.match(format('2026-12-01T15:00:00Z'),/10:00:00 AM ET/);
+  assert.equal(format('bad'),'Unknown');
+ }
+});

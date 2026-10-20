@@ -99,7 +99,7 @@ try{
  await page.route('https://**/*',r=>r.request().url().includes('scan-history')?r.fulfill({json:[]}):r.abort());
  let mode='connected';
  await page.route('**/private/plaid/status',r=>r.fulfill({json:{connected:mode==='connected'}}));
- await page.route('**/private/plaid/snapshot',r=>r.fulfill({json:{snapshot:null}}));
+ await page.route('**/private/plaid/snapshot',r=>r.fulfill({json:{snapshot:{retrieved_at:new Date().toISOString(),range:{start:'2026-10-01',end:'2026-10-19'},accounts:[{account_id:'synthetic',name:'Synthetic test account'}],securities:[{security_id:'synthetic-security',ticker_symbol:'TEST'}],holdings:[{account_id:'synthetic',security_id:'synthetic-security',quantity:1.234567,institution_value:123.45,institution_price_as_of:'2026-10-19'}],transactions:[],coverage:{total_transactions:0,complete:true}}}}));
  await page.route('**/private/plaid/robinhood/status',r=>mode==='failed'?r.fulfill({status:401,json:{error:'Private sign-in required'}}):r.fulfill({json:{connected:mode==='connected',status:mode==='expired'?'RECONNECT_REQUIRED':'READY',expires_at:mode==='connected'?'2099-01-01T00:00:00Z':null}}));
  try{
  for(const state of ['connected','expired','failed']){
@@ -112,12 +112,23 @@ try{
  assert.ok(await page.locator('#rh-live-connect').isDisabled());assert.ok(await page.locator('#rh-live-test').isEnabled());
  assert.match(await page.locator('#rh-connect-help').innerText(),/Already connected/);
  assert.ok(await page.locator('#plaid-connect').isDisabled());assert.ok(await page.locator('#plaid-sync').isEnabled());
+ await page.locator('#plaid-snapshot table').first().waitFor();
+ assert.match(await page.locator('#plaid-snapshot').innerText(),/2026-10-19/);
+ if(width<760)assert.ok(await page.locator('#plaid-snapshot').evaluate(el=>el.scrollWidth>el.clientWidth),'wide provider table must scroll inside its container');
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'populated provider data page overflow');
  }else if(state==='expired'){
  assert.ok(await page.locator('#rh-live-connect').isEnabled());assert.ok(await page.locator('#rh-live-test').isDisabled());
  assert.match(await page.locator('#rh-connect-help').innerText(),/expired/);
  }else{
  assert.ok(await page.locator('#rh-live-connect').isDisabled());assert.ok(await page.locator('#rh-live-test').isDisabled());
  assert.match(await page.locator('#rh-connect-help').innerText(),/could not be checked/);
+ }
+ if(state==='connected'){
+ const stamp=new Date().toISOString(),future=new Date(Date.now()+86400000).toISOString(),instrument={id:'synthetic-review',chain_symbol:'TEST',strike_price:100,type:'call',expiration_date:'2099-01-01'};
+ await page.locator('#rh-file').setInputFiles({name:'synthetic-future-clock.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({format:'robinhood-research-v1',retrieved_at:stamp,accounts:[],bars:[],observations:[{instrument,quote:{instrument_id:instrument.id,bid_price:'.29',ask_price:'.30',delta:'.4',theta:'-.01',updated_at:stamp},received_at:future,session_status:'open'}]}))});
+ await page.locator('#rh-quotes').getByText('Missing or inconsistent quote clock',{exact:false}).waitFor();
+ assert.match(await page.locator('#rh-quotes').innerText(),/Missing or inconsistent quote clock/);
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'imported review page overflow');
  }
  await page.screenshot({path:`test-results/mobile/${width}-connections-${state}.png`,fullPage:true});
  }
