@@ -103,6 +103,12 @@ try{
  assert.ok(await page.locator('#retry-request').isEnabled());
  assert.ok(await page.locator('#export-evidence').isEnabled());
  assert.equal(await page.locator('#rows tr').count(),1,'failed batch replacement must preserve cohort');
+ const historyBefore=await page.evaluate(()=>JSON.parse(sessionStorage.getItem('private-quote-session-v1')).history);
+ page.once('dialog',d=>d.accept());
+ await page.locator('#scanner').setInputFiles({name:'invalid-snapshot.json',mimeType:'application/json',buffer:Buffer.from('{"wrong":true}')});
+ await page.locator('#status').filter({hasText:'Expected scanner candidates'}).waitFor();
+ assert.deepEqual(await page.evaluate(()=>JSON.parse(sessionStorage.getItem('private-quote-session-v1')).history),historyBefore);
+ assert.equal(await page.locator('#rows tr').count(),1,'invalid file replacement must preserve cohort');
  console.log(`${width}px: loader, capture countdown, failure recovery, evidence preservation, no overflow passed`);
  assert.deepEqual(errors,[]);
  }finally{await page.screenshot({path:`test-results/mobile/${width}-final.png`,fullPage:true});await writeFile(`test-results/mobile/${width}-errors.json`,JSON.stringify(errors));await context.tracing.stop({path:`test-results/mobile/${width}-trace.zip`});await context.close();}

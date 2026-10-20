@@ -60,15 +60,15 @@ function render(){
  if(!busy&&matched)$('refresh-help').textContent='Ready to refresh manually. Use the validation clock for 5 / 10 / 15-minute captures; there is no automatic polling.';
  return rows;
 }
-for(const id of ['scanner','research'])$(id).onchange=async e=>{if(busy||id==='scanner'&&!mayReplace())return;try{const f=e.target.files[0];if(!f)return;if(f.size>10000000)throw Error('Maximum file size is 10 MB');const data=JSON.parse(await f.text());if(id==='scanner'){evidenceHistory=[];if(!Array.isArray(data.candidates))throw Error('Expected scanner candidates');candidateQuotes(data,[]);scanner=data;observations=[];scannerSource='Imported file; environment unverified';}else observations=validateRobinhoodPack(data).observations;render();persist();$('status').textContent='Snapshot checks updated. No scanner rankings changed.';}catch(e){if(id==='scanner'){scanner=null;evidenceHistory=[];}else observations=[];render();persist();$('refresh').disabled=true;$('status').textContent=e.message;}};
+for(const id of ['scanner','research'])$(id).onchange=async e=>{if(busy||id==='scanner'&&!mayReplace())return;try{const f=e.target.files[0];if(!f)return;if(f.size>10000000)throw Error('Maximum file size is 10 MB');const data=JSON.parse(await f.text());if(id==='scanner'){if(!Array.isArray(data.candidates))throw Error('Expected scanner candidates');candidateQuotes(data,[]);scanner=data;observations=[];evidenceHistory=[];scannerSource='Imported file; environment unverified';}else observations=validateRobinhoodPack(data).observations;render();persist();$('status').textContent='Snapshot checks updated. No scanner rankings changed.';}catch(e){render();persist();$('status').textContent=e.message;}};
 $('load-scanner').onclick=async()=>{
- if(busy||!mayReplace())return;busy=true;scanner=null;observations=[];evidenceHistory=[];render();
+ if(busy||!mayReplace())return;busy=true;render();
  try{
  const read=path=>requestJSON(path);
  const health=await read('/health');if(health.environment!=='staging')throw Error('This loader requires the staging environment. Import a snapshot instead.');
  const data=await read('/data/candidate-snapshot.json');candidateQuotes(data,[]);
  if(!Number.isFinite(Date.parse(data.generated_at)))throw Error('Snapshot generation timestamp is missing or invalid.');
- scanner=data;scannerSource='Staging · same-origin scanner data';$('status').textContent='Staging snapshot loaded. Review its generation time before using candidates.';
+ scanner=data;observations=[];evidenceHistory=[];scannerSource='Staging · same-origin scanner data';$('status').textContent='Staging snapshot loaded. Review its generation time before using candidates.';
  }catch(e){$('status').textContent=e.message;}finally{busy=false;persist();render();}
 };
 $('load-current').onclick=async()=>{
@@ -76,9 +76,9 @@ $('load-current').onclick=async()=>{
  try{const d=await readPrivate('candidates');candidateQuotes(d.snapshot,[]);if(!Number.isFinite(Date.parse(d.snapshot.generated_at)))throw Error('Invalid scanner timestamp');scanner=d.snapshot;observations=[];evidenceHistory=[];scannerSource='Production · private current scanner batch';$('status').textContent=`Loaded ${scanner.included_contracts} contracts from ${scanner.qualifying_contracts} passing research screens and ask <= $0.30. At most two per ticker. Review scan age; prices are not live.${scanner.included_contracts===0?' No candidates passed; no fallback to unscreened contracts.':''}`;}catch(e){$('status').textContent=failure(e);}finally{busy=false;persist();render();}
 };
 $('load-validation').onclick=async()=>{
- if(busy||!mayReplace())return;busy=true;scanner=null;observations=[];evidenceHistory=[];render();
+ if(busy||!mayReplace())return;busy=true;render();
  try{
- scanner=scannerFromEvidencePacket(await requestJSON('/data/staging-shadow-evidence-latest.json'));scannerSource='STAGING VALIDATION · frozen evidence packet';$('status').textContent=`Loaded ${scanner.included_contracts} staging contracts. Packet captured ${scanner.captured_at}; session ${scanner.market_session||'unknown'}. Require a fresh OPEN-session packet for validation. Match contracts and fetch live quotes next.`;
+ const replacement=scannerFromEvidencePacket(await requestJSON('/data/staging-shadow-evidence-latest.json'));scanner=replacement;observations=[];evidenceHistory=[];scannerSource='STAGING VALIDATION · frozen evidence packet';$('status').textContent=`Loaded ${scanner.included_contracts} staging contracts. Packet captured ${scanner.captured_at}; session ${scanner.market_session||'unknown'}. Require a fresh OPEN-session packet for validation. Match contracts and fetch live quotes next.`;
  }catch(e){$('status').textContent=e.message;}finally{busy=false;persist();render();}
 };
 $('resolve').onclick=async()=>{

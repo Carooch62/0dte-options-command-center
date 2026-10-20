@@ -74,6 +74,16 @@ class ReliabilityTests(unittest.TestCase):
         o=option(delta=None,greeks_verified=False)
         self.assertFalse(contract_checks(o,100)['delta_ok'])
         self.assertEqual(execution_engine.classify_contract(o,100)['contract_role'],'UNVERIFIED')
+    def test_missing_catalyst_cannot_become_verified_execution_readiness(self):
+        x=normalize(snapshot(row(news_items=[])),NOW)['candidates'][0]
+        self.assertTrue(x['momentum_confirmed'])
+        self.assertTrue(x['preferred_contracts'])
+        self.assertFalse(x['setup_qualified'])
+        self.assertEqual(x['execution_readiness'],'WATCH_ONLY')
+        qualified=normalize(snapshot(row()),NOW)['candidates'][0]
+        self.assertTrue(qualified['setup_qualified'])
+        self.assertEqual(qualified['execution_readiness'],'VERIFIED_DELAYED')
+
     def test_expired_series_never_eligible(self):
         x=normalize(snapshot(row(options=[option(expiry='2026-09-29')])),NOW)['candidates'][0]
         self.assertEqual(x['eligible_contracts'],[])
@@ -142,6 +152,17 @@ class ReliabilityTests(unittest.TestCase):
         success=unittest.mock.Mock();success.raise_for_status.return_value=None;success.json.return_value={'ok':True}
         with patch.object(scanner.requests,'get',side_effect=[r,success]) as get,patch.object(scanner.time,'sleep'):
             self.assertTrue(scanner.request_json('https://example.org')['ok']);self.assertEqual(get.call_count,2)
+    def test_pipeline_distinguishes_unverified_empty_chains_from_proven_no_expiry(self):
+        with tempfile.TemporaryDirectory() as folder:
+            stage=Path(folder);(stage/'data').mkdir()
+            for chain_status,expected in [('EMPTY_UNVERIFIED','DEGRADED'),('SOURCE_FAILURE','DEGRADED'),('NO_EXPIRATION_TODAY','SUCCESS'),('SUCCESS','SUCCESS')]:
+                with self.subTest(chain_status=chain_status):
+                    raw={'universe_size':1,'scan_id':'health-qc','candidates':[{'chain_attempted':True}],
+                         'coverage':{'chains_attempted':1,'chain_status_counts':{chain_status:1}}}
+                    (stage/'data/market.json').write_text(json.dumps(raw))
+                    (stage/'data/market-dashboard.json').write_text(json.dumps({'schema_version':7,'candidates':[{'execution_state':'WATCH','preferred_contracts':[]}]}))
+                    self.assertEqual(pipeline.validate(stage)['status'],expected)
+
     def test_pipeline_failure_preserves_last_good_files(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);(root/'data').mkdir();(root/'data/market.json').write_text('last-good')

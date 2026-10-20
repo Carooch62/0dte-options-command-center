@@ -1,8 +1,20 @@
 import unittest
-from execution_engine import classify_contract, crossing, market_regime, momentum_state, enrich
+from execution_engine import classify_contract, crossing, market_regime, momentum_state, enrich, execution_state
 
 
 class ExecutionEngineTests(unittest.TestCase):
+    def test_crossing_cannot_confirm_an_unqualified_setup(self):
+        x={'direction':'UP','price':100.1,'price_freshness':'RECENT','direction_confirmed':True,
+           'momentum_confirmed':True,'acceleration_confirmed':False,'momentum_state':'STABLE',
+           'execution_readiness':'VERIFIED_DELAYED','setup_bucket':'WATCH'}
+        old={'direction':'UP','price':99.9,'trigger_price':100}
+        for qualified in (False,None,'true',1):
+            with self.subTest(qualified=qualified):
+                x['setup_qualified']=qualified
+                self.assertEqual(execution_state(x,old),('TRIGGERED',True))
+        x['setup_qualified']=True
+        self.assertEqual(execution_state(x,old),('CONFIRMED',True))
+
     def test_downside_trigger_cross(self):
         x = {"direction": "DOWN", "price": 19.60}
         old = {"price": 19.80, "trigger_price": 19.70}

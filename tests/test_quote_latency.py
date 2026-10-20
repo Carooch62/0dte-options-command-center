@@ -107,3 +107,32 @@ class LatencyTests(unittest.TestCase):
         r = summarize_exports([a])
         self.assertEqual(r['timed_request_count'], 0)
         self.assertEqual(r['repeated_observations_skipped'], 0)
+
+    def test_reuse_groups_preserve_unknown_legacy_and_withhold_conflicts(self):
+        d=export()
+        d['observations']=[observation(minute=i,duration=(i+1)*10) for i in range(3)]
+        d['observations'][0]['request_timing']['setup_reused']=False
+        d['observations'][1]['request_timing']['setup_reused']=True
+        r=summarize(d)
+        for group,duration in [('initialized',10),('reused',20),('unknown',30)]:
+            self.assertEqual(r['setup_groups'][group]['browser_ms'],{'samples':1,'p50':duration,'p95':duration})
+        conflict=copy.deepcopy(d['observations'][0]);conflict['contract_id']='OTHER'
+        conflict['request_timing']['setup_reused']=True
+        d['observations'].append(conflict)
+        self.assertEqual(summarize(d)['batches'][0]['status'],'WITHHELD_CONFLICTING_TIMING')
+        self.assertEqual(summarize_exports([d,d])['timed_request_count'],2)
+
+    def test_attempt_logs_are_bounded_allowlisted_deduplicated_and_cutoff_checked(self):
+        a=export()
+        attempt={'operation':'quotes','code':'NETWORK','started_at':'2026-10-16T18:00:00Z',
+                 'finished_at':'2026-10-16T18:00:01Z','browser_ms':1000,'access_token':'secret'}
+        a['requests']=[attempt,{**attempt,'finished_at':'2026-10-18T18:00:00Z'},None]
+        original=copy.deepcopy(a)
+        r=summarize_exports([a,a])
+        self.assertEqual(r['request_attempts']['retained_valid_count'],1)
+        self.assertEqual(r['request_attempts']['by_operation_and_code'],{'quotes':{'NETWORK':1}})
+        self.assertEqual(r['timed_request_count'],0)
+        self.assertNotIn('secret',str(r));self.assertEqual(a,original)
+        self.assertFalse(summarize(export())['request_attempts']['provided'])
+        with self.assertRaises(ValueError):
+            summarize({**export(),'requests':[attempt]*201})
