@@ -1,0 +1,29 @@
+name: Inspect private Worker binding metadata
+on:
+  push:
+    branches: [diagnostic/private-bindings-20261020]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Inspect binding names only without changing configuration
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          node --input-type=module <<'JS'
+          const root='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(process.env.CLOUDFLARE_ACCOUNT_ID)+'/workers/scripts/0dte-options-command-center';
+          for(const suffix of ['/settings','/secrets','/versions?per_page=1']){
+            const r=await fetch(root+suffix,{headers:{Authorization:'Bearer '+process.env.CLOUDFLARE_API_TOKEN},signal:AbortSignal.timeout(15000)});
+            const d=await r.json(),v=d.result;
+            const names=rows=>Array.isArray(rows)?rows.map(x=>({name:x.name,type:x.type})):null;
+            console.log(JSON.stringify({endpoint:suffix,http_status:r.status,success:d.success,result_type:Array.isArray(v)?'array':typeof v,result_keys:v&&typeof v==='object'&&!Array.isArray(v)?Object.keys(v):null,bindings:names(v?.bindings),secrets:suffix==='/secrets'?names(v):null,version_count:Array.isArray(v?.items)?v.items.length:null}));
+          }
+          JS
