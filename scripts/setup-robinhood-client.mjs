@@ -1,3 +1,4 @@
+import {inspectWorkerBindings} from './worker-setup-readiness.mjs';
 // Run only in the authenticated Worker deployment job. Never prints credentials.
 import {appendFileSync} from 'node:fs';
 const account=process.env.CLOUDFLARE_ACCOUNT_ID,token=process.env.CLOUDFLARE_API_TOKEN;
@@ -17,10 +18,8 @@ for(const [name,text] of Object.entries({
 })){
  await api('/workers/scripts/'+worker+'/secrets',{method:'PUT',body:JSON.stringify({name,text,type:'secret_text'})});
 }
-const settings=await api('/workers/scripts/'+worker+'/settings');
-const names=new Set((settings.bindings||[]).map(b=>b.name));
-const required=['ROBINHOOD_CLIENT_ID','ROBINHOOD_REDIRECT_URI','PLAID_STORE','PLAID_ENCRYPTION_KEY','CF_ACCESS_TEAM_DOMAIN','CF_ACCESS_AUD','CF_ACCESS_EMAIL'];
-const missing=required.filter(name=>!names.has(name));
+const inspection=await inspectWorkerBindings(()=>api('/workers/scripts/'+worker+'/settings'));
+const missing=inspection.missing;
 let accessRoutes=null,accessInspection='available';
 try{
  const apps=await api('/access/apps?per_page=100');
@@ -41,7 +40,10 @@ const privatePrerequisitesReady=missing.length===0&&guarded;
 // The owner explicitly requested a manual retry. This enables sign-in attempts
 // only; registration and Access checks do not prove provider authorization.
 const enabled=privatePrerequisitesReady;
-await api('/workers/scripts/'+worker+'/secrets',{method:'PUT',body:JSON.stringify({name:'ROBINHOOD_CONNECTION_ENABLED',text:enabled?'true':'false',type:'secret_text'})});
-const result={registered_client_configured:true,manual_connection_enabled:enabled,private_prerequisites_ready:privatePrerequisitesReady,authorization_status:enabled?'MANUAL_RETRY_UNVERIFIED':'SETUP_REQUIRED',protected_routes:guards.map(({path,protected:guard})=>({path,protected:guard})),missing_bindings:missing,access_inspection:accessInspection,access_routes:accessRoutes,automatic_polling_enabled:false};
+// Incomplete metadata must not turn off an already-authorized connection.
+if(enabled)await api('/workers/scripts/'+worker+'/secrets',{method:'PUT',body:JSON.stringify({name:'ROBINHOOD_CONNECTION_ENABLED',text:'true',type:'secret_text'})});
+const result={registered_client_configured:true,manual_connection_enabled:enabled?true:null,connection_flag_updated:enabled,metadata_attempts:inspection.attempts,private_prerequisites_ready:privatePrerequisitesReady,authorization_status:enabled?'MANUAL_RETRY_UNVERIFIED':'SETUP_REQUIRED',protected_routes:guards.map(({path,protected:guard})=>({path,protected:guard})),missing_bindings:missing,access_inspection:accessInspection,access_routes:accessRoutes,automatic_polling_enabled:false};
 console.log('Robinhood setup: '+JSON.stringify(result));
 if(process.env.GITHUB_STEP_SUMMARY)appendFileSync(process.env.GITHUB_STEP_SUMMARY,'\nRobinhood setup (no credentials):\n\n```json\n'+JSON.stringify(result,null,2)+'\n```\n');
+
+if(!enabled)throw Error('Private prerequisites could not be verified; the existing connection flag was left unchanged.');
