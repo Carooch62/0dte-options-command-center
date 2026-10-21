@@ -57,7 +57,7 @@ try{
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'scanner failure state overflow');
    // Expiration changes must load retained research, rather than show missing groups as empty.
    compactMode=true;fail=false;await page.locator('#check').click();
-   await page.locator('#coverage').filter({hasText:'Universe: 2'}).waitFor();
+   await page.locator('#coverage').filter({hasText:'Universe: 2'}).waitFor({state:'attached'});
    fail=true;await page.locator('#expiration').selectOption('week');
    await page.locator('#shown').filter({hasText:'Selected expiration unavailable'}).waitFor();
    assert.equal(await page.locator('#board article').count(),0);
