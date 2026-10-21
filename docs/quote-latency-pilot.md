@@ -1,6 +1,8 @@
 # Private quote latency pilot
 
-The next phase measures manual quote-refresh requests before changing the connection lifecycle. Exact contract mappings are already reused by Refresh; Match performs metadata lookup. Each current quote request initializes MCP, acknowledges initialization, discovers the required read-only tool and then calls it. Measure those stages before deciding whether session reuse is worthwhile.
+The current phase measures the bounded connection-reuse release under manual foreground refreshes. Exact contract mappings are reused by Refresh; Match performs metadata lookup. A request either initializes MCP, acknowledges initialization and discovers the required read-only tool, or reuses a compatible negotiated session. Session reuse is bounded to five minutes, partitioned by authorization and required tools, and evicted on failure; it is not a quote-price cache. Exported `setup_reused` distinguishes initialized (`false`), reused (`true`) and unknown (absent) observations. Do not infer this label for legacy exports. No live before/after speedup has yet been established by the pre-test preparation.
+
+Use the [market-open checklist](market-open-test-checklist.md) for collection and [rollback guide](quote-test-rollback.md) for targeted recovery. The collection protocol below describes the evidence needed for acceptance; shipping the experiment does not establish its performance benefit.
 
 ## Measurements
 
@@ -23,7 +25,7 @@ These intervals overlap; do not add them. Worker timing stops before final respo
 2. After release, one signed-in manual refresh exports all four timing fields and survives reload with identical provider and receipt clocks. An old export remains evaluable without timings.
 3. Collect at least 20 successful foreground requests across at least two open market sessions, using matched contract batches. Record batch size, missing contracts, valid-book rate, provider quote age and failed-request counts alongside request duration. Avoid repeated metadata matching during the refresh measurement.
 4. Report p50/p95 separately for setup, quote retrieval, Worker and browser duration, with sample counts and session/batch composition. Set a measured baseline before proposing a speed target.
-5. Only then consider a bounded connection-reuse experiment. Compare equal batch sizes under comparable session conditions. Require lower request duration without worse quote age, book validity, identity validation or failure rate. Reconnect, expiry, provider session loss, concurrent refresh and authorization isolation must be tested before enabling reuse.
+5. Evaluate the bounded connection-reuse experiment using equal batch sizes under comparable session conditions. Require lower request duration without worse quote age, book validity, identity validation or failure rate. Keep initialized/reused/unknown groups separate. Reconnect, expiry, provider session loss, concurrent refresh and authorization isolation remain required safety checks.
 
 Production scoring remains unchanged. Fixed 40/38/10/7/5 versus adaptive comparison requires completed, provenance-backed component reviews available at the declared decision cutoff and matching prospective outcomes. Later review cannot be backdated into an earlier scan.
 
