@@ -1,6 +1,6 @@
 import {candidateQuotes} from './candidate-quotes.js';
 import {validateRobinhoodPack} from './robinhood-review.js';
-import {quoteGuidance,appendQuoteEvidence,quoteEvidenceInput,scannerFromEvidencePacket,validationTiming,captureWindows} from './quote-evidence.js';
+import {quoteGuidance,appendQuoteEvidence,quoteEvidenceInput,scannerFromEvidencePacket,validationTiming,captureWindows,captureAction} from './quote-evidence.js';
 import {SESSION_KEY,sessionPayload,restoreSession} from './quote-session.js';
 import {quoteRequestTiming} from './quote-timing.js';
 import {requestJSON,safeRequestAttempts} from './private-request.js';
@@ -37,7 +37,8 @@ function render(){
  $('load-scanner').disabled=busy;$('load-current').disabled=busy;$('resolve').disabled=busy||!scanner?.candidates?.length;
  $('load-validation').disabled=busy;$('validation-clock').textContent=validationTiming(evidenceHistory);
  $('capture-windows').replaceChildren();
- const windows=captureWindows(evidenceHistory),clock=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+ const windows=captureWindows(evidenceHistory);$('capture-action').textContent=captureAction(windows);$('capture-refresh').disabled=true;
+ const clock=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
  for(const contract of [...new Set(windows.map(w=>w.contract))]){const p=document.createElement('p');p.textContent=contract+' · '+windows.filter(w=>w.contract===contract).map(w=>`${w.minutes}m: ${w.state==='OPEN'?'REFRESH NOW · closes in '+clock(w.seconds):w.state==='UPCOMING'?'opens in '+clock(w.seconds):w.state}${w.failed_checks?' (quote check failed)':''}`).join(' | ');$('capture-windows').append(p);}
  $('export-evidence').disabled=busy||!evidenceHistory.length&&!attempts.length;
  $('resolve-help').textContent=busy?'A request is in progress. Wait for it to finish.':!scanner?'Load a batch first.':!scanner.candidates?.length?'This batch has no candidates. Load a current batch with eligible research contracts.':'Ready to match exact contracts and fetch their first quotes.';
@@ -56,7 +57,7 @@ function render(){
  $('quote-summary').textContent=`${within} fresh quotes within $0.30 · ${above} fresh quotes above limit · ${rows.length-within-above} unverified or requires recheck. Quote checks are not setup eligibility or trade recommendations.`;
  for(const row of rows.filter(r=>!$('verified-only').checked||r.status==='QUOTE_CHECK_PASSED'&&r.premium_status==='WITHIN_LIMIT')){const tr=document.createElement('tr');for(const value of [row.contract,row.bid===undefined?'Unknown':`${row.bid} / ${row.ask}`,Number.isFinite(row.age_seconds)?row.age_seconds.toFixed(1):'Unknown',row.premium_status==='WITHIN_LIMIT'?'Within $0.30':row.premium_status==='ABOVE_LIMIT'?'Above $0.30 · outside budget':'Unknown · quote check required',quoteGuidance(row)]){const td=document.createElement('td');td.textContent=value;td.setAttribute?.('data-label',['Contract','Bid / ask','Age (seconds)','$0.30 live ask','Quote check'][tr.children.length]);tr.append(td);}$('rows').append(tr);}
  const matched=rows.some(r=>r.instrument_id);
- $('refresh').disabled=busy||!matched;
+ $('refresh').disabled=busy||!matched;$('capture-refresh').disabled=busy||!matched;
  if(!busy&&matched)$('refresh-help').textContent='Ready to refresh manually. Use the validation clock for 5 / 10 / 15-minute captures; there is no automatic polling.';
  return rows;
 }
@@ -111,6 +112,7 @@ $('refresh').onclick=async()=>{
  $('status').textContent=`Received ${data.received_at}. Missing contracts: ${ids.filter(id=>!seen.has(id)).length}. Refresh request: ${(data.request_timing.browser_ms/1000).toFixed(1)} seconds.`;
  }catch(e){observations=prior.map(x=>({...x,quote:{instrument_id:x.instrument.id},received_at:null}));$('status').textContent=failure(e);}finally{busy=false;persist();render();}
 };
+ $('capture-refresh').onclick=()=>{if(!busy&&!$('refresh').disabled)return $('refresh').onclick();};
  $('verified-only').onchange=render;
  $('check-connection').onclick=async()=>{if(busy)return;busy=true;render();$('authorization-state').textContent='Checking private connection status…';$('connection-state').textContent='Checking private access and stored Robinhood authorization…';$('status').textContent='Checking connection status…';try{const d=await readPrivate('status');$('authorization-state').textContent=d.connected?`Authorized until ${d.expires_at}. This is separate from a successful quote request.`:'Robinhood authorization is inactive. Open Connections to connect or renew.';$('status').textContent='Connection status checked. Batch loading and quote checks are separate.';}catch(e){$('authorization-state').textContent='Authorization could not be checked; the previous stored connection may still be active.';$('status').textContent=failure(e);}finally{busy=false;persist();render();}};
  $('retry-request').onclick=()=>{const id={status:'check-connection',candidates:'load-current',resolve:'resolve',quotes:'refresh'}[retryPath];if(!busy&&id)return $(id).onclick();};

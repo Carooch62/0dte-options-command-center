@@ -6,7 +6,7 @@ import {validateRobinhoodPack} from '../robinhood-review.js';
 import {quoteGuidance,appendQuoteEvidence,quoteEvidenceInput,scannerFromEvidencePacket,validationTiming} from '../quote-evidence.js';
 import {SESSION_KEY,sessionPayload,restoreSession} from '../quote-session.js';
 import {quoteRequestTiming} from '../quote-timing.js';
-import {captureWindows} from '../quote-evidence.js';
+import {captureWindows,captureAction} from '../quote-evidence.js';
 import {requestJSON,safeRequestAttempts} from '../private-request.js';
 const source=(await readFile(new URL('../candidate-quotes-panel.js',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'');
 async function harness(responses=[],storage=new Map(),prime=true,consent=()=>true){
@@ -14,7 +14,7 @@ async function harness(responses=[],storage=new Map(),prime=true,consent=()=>tru
  const get=id=>{if(!nodes.has(id))nodes.set(id,node());return nodes.get(id);};let tick;
  const calls=[];const fetch=async(...args)=>{calls.push(args);return responses.shift();};
  const sessionStorage={getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)};
- new Function('document','fetch','setInterval','candidateQuotes','validateRobinhoodPack','quoteGuidance','appendQuoteEvidence','quoteEvidenceInput','scannerFromEvidencePacket','validationTiming','SESSION_KEY','sessionPayload','restoreSession','sessionStorage','confirm','quoteRequestTiming','requestJSON','safeRequestAttempts','captureWindows',source)({getElementById:get,createElement:node},fetch,fn=>tick=fn,candidateQuotes,validateRobinhoodPack,quoteGuidance,appendQuoteEvidence,quoteEvidenceInput,scannerFromEvidencePacket,validationTiming,SESSION_KEY,sessionPayload,restoreSession,sessionStorage,consent,quoteRequestTiming,(url,options,ms)=>requestJSON(url,options,ms,fetch),safeRequestAttempts,captureWindows);
+ new Function('document','fetch','setInterval','candidateQuotes','validateRobinhoodPack','quoteGuidance','appendQuoteEvidence','quoteEvidenceInput','scannerFromEvidencePacket','validationTiming','SESSION_KEY','sessionPayload','restoreSession','sessionStorage','confirm','quoteRequestTiming','requestJSON','safeRequestAttempts','captureWindows','captureAction',source)({getElementById:get,createElement:node},fetch,fn=>tick=fn,candidateQuotes,validateRobinhoodPack,quoteGuidance,appendQuoteEvidence,quoteEvidenceInput,scannerFromEvidencePacket,validationTiming,SESSION_KEY,sessionPayload,restoreSession,sessionStorage,consent,quoteRequestTiming,(url,options,ms)=>requestJSON(url,options,ms,fetch),safeRequestAttempts,captureWindows,captureAction);
  const load=async(id,data)=>get(id).onchange({target:{files:[{size:100,text:async()=>JSON.stringify(data)}]}});
  const id='bbdbf613-f3e0-4f68-9cc7-fc090ca84e24';const now=new Date().toISOString();
  if(prime){await load('scanner',{candidates:[{ticker:'SPY',options:[{strike:778,side:'call',expiry:'2026-10-12'}]}]});
@@ -24,6 +24,15 @@ async function harness(responses=[],storage=new Map(),prime=true,consent=()=>tru
 test('invalid scanner import preserves the existing snapshot and mapping',async()=>{
  const h=await harness();assert.equal(h.get('rows').children.length,1);assert.equal(h.get('refresh').disabled,false);
  await h.load('scanner',{wrong:true});h.tick();assert.equal(h.get('rows').children.length,1);assert.equal(h.get('refresh').disabled,false);assert.match(h.get('status').textContent,/Expected scanner candidates/);
+});
+test('capture refresh shares manual request handler and does not start background requests',async()=>{
+ const h=await harness([Response.json({received_at:new Date().toISOString(),observations:[]})]);
+ assert.equal(h.calls.length,0);assert.equal(h.get('capture-refresh').disabled,false);
+ await h.get('capture-refresh').onclick();assert.equal(h.calls.length,1);
+ assert.equal(h.calls[0][0],'/private/plaid/robinhood/quotes');
+ h.tick();assert.equal(h.calls.length,1);
+ const empty=await harness([],new Map(),false);assert.equal(empty.get('capture-refresh').disabled,true);
+ await empty.get('capture-refresh').onclick();assert.equal(empty.calls.length,0);
 });
 test('connection check immediately shows progress and retains its retry after a sign-in redirect',async()=>{
  let finish;

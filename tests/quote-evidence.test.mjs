@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {quoteGuidance,appendQuoteEvidence,quoteEvidenceInput,quoteDiagnostics} from '../quote-evidence.js';
+import {quoteGuidance,appendQuoteEvidence,quoteEvidenceInput,quoteDiagnostics,captureWindows,captureAction} from '../quote-evidence.js';
 import {sessionPayload,restoreSession} from '../quote-session.js';
 const now=Date.parse('2026-10-14T15:00:00Z'),id='bbdbf613-f3e0-4f68-9cc7-fc090ca84e24';
 const snapshot={scan_id:'test',generated_at:'2026-10-14T14:59:00Z',account_id:'private',candidates:[{ticker:'TEST',options:[{contract_id:'TEST261016C00100000',strike:100,side:'call',expiry:'2026-10-16'}]}]};
@@ -15,6 +15,18 @@ test('export preserves quote clocks, excludes account metadata and uses quote re
  assert.equal(exported.entries[0].decision_at,observation.received_at);assert.equal(exported.entries[0].quote.multiplier,100);
  assert.equal(exported.observations[0].observed_at,observation.quote.updated_at);assert.ok(!JSON.stringify(exported).includes('account_id'));
  assert.equal(appendQuoteEvidence(snapshot,[observation],history,now).length,1);
+});
+test('next capture action prioritizes open deadlines, later contract clocks and completed exports',()=>{
+ const history=appendQuoteEvidence(snapshot,[observation],[],now);
+ assert.match(captureAction([]),/Match contracts/);
+ assert.match(captureAction(captureWindows(history,now)),/Next capture.*5-minute.*11:05:00 AM.*11:06:00 AM ET.*5:00/);
+ assert.match(captureAction(captureWindows(history,now+5*60000)),/Refresh now.*Closes in 1:00/);
+ const windows=captureWindows(history,now+6*60000+1);
+ assert.match(captureAction(windows),/Next capture.*10-minute.*earlier contract windows missed/);
+ const earlier={...windows[1],state:'OPEN',closes:now+100,minutes:10,seconds:1};
+ assert.match(captureAction([{...earlier,closes:now+200,minutes:15},earlier]),/10-minute/);
+ assert.match(captureAction(captureWindows(history,now+16*60000+1)),/finished: 0\/3 captured.*Export/);
+ assert.equal(quoteEvidenceInput(snapshot,history).entries[0].decision_at,observation.received_at);
 });
 test('failed quote checks cannot supply an entry estimate',()=>{
  const bad={...observation,quote:{...observation.quote,bid_price:'.10'}};

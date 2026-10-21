@@ -1,6 +1,32 @@
 import copy
 import unittest
 from quote_latency import summarize, summarize_exports
+from quote_latency import timing
+
+
+class SetupDiagnosticsTests(unittest.TestCase):
+    def test_modes_and_cache_states_are_allowlisted_and_legacy_unknown(self):
+        values = dict(setup_ms=1, quote_ms=2, worker_ms=3, browser_ms=4)
+        self.assertEqual(timing(dict(values, setup_mode='stateless', setup_cache_status='hit', secret='PRIVATE')),
+                         dict(values, setup_mode='stateless', setup_cache_status='hit'))
+        self.assertEqual(timing(dict(values, setup_mode='PRIVATE', setup_cache_status='PRIVATE')), values)
+        self.assertNotIn('setup_mode', timing(values))
+
+    def test_report_counts_each_mode_once_per_batch_and_preserves_unknown(self):
+        data = export()
+        legacy = observation(minute=0)
+        warm = observation(minute=1)
+        warm['request_timing'].update(setup_reused=True, setup_mode='stateless', setup_cache_status='hit')
+        data['observations'] = [legacy, warm, dict(copy.deepcopy(warm), contract_id='SECOND')]
+        result = summarize_exports([data, data])
+        self.assertEqual(result['setup_diagnostics']['setup_mode'], {'session': 0, 'stateless': 1, 'unknown': 1})
+        self.assertEqual(result['setup_diagnostics']['setup_cache_status'], {'hit': 1, 'miss': 0, 'expired': 0, 'unknown': 1})
+        self.assertEqual(result['timed_request_count'], 2)
+        conflicting = copy.deepcopy(warm)
+        conflicting['contract_id'] = 'THIRD'
+        conflicting['request_timing']['setup_mode'] = 'session'
+        data['observations'].append(conflicting)
+        self.assertEqual(summarize(data)['timed_request_count'], 1)
 
 
 def export():

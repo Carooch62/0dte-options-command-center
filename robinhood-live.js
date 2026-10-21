@@ -26,7 +26,7 @@ async function exchange(form){const response=await fetch(TOKEN,{method:'POST',he
 const ALLOWED=new Set(['get_equity_quotes','get_option_quotes','get_option_chains','get_option_instruments']);
 export async function rpc(token,method,params={},session=null){
  if(!['initialize','tools/list','tools/call'].includes(method)||method==='tools/call'&&!ALLOWED.has(params.name))throw Error('Market-data operation required');
- const response=await fetch(MCP,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json',Accept:'application/json, text/event-stream',...(session?{'Mcp-Session-Id':session,'MCP-Protocol-Version':'2025-03-26'}:{})},body:JSON.stringify({jsonrpc:'2.0',id:crypto.randomUUID(),method,params}),signal:AbortSignal.timeout(15000)});
+ const response=await fetch(MCP,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json',Accept:'application/json, text/event-stream',...(method!=='initialize'?{'MCP-Protocol-Version':'2025-03-26'}:{}),...(session?{'Mcp-Session-Id':session}:{})},body:JSON.stringify({jsonrpc:'2.0',id:crypto.randomUUID(),method,params}),signal:AbortSignal.timeout(15000)});
  if(!response.ok)throw Error(response.status===401?'Robinhood connection expired; reconnect':'Robinhood quote service unavailable');
  const raw=await response.text();if(raw.length>2000000)throw Error('Robinhood response too large');
  let message;
@@ -93,6 +93,8 @@ async function marketClient(token,required,authorizationExpiresAt){
   catch(e){marketSessions.drop(cacheKey);throw e;}
  };
  call.setup_reused=setup.reused;
+ call.setup_mode=setup.value.session===null?'stateless':'session';
+ call.setup_cache_status=setup.cache_status;
  return call;
 }
 export async function handleRobinhood(request,env){
@@ -154,7 +156,7 @@ export async function handleRobinhood(request,env){
    const quoteFinished=performance.now();
    // Extract only quote pairs; never expose arbitrary tool content or account data.
    const normalized=normalizeQuotes(data,operation,receivedAt);
-   const request_timing=quoteRequestTiming({setup_ms:setupFinished-setupStarted,quote_ms:quoteFinished-setupFinished,worker_ms:performance.now()-requestStarted,setup_reused:call.setup_reused});
+   const request_timing=quoteRequestTiming({setup_ms:setupFinished-setupStarted,quote_ms:quoteFinished-setupFinished,worker_ms:performance.now()-requestStarted,setup_reused:call.setup_reused,setup_mode:call.setup_mode,setup_cache_status:call.setup_cache_status});
    return reply({ok:true,source:'Robinhood MCP',received_at:new Date(receivedAt).toISOString(),...normalized,request_timing,latency_verified:false,greek_calculation_time:null,scanner_feed:'DELAYED_RESEARCH'});
   }catch{return reply({ok:false,error:'Robinhood quote verification failed; reconnect or check client setup'},502);}
  }

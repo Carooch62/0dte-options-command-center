@@ -31,6 +31,10 @@ def timing(value):
     result = {k: value[k] for k in FIELDS}
     if type(value.get('setup_reused')) is bool:
         result['setup_reused'] = value['setup_reused']
+    for field, allowed in [('setup_mode', ('session', 'stateless')),
+                           ('setup_cache_status', ('hit', 'miss', 'expired'))]:
+        if value.get(field) in allowed:
+            result[field] = value[field]
     return result
 
 
@@ -113,6 +117,10 @@ def summarize(data):
         'durations_ms': duration_summary(samples),
         'setup_groups': {name: duration_summary([s for s in samples if s.get('setup_reused') is flag])
                          for name, flag in [('reused', True), ('initialized', False), ('unknown', None)]},
+        'setup_diagnostics': {field: {**{label: sum(s.get(field) == label for s in samples)
+                                for label in labels}, 'unknown': sum(s.get(field) not in labels for s in samples)} for field, labels in [
+                                    ('setup_mode', ('session', 'stateless')),
+                                    ('setup_cache_status', ('hit', 'miss', 'expired'))]},
         'request_attempts': {'provided': 'requests' in data, 'retained_valid_count': len(attempts) if 'requests' in data else None,
                              'by_operation_and_code': {op: {code: sum(a['operation'] == op and a['code'] == code for a in attempts)
                                  for code in sorted({a['code'] for a in attempts if a['operation'] == op})}

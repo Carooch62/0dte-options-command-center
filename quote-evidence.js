@@ -89,6 +89,16 @@ export function validationTiming(history,now=Date.now()){
  });
  return windows.join(' | ')+' · Refresh manually; export before leaving. Backgrounded phones may pause page updates.';
 }
+export function captureAction(windows){
+ if(!windows.length)return 'Match contracts and fetch the first passing quote to start capture windows.';
+ const open=windows.filter(w=>w.state==='OPEN').sort((a,b)=>a.closes-b.closes)[0];
+ const next=open||windows.filter(w=>w.state==='UPCOMING').sort((a,b)=>a.target-b.target)[0];
+ const missed=windows.filter(w=>w.state==='MISSING').length;
+ if(!next)return `Capture windows finished: ${windows.filter(w=>w.state==='CAPTURED').length}/${windows.length} captured. Export this session. Missing windows stay missing.`;
+ const time=value=>new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',hour:'numeric',minute:'2-digit',second:'2-digit'}).format(new Date(value));
+ const remaining=Math.floor(next.seconds/60)+':'+String(next.seconds%60).padStart(2,'0');
+ return `${open?'Refresh now':'Next capture'} · ${next.minutes}-minute window ${time(next.target)}–${time(next.closes)} ET. ${open?'Closes':'Opens'} in ${remaining}.${missed?' '+missed+' earlier contract windows missed.':''}`;
+}
 
 
 
