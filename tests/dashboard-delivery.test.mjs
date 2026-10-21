@@ -30,3 +30,5 @@ test('legacy fallback is limited to a missing optional file, and never fabricate
  }
  await assert.rejects(loadDashboardSnapshot('/data/','unknown',async()=>{throw Error('must not fetch');}),/Unknown expiration/);
 });
+
+test('a partial response cannot masquerade as the full later-expiration snapshot',async()=>{await assert.rejects(loadDashboardSnapshot('/data/','week',async()=>Response.json(deliverySnapshot(fixture()))),/Invalid research snapshot/);});

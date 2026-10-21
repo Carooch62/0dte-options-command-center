@@ -128,7 +128,7 @@ $('candidateBoard').before(earlyPanel);
 function render(){if(!data)return;
  if(data.delivery_window&&data.delivery_window!==$('expiration').value){
   $('board').replaceChildren();$('shown').textContent=dataDownloadFailed?'Selected expiration unavailable':'Loading selected expiration…';
-  notice('freshness',dataDownloadFailed?'Unable to load the selected expiration. Tap Check published results to retry.':'Loading the selected expiration; existing research is retained.');
+  notice('freshness',dataDownloadFailed?'Unable to load the selected expiration. Tap Reload displayed data to retry.':'Loading the selected expiration; existing research is retained.');
   if(!loadPromise&&!dataDownloadFailed)void load();return;
  }
  const anchor=boardAnchor();

@@ -6,7 +6,7 @@ export async function loadDashboardSnapshot(base,window,read){
   const legacy=await read(`${base}market-dashboard.json?v=${Date.now()}`);
   if(!legacy.ok)throw Error(`HTTP ${legacy.status}`);
   const snapshot=await legacy.json();
-  if(!Array.isArray(snapshot?.candidates)||!Number.isFinite(Date.parse(snapshot.generated_at)))throw Error('Invalid research snapshot');
+  if(snapshot?.delivery_window||!Array.isArray(snapshot?.candidates)||!Number.isFinite(Date.parse(snapshot.generated_at)))throw Error('Invalid research snapshot');
   return snapshot;
  };
  if(window!=='today')return full();
