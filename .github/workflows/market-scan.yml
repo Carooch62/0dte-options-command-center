@@ -60,6 +60,9 @@ jobs:
       - name: Scan, enrich, and validate
         id: scan
         run: python pipeline.py
+      - name: Generate fast initial dashboard view
+        if: success()
+        run: node scripts/write-dashboard-delivery.mjs
       - name: Generate compact quote-check batch
         if: success()
         run: node scripts/write-candidate-batch.mjs
