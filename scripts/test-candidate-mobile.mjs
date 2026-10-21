@@ -34,10 +34,10 @@ try{
  await page.getByText('This loader requires the staging environment.',{exact:false}).waitFor();
  assert.equal(await page.locator('#rows tr').count(),1,'failed staging load must preserve the prior cohort');
  // Validate the automatic private workflow using sanitized synthetic responses.
- const now=new Date().toISOString(),id='22222222-2222-2222-2222-222222222222',contract={ticker:'TEST',strike:100,side:'call',expiry:'2099-01-01'};
+ const now=await page.evaluate(()=>new Date().toISOString()),id='22222222-2222-2222-2222-222222222222',contract={ticker:'TEST',strike:100,side:'call',expiry:'2099-01-01'};
  await page.route('**/private/plaid/robinhood/candidates',r=>r.fulfill({json:{snapshot:{generated_at:now,included_contracts:1,total_contracts:1,qualifying_contracts:1,omitted_contracts:0,candidates:[{ticker:'TEST',options:[{...contract,contract_id:'TEST20990101C00100000'}]}]}}}));
  await page.route('**/private/plaid/robinhood/resolve',r=>r.fulfill({json:{results:[{contract,status:'EXACT_METADATA_MATCH',instrument:{id,chain_symbol:'TEST',strike_price:100,type:'call',expiration_date:'2099-01-01',state:'active',tradability:'tradable',trade_value_multiplier:100,sellout_datetime:'2099-01-01T19:45:00Z'}}]}}));
- await page.route('**/private/plaid/robinhood/quotes',r=>r.fulfill({json:{received_at:new Date().toISOString(),request_timing:{setup_ms:60,quote_ms:40,worker_ms:105},observations:[{quote:{instrument_id:id,bid_price:'.30',ask_price:'.31',updated_at:now}}]}}));
+ await page.route('**/private/plaid/robinhood/quotes',async r=>r.fulfill({json:{received_at:await page.evaluate(()=>new Date().toISOString()),request_timing:{setup_ms:60,quote_ms:40,worker_ms:105},observations:[{quote:{instrument_id:id,bid_price:'.30',ask_price:'.31',updated_at:now}}]}}));
  await page.route('**/data/staging-shadow-evidence-latest.json',r=>r.fulfill({json:{format:'shadow-evidence-v1',packet_id:'a'.repeat(64),scan_id:'staging-test',generated_at:now,captured_at:now,market_session:'OPEN',candidates:[{candidate_id:'TEST20990101C00100000',ticker:'TEST',contract:{contract_id:'TEST20990101C00100000',strike:100,side:'call',expiry:'2099-01-01'}}]}}));
  await page.getByRole('button',{name:'Load staging validation batch',exact:true}).click();
  await page.getByText('Loaded 1 staging contracts',{exact:false}).waitFor();
@@ -70,7 +70,7 @@ try{
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'private results overflow');
  assert.equal(await page.locator('td[data-label="$0.30 live ask"]').innerText(),'Above $0.30 · outside budget');
  await page.screenshot({path:`test-results/mobile/${width}-private-live.png`,fullPage:true});
- await page.route('**/private/plaid/robinhood/quotes',r=>r.fulfill({json:{received_at:new Date().toISOString(),observations:[{quote:{instrument_id:id,bid_price:'.02',ask_price:'.03',updated_at:now}}]}}));
+ await page.route('**/private/plaid/robinhood/quotes',async r=>r.fulfill({json:{received_at:await page.evaluate(()=>new Date().toISOString()),observations:[{quote:{instrument_id:id,bid_price:'.02',ask_price:'.03',updated_at:now}}]}}));
  await page.getByRole('button',{name:'Refresh matched option quotes',exact:true}).click();
  await page.getByText('The spread exceeds the quote-check limit.',{exact:false}).waitFor();
  await page.reload();await page.getByText('Restored this tab’s session',{exact:false}).first().waitFor();

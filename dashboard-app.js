@@ -1,3 +1,4 @@
+import {loadDashboardSnapshot} from './dashboard-delivery.js';
 import {entryReadiness,trendSummary,matchesTrend,quoteKey,observePremiums,premiumChange,positionEstimate,reentryProblem,positionAlerts,validPlan} from './trade-review.js?v=20261002-trend-filters';
 import {signalChecklist,earlyWatchVisible} from './signal-checklist.js?v=20261008-rvol-v1';
 import {refreshProgress,publishedReceipt,closedReceipt,refreshBlocksNewRequest,publicationCheckExpired,verifiedRefresh} from './refresh-progress.js?v=20261001-opening-bar';
@@ -125,6 +126,11 @@ const earlyPanel=document.createElement('section');earlyPanel.className='panel';
 earlyPanel.innerHTML='<h2>EARLY WATCH · shadow research</h2><p class="smallnote">Pre-breakout pattern hypotheses, not entry signals. Requires a company catalyst, compression, quiet volume, directional structure and proximity to a level. Uses completed bars only. Existing ranking and contract gates remain unchanged.</p><div id="earlyWatchList"></div>';
 $('candidateBoard').before(earlyPanel);
 function render(){if(!data)return;
+ if(data.delivery_window&&data.delivery_window!==$('expiration').value){
+  $('board').replaceChildren();$('shown').textContent=dataDownloadFailed?'Selected expiration unavailable':'Loading selected expiration…';
+  notice('freshness',dataDownloadFailed?'Unable to load the selected expiration. Tap Reload displayed data to retry.':'Loading the selected expiration; existing research is retained.');
+  if(!loadPromise&&!dataDownloadFailed)void load();return;
+ }
  const anchor=boardAnchor();
  const age=minutes(data.generated_at),usable=!dataDownloadFailed&&snapshotUsable(data);
  const sessionKnown=Date.now()>=Date.parse(data.session_open_at)&&Date.now()<Date.parse(data.session_close_at);
@@ -178,8 +184,9 @@ function applyVerifiedRefresh(request,result){
 }
 async function load(manual=false){
  if(loadPromise)return loadPromise;
+ const requestedWindow=$('expiration').value;
  loadPromise=(async()=>{try{
-   const oldId=data?.scan_id,d=await json(DATA+'market-dashboard.json?v='+Date.now());
+   const oldId=data?.scan_id,d=await loadDashboardSnapshot(DATA,requestedWindow,url=>fetch(url,{cache:'no-store',signal:AbortSignal.timeout(20000)}));
    checkChanged=!!data&&(d.scan_id||d.generated_at)!==(data.scan_id||data.generated_at);lastChecked=new Date().toISOString();if(checkChanged)previous=data;data=d;dataDownloadFailed=false;premiumHistory=observePremiums(premiumHistory,d.candidates||[],d.generated_at);save('0dtePremiumHistory',premiumHistory);render();renderJournal();
    reloadMessage=`${oldId===d.scan_id?'No newer scan has published.':'Displayed data updated.'} Latest snapshot: ${time(d.generated_at)}.`;
    const health=await json(DATA+'scan-health.json?v='+Date.now()).catch(()=>null);
@@ -198,7 +205,7 @@ async function load(manual=false){
    renderRefresh();
  }catch(e){dataDownloadFailed=true;if(data)render();notice('freshness','Unable to download new results: '+e.message+'. Last displayed snapshot is retained for research.','bad');}
  })();
- try{await loadPromise;}finally{loadPromise=null;}
+ try{await loadPromise;}finally{loadPromise=null;if(requestedWindow!==$('expiration').value)void load();}
 }
 function enableScan(enabled){$('scan').disabled=!enabled;$('wave').disabled=!enabled;}
 async function pollRun(){
@@ -255,7 +262,7 @@ $('import').onchange=async e=>{try{const f=e.target.files[0];if(!f)return;if(f.s
 $('board').onclick=e=>{const t=e.target.dataset.star;if(!t)return;stars=stars.includes(t)?stars.filter(x=>x!==t):[...stars,t];save('0dteStars',stars);render();};
 $('scan').onclick=()=>startScan('manual');$('wave').onclick=()=>startScan('second-wave');$('check').onclick=()=>load(true);$('auto').onclick=()=>{auto=!auto;startTimer();};$('interval').onchange=startTimer;
 if($('activeFilters'))$('activeFilters').onclick=e=>{const id=e.target.closest('button')?.dataset.clearFilter;if(!id)return;const reset=id==='all'?Object.keys(filterDefaults):id==='price'?['askMin','askMax']:[id];for(const key of reset)$(key).value=filterDefaults[key];persistFilters();render();};
-for(const id of ['thetaMax','expiration','state','direction','trendPeriod','trendDirection','trendAlignment','catalyst','askMin','askMax','onlyContracts','sort'])$(id).addEventListener('input',()=>{persistFilters();render();});
+for(const id of ['thetaMax','expiration','state','direction','trendPeriod','trendDirection','trendAlignment','catalyst','askMin','askMax','onlyContracts','sort'])$(id).addEventListener('input',()=>{persistFilters();if(id==='expiration')dataDownloadFailed=false;render();});
 for(const id of ['perTrade','dailyLoss','maxExposure','timeStop','cutoff']){$(id).value=settings[id]??'';$(id).addEventListener('input',renderRisk);}
 for(const id of ['riskAsk','riskQty'])$(id).addEventListener('input',renderRisk);
 active=read('0dteActiveScan',null);lastRefresh=read('0dteLastRefresh',null);enableScan(!refreshBlocksNewRequest(active));renderRefresh();renderJournal();await load();startTimer();if(active)pollRun();
