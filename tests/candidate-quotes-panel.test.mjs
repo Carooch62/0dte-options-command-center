@@ -25,6 +25,23 @@ test('invalid scanner import preserves the existing snapshot and mapping',async(
  const h=await harness();assert.equal(h.get('rows').children.length,1);assert.equal(h.get('refresh').disabled,false);
  await h.load('scanner',{wrong:true});h.tick();assert.equal(h.get('rows').children.length,1);assert.equal(h.get('refresh').disabled,false);assert.match(h.get('status').textContent,/Expected scanner candidates/);
 });
+test('connection check immediately shows progress and retains its retry after a sign-in redirect',async()=>{
+ let finish;
+ const pending=new Promise(resolve=>finish=resolve);
+ const h=await harness([pending],new Map(),false);
+ const check=h.get('check-connection').onclick();
+ assert.match(h.get('authorization-state').textContent,/Checking private connection/);
+ assert.match(h.get('connection-state').textContent,/Checking private access/);
+ assert.equal(h.get('check-connection').disabled,true);
+ finish({type:'opaqueredirect',status:0,ok:false,headers:new Headers()});
+ await check;
+ assert.match(h.get('status').textContent,/Private sign-in required/);
+ assert.equal(h.get('check-connection').disabled,false);
+ assert.match(h.get('retry-request').textContent,/connection check/);
+ const html=await readFile(new URL('../candidate-quotes.html',import.meta.url),'utf8');
+ assert.match(html,/<a id="private-sign-in" href="\.\/brokerage.html#robinhood-live" target="_blank" rel="noopener">/);
+ assert.ok(html.indexOf('id="private-sign-in"')>html.indexOf('</p>\n<section aria-label="Connection health">'));
+});
 test('staging denial clears old prices and permits a later retry',async()=>{
  const h=await harness([Response.json({error:'Private routes disabled in staging'},{status:403})]);await h.get('refresh').onclick();assert.match(h.get('status').textContent,/access was denied/);assert.equal(h.get('rows').children[0].children[1].textContent,'Unknown');assert.equal(h.get('refresh').disabled,false);assert.equal(h.calls[0][1].cache,'no-store');
 });

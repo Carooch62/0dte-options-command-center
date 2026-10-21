@@ -7,10 +7,10 @@ export async function requestJSON(url,options={},timeoutMs=20000,fetcher=fetch){
  const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{reject(new RequestFailure('TIMEOUT','Request timed out. Retry when ready; authorization has not been checked.'));controller.abort();},timeoutMs);});
  try{return await Promise.race([timeout,(async()=>{
   let response;
-  try{response=await fetcher(url,{cache:'no-store',credentials:'same-origin',...options,signal:controller.signal});}
+  try{response=await fetcher(url,{cache:'no-store',credentials:'same-origin',...options,redirect:'manual',signal:controller.signal});}
   catch(e){if(e instanceof RequestFailure)throw e;throw new RequestFailure('NETWORK','Private service could not be reached. Check your network and retry; this does not establish an authorization problem.');}
   const json=response.headers.get('content-type')?.includes('application/json');
-  if(response.status===401||response.redirected&&!json||response.ok&&!json)throw new RequestFailure('SIGN_IN','Private sign-in required. Open Connections, sign in, then retry.',response.status);
+  if(response.type==='opaqueredirect'||response.status>=300&&response.status<400||response.status===401||response.redirected&&!json||response.ok&&!json)throw new RequestFailure('SIGN_IN','Private sign-in required. Open Connections, sign in, then retry.',response.status);
   if(!json)throw new RequestFailure('SERVICE',`Service returned HTTP ${response.status}. Retry; authorization status is unknown.`,response.status);
   let data;try{data=await response.json();if(!data||typeof data!=='object')throw Error();}catch{throw new RequestFailure('INVALID_RESPONSE','Service returned an unreadable response. Retry without replacing the batch.',response.status);}
   if(!response.ok){
