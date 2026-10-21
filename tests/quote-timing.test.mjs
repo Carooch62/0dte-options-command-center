@@ -14,3 +14,7 @@ test('setup reuse flag is a strict optional boolean; historical exports remain u
  assert.deepEqual(quoteRequestTiming({setup_reused:'true'}),{});
  assert.equal(Object.hasOwn(quoteRequestTiming({setup_ms:2}),'setup_reused'),false);
 });
+test('setup diagnostics accept only named modes and cache states without identifiers',()=>{
+ assert.deepEqual(quoteRequestTiming({setup_mode:'stateless',setup_cache_status:'hit',session:'SECRET'}),{setup_mode:'stateless',setup_cache_status:'hit'});
+ assert.deepEqual(quoteRequestTiming({setup_mode:'secret-token',setup_cache_status:'private-session'}),{});
+});

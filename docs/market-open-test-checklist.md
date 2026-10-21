@@ -12,6 +12,12 @@ Choose **Load current $0.30 scanner batch** for this production connection test.
 
 Use **Match contracts and fetch live quotes** once. This performs metadata matching and an initial quote fetch. Do not repeatedly match during the refresh measurements. Check exact matches, missing contracts and quote status. Keep this cohort and tab throughout the test. Leave the phone foregrounded and awake.
 
+## Short setup check before another full benchmark
+
+After a setup-cache release, first collect only three quote responses: the initial Match/fetch, then manual Refresh around +30 and +60 seconds. Keep the same batch, foreground tab and network; export immediately afterward. Inspect `setup_reused`, `setup_mode` and `setup_cache_status` before attempting another full capture session. A new Worker instance can still yield a miss; no warm hit or faster price freshness is guaranteed. This short check is connection evidence, not completed 5/10/15-minute outcome collection.
+
+The pinned capture card shows the earliest open or upcoming per-contract window in Eastern time. Use **Refresh for capture** there or the existing refresh button; both make exactly one manual quote request. Check for CAPTURED afterward. The card does not poll quotes, restart clocks or repair missed windows. Backgrounded devices can pause its countdown.
+
 ## Refresh sequence
 
 The initial fetch is separate from the **nine manual refreshes** below: ten successful quote request opportunities in total. Matching may involve other HTTP operations; those are not ten additional quote samples. `T` is the first passing quote receipt for each contract; the app's per-contract capture countdown is authoritative. Contracts first passing later have later targets.

@@ -91,10 +91,10 @@ test('authenticated quote path measures setup and retrieval without changing fre
  const result=await handleRobinhood(request('quotes','POST',auth,{kind:'equity',symbols:['JD']}),env),text=await result.text();
  assert.equal(result.status,200);assert.ok(!text.includes('secret'));assert.ok(!text.includes('never-return'));assert.equal(JSON.parse(text).latency_verified,false);assert.equal(JSON.parse(text).scanner_feed,'DELAYED_RESEARCH');
  assert.deepEqual(methods,['initialize','notifications/initialized','tools/list','tools/call']);
- assert.deepEqual(JSON.parse(text).request_timing,{setup_ms:60,quote_ms:40,worker_ms:100,setup_reused:false});
+ assert.deepEqual(JSON.parse(text).request_timing,{setup_ms:60,quote_ms:40,worker_ms:100,setup_reused:false,setup_mode:'session',setup_cache_status:'miss'});
  const second=await handleRobinhood(request('quotes','POST',auth,{kind:'equity',symbols:['JD']}),env),secondData=await second.json();
  assert.equal(second.status,200);assert.deepEqual(methods,['initialize','notifications/initialized','tools/list','tools/call','tools/call']);
- assert.deepEqual(secondData.request_timing,{setup_ms:0,quote_ms:40,worker_ms:40,setup_reused:true});
+ assert.deepEqual(secondData.request_timing,{setup_ms:0,quote_ms:40,worker_ms:40,setup_reused:true,setup_mode:'session',setup_cache_status:'hit'});
  assert.equal(secondData.latency_verified,false);
  setUpstream(async()=>new Response(null,{status:503}));
  const failed=await handleRobinhood(request('quotes','POST',auth,{kind:'equity',symbols:['JD']}),env);
@@ -115,6 +115,31 @@ test('candidate and metadata routes require Access and reject cross-origin and i
  assert.equal((await handleRobinhood(request('resolve','POST',{...auth,Origin:'https://evil.test'},{contracts:[]}),env)).status,403);
  assert.equal((await handleRobinhood(request('resolve','POST',auth,{contracts:[{ticker:'SPY',strike:772,side:'order',expiry:'2026-10-16'}]}),env)).status,400);
  assert.equal(calls.length,0);
+}));
+test('stateless provider setup is reused, protocols are explicit, and a failure evicts without automatic retry',async()=>harness(async({env,auth,setUpstream})=>{
+ const start=await handleRobinhood(request('connect','POST',auth,{}),env),target=new URL((await start.json()).authorization_url);
+ const callback=new URL(env.ROBINHOOD_REDIRECT_URI);callback.search=new URLSearchParams({code:'code',state:target.searchParams.get('state'),iss:'https://agent.robinhood.com/mcp/trading'});
+ setUpstream(async()=>Response.json({access_token:'stateless-secret',token_type:'Bearer',expires_in:3600}));
+ await handleRobinhood(new Request(callback,{headers:{...auth,Cookie:start.headers.get('Set-Cookie').split(';')[0]}}),env);
+ const methods=[];let fail=false;
+ setUpstream(async(_,options)=>{
+  const body=JSON.parse(options.body);methods.push(body.method);
+  assert.equal(options.headers['Mcp-Session-Id'],undefined);
+  if(body.method==='initialize')return Response.json({result:{protocolVersion:'2025-03-26'}});
+  assert.equal(options.headers['MCP-Protocol-Version'],'2025-03-26');
+  if(body.method==='notifications/initialized')return new Response(null,{status:202});
+  if(body.method==='tools/list')return Response.json({result:{tools:[{name:'get_equity_quotes'}]}});
+  if(fail)return new Response(null,{status:503});
+  return Response.json({result:{structuredContent:{data:{results:[{quote:{symbol:'JD',bid_price:'1',ask_price:'1.01',venue_bid_time:new Date().toISOString(),venue_ask_time:new Date().toISOString()}}]}}}});
+ });
+ const get=()=>handleRobinhood(request('quotes','POST',auth,{kind:'equity',symbols:['JD']}),env);
+ const first=await (await get()).json();assert.equal(first.request_timing.setup_mode,'stateless');assert.equal(first.request_timing.setup_reused,false);
+ const second=await (await get()).json();assert.equal(second.request_timing.setup_reused,true);assert.equal(second.request_timing.setup_cache_status,'hit');
+ assert.deepEqual(methods,['initialize','notifications/initialized','tools/list','tools/call','tools/call']);
+ assert.equal(second.latency_verified,false);assert.ok(!JSON.stringify(second).includes('stateless-secret'));
+ fail=true;assert.equal((await get()).status,502);assert.equal(methods.length,6);
+ fail=false;const recovered=await (await get()).json();assert.equal(recovered.request_timing.setup_reused,false);
+ assert.deepEqual(methods.slice(6),['initialize','notifications/initialized','tools/list','tools/call']);
 }));
 test('private scanner route projects the fixed main source without needing stored broker credentials',async()=>harness(async({env,auth,setUpstream})=>{
  setUpstream(async(url)=>{assert.match(url,/^https:\/\/raw.githubusercontent.com\/Carooch62\/0dte-options-command-center\/main\/data\/candidate-quote-batch.json\?v=\d+$/);return Response.json({format:'candidate-identities-v1',selection_policy:'published-research-screens-v1',max_per_ticker:2,generated_at:'2026-10-14T14:00:00Z',included_contracts:1,total_contracts:1,qualifying_contracts:1,omitted_contracts:0,candidates:[{ticker:'SPY',options:[{strike:772,side:'put',expiry:'2026-10-16',scanner_ask:.2}]}]});});

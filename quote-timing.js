@@ -5,5 +5,7 @@ export function quoteRequestTiming(value){
   .filter(k=>typeof value[k]==='number'&&Number.isFinite(value[k])&&value[k]>=0&&value[k]<=600000)
   .map(k=>[k,Math.round(value[k])]));
  if(typeof value.setup_reused==='boolean')durations.setup_reused=value.setup_reused;
+ if(['session','stateless'].includes(value.setup_mode))durations.setup_mode=value.setup_mode;
+ if(['hit','miss','expired'].includes(value.setup_cache_status))durations.setup_cache_status=value.setup_cache_status;
  return durations;
 }
