@@ -18,6 +18,14 @@ try{
  await page.route('**/health',r=>r.fulfill({json:{environment:'staging'}}));
  await page.route('**/data/candidate-snapshot.json',r=>r.fulfill({json:{generated_at:'2026-10-12T14:00:00Z',candidates:[{ticker:'TEST',options:[{contract_id:'SYNTHETIC-LONG-CONTRACT-NAME-261012C00100000',strike:100,side:'call',expiry:'2026-10-12'}]}]}}));
  await page.goto(`http://127.0.0.1:${server.address().port}/`);
+ let followedSignIn=0;
+ await page.route('https://private-sign-in.invalid/**',r=>{followedSignIn++;return r.abort();});
+ await page.route('**/private/plaid/robinhood/status',r=>r.fulfill({status:302,headers:{Location:'https://private-sign-in.invalid/login'}}));
+ await page.locator('#check-connection').click();
+ await page.locator('#status').filter({hasText:'Private sign-in required.'}).waitFor();
+ assert.equal(followedSignIn,0,'private fetch must not follow the cross-origin Access redirect');
+ assert.ok(await page.locator('#private-sign-in').isVisible());
+ assert.ok(await page.locator('#retry-request').isEnabled());
  assert.equal(await page.locator('link[href="./connection-ui.css"]').count(),1);
  assert.equal(await page.locator('.project-nav a').count(),3);
  assert.equal(await page.locator('.project-nav a[aria-current=page]').innerText(),'Quotes');
