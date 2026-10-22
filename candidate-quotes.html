@@ -44,7 +44,7 @@
 <button class="primary" id="resolve" aria-describedby="resolve-help" disabled>Match contracts and fetch live quotes</button>
 <p id="resolve-help" class="control-help">Load a batch first.</p>
 <p id="validation-clock" aria-live="off">Validation clock starts after the first passing fetched quote.</p>
-<details><summary>Capture countdowns by contract</summary><div id="capture-windows" aria-live="off"></div><p class="muted">Refresh while a window is open and check for CAPTURED. Older provider timestamps or failing quote checks can leave it incomplete. Missing windows stay missing; the clock never restarts to fill them.</p></details>
+<details><summary>Capture countdowns by contract</summary><div id="capture-windows" aria-live="off"></div><p class="muted">Refresh while a window is open and check for CAPTURED. If the provider timestamp is before the target, refresh again before the window closes. Failed checks stay excluded. No contract quote received can also mean a failed request or missing contract; review request diagnostics. Missing windows stay missing; the clock never restarts to fill them.</p></details>
 <p id="snapshot-info" role="status">No scanner snapshot loaded.</p>
 <details>
 <summary>Snapshot imports and staging fallback</summary>
@@ -72,6 +72,7 @@
 </div>
 </div>
 <p class="muted">Request duration measures the browser request. It does not measure exchange latency or make an old quote fresh.</p>
+<details><summary>Request timing details</summary><p id="request-stages">No current quote timings.</p><p class="muted">These intervals overlap; do not add them. The Worker duration includes setup and quote retrieval, plus access checks, connection lookup and response preparation. This export does not time those remaining tasks separately. Browser and Worker clocks are independent; their difference is not a precise network measurement. Quote age is shown separately per contract.</p></details>
 </section>
 <section>
 <h2>3 · Capture and export</h2>

@@ -76,7 +76,19 @@ export function captureWindows(history,now=Date.now()){
   const target=Date.parse(entry.decision_at)+minutes*60000,closes=target+60000;
   const samples=history.filter(q=>q.contract_id===entry.candidate_id&&Date.parse(q.observed_at)>=target&&Date.parse(q.observed_at)<=closes&&Date.parse(q.received_at)<=now);
   const captured=samples.some(q=>q.multiplier===100&&(!q.quote_check||q.quote_check==='QUOTE_CHECK_PASSED'));
-  return {contract:entry.candidate_id,minutes,target,closes,state:captured?'CAPTURED':now>closes?'MISSING':now>=target?'OPEN':'UPCOMING',seconds:Math.max(0,Math.ceil(((now<target?target:closes)-now)/1000)),failed_checks:samples.length>0&&!captured};
+  const state=captured?'CAPTURED':now>closes?'MISSING':now>=target?'OPEN':'UPCOMING';
+  const received=history.filter(q=>q.contract_id===entry.candidate_id&&Date.parse(q.received_at)>=target&&Date.parse(q.received_at)<=Math.min(closes,now));
+  const reasons=[...new Set(samples.flatMap(q=>quoteDiagnostics(q).quote_check_reasons||[]))];
+  let explanation;
+  if(captured)explanation='Passing quote captured.';
+  else if(state==='UPCOMING')explanation='Waiting for this window to open.';
+  else if(samples.length){
+   explanation=reasons.includes('WIDE_SPREAD')?'Spread check failed.':reasons.includes('STALE_QUOTE')?'Quote freshness check failed.':'Quote checks failed.';
+  }else if(!received.length)explanation='No contract quote received during this window.';
+  else if(received.every(q=>Date.parse(q.observed_at)<target))explanation='Provider timestamp is before the capture target.';
+  else if(received.every(q=>Date.parse(q.observed_at)>closes))explanation='Provider timestamp is after the capture window.';
+  else explanation='No usable provider timestamp inside this window.';
+  return {contract:entry.candidate_id,minutes,target,closes,state,seconds:Math.max(0,Math.ceil(((now<target?target:closes)-now)/1000)),failed_checks:samples.length>0&&!captured,explanation};
  }));
 }
 export function validationTiming(history,now=Date.now()){
@@ -97,7 +109,8 @@ export function captureAction(windows){
  if(!next)return `Capture windows finished: ${windows.filter(w=>w.state==='CAPTURED').length}/${windows.length} captured. Export this session. Missing windows stay missing.`;
  const time=value=>new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',hour:'numeric',minute:'2-digit',second:'2-digit'}).format(new Date(value));
  const remaining=Math.floor(next.seconds/60)+':'+String(next.seconds%60).padStart(2,'0');
- return `${open?'Refresh now':'Next capture'} · ${next.minutes}-minute window ${time(next.target)}–${time(next.closes)} ET. ${open?'Closes':'Opens'} in ${remaining}.${missed?' '+missed+' earlier contract windows missed.':''}`;
+ const horizon=windows.filter(w=>w.minutes===next.minutes),complete=horizon.filter(w=>w.state==='CAPTURED').length;
+ return `${open?'Refresh now':'Next capture'} · ${next.minutes}-minute window ${time(next.target)}–${time(next.closes)} ET. ${open?'Closes':'Opens'} in ${remaining}. ${complete}/${horizon.length} captured for this horizon.${missed?' '+missed+' earlier contract windows missed.':''}`;
 }
 
 

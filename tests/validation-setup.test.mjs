@@ -34,4 +34,28 @@ test('closing countdown, failed captures and staggered contracts keep immutable 
  assert.equal(captureWindows([q,valid],now)[0].state,'CAPTURED');
  assert.equal(quoteEvidenceInput(null,[q,valid]).entries[0].decision_at,q.received_at);
 });
+test('capture explanations distinguish missing observations, old provider clocks and failed screens',()=>{
+ const entry={contract_id:'T',observed_at:'2026-10-21T17:00:00Z',received_at:'2026-10-21T17:00:02Z',multiplier:100,quote_check:'QUOTE_CHECK_PASSED'};
+ const now=Date.parse('2026-10-21T17:05:20Z');
+ const early={...entry,observed_at:'2026-10-21T17:05:01Z',received_at:'2026-10-21T17:05:10Z'};
+ assert.match(captureWindows([entry],now)[0].explanation,/No contract quote received/);
+ assert.match(captureWindows([entry,early],now)[0].explanation,/Provider timestamp is before/);
+ const wide={...early,observed_at:'2026-10-21T17:05:02Z',multiplier:null,quote_check:'REQUIRES_RECHECK',quote_check_reasons:['WIDE_SPREAD']};
+ assert.match(captureWindows([entry,wide],now)[0].explanation,/Spread check failed/);
+ const stale={...wide,quote_check_reasons:['STALE_QUOTE']};
+ assert.match(captureWindows([entry,stale],now)[0].explanation,/freshness check failed/);
+ const invalid={...early,observed_at:'invalid'};
+ assert.match(captureWindows([entry,invalid],now)[0].explanation,/No usable provider timestamp/);
+ assert.match(captureWindows([entry],Date.parse('2026-10-21T17:06:03Z'))[0].explanation,/No contract quote received/);
+ assert.equal(quoteEvidenceInput(null,[entry,early,wide]).entries[0].decision_at,entry.received_at);
+});
+test('capture target and end remain inclusive and future receipts stay unobserved',()=>{
+ const entry={contract_id:'T',observed_at:'2026-10-21T17:00:00Z',received_at:'2026-10-21T17:00:02Z',multiplier:100};
+ for(const stamp of ['2026-10-21T17:05:02Z','2026-10-21T17:06:02Z']){
+  const q={...entry,observed_at:stamp,received_at:stamp};
+  assert.equal(captureWindows([entry,q],Date.parse(stamp))[0].state,'CAPTURED');
+  const before=captureWindows([entry,q],Date.parse(stamp)-1)[0];
+  assert.notEqual(before.state,'CAPTURED');assert.match(before.explanation,/Waiting for this window|No contract quote received/);
+ }
+});
 
