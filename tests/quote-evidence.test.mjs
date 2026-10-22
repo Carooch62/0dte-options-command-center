@@ -5,6 +5,40 @@ import {sessionPayload,restoreSession} from '../quote-session.js';
 const now=Date.parse('2026-10-14T15:00:00Z'),id='bbdbf613-f3e0-4f68-9cc7-fc090ca84e24';
 const snapshot={scan_id:'test',generated_at:'2026-10-14T14:59:00Z',account_id:'private',candidates:[{ticker:'TEST',options:[{contract_id:'TEST261016C00100000',strike:100,side:'call',expiry:'2026-10-16'}]}]};
 const observation={instrument:{id,chain_symbol:'TEST',strike_price:100,type:'call',expiration_date:'2026-10-16',trade_value_multiplier:100,state:'active',tradability:'tradable',sellout_datetime:'2026-10-16T20:00:00Z',account_id:'private'},quote:{instrument_id:id,bid_price:'.29',ask_price:'.30',updated_at:'2026-10-14T15:00:00Z'},received_at:'2026-10-14T15:00:00Z'};
+test('provider depth and mark survive export and recovery at their original clocks',()=>{
+ const enriched={...observation,quote:{...observation.quote,bid_size:0,ask_size:7,mark_price:'.295',account_id:'secret'}};
+ const history=appendQuoteEvidence(snapshot,[enriched],[],now);
+ const recovered=restoreSession(JSON.stringify(sessionPayload(snapshot,[enriched],history,'test',now)),now);
+ for(const q of [history[0],quoteEvidenceInput(snapshot,history).observations[0],recovered.history[0],recovered.observations[0].quote]){
+  assert.equal(q.bid_size,0);assert.equal(q.ask_size,7);assert.equal(q.mark_price,.295);
+ }
+ assert.equal(recovered.history[0].observed_at,observation.quote.updated_at);
+ assert.equal(recovered.history[0].received_at,observation.received_at);
+ assert.equal(recovered.history[0].quote_check,'QUOTE_CHECK_PASSED');
+ assert.ok(!JSON.stringify(recovered).includes('secret'));
+ assert.deepEqual(appendQuoteEvidence(recovered.scanner,recovered.observations,[],now),history);
+});
+test('optional evidence rejects malformed sizes and marks without inventing zero',()=>{
+ for(const value of [undefined,null,-1,1.5,Infinity,NaN,'3',true,{},Number.MAX_SAFE_INTEGER+1]){
+  const fields=quoteDiagnostics({bid_size:value,ask_size:value});
+  assert.deepEqual(fields,{});
+ }
+ for(const value of [undefined,null,0,-1,'',true,{},Infinity,'NaN'])assert.deepEqual(quoteDiagnostics({mark_price:value}),{});
+ assert.deepEqual(quoteDiagnostics({bid_size:0,ask_size:2,mark_price:'.295'}),{bid_size:0,ask_size:2,mark_price:.295});
+});
+test('optional evidence does not borrow depth or mark from older observations',()=>{
+ const old={...observation,received_at:'2026-10-14T14:59:59Z',quote:{...observation.quote,updated_at:'2026-10-14T14:59:59Z',bid_size:9,ask_size:8,mark_price:'.295'}};
+ for(const rows of [[old,observation],[observation,old]]){
+  const [q]=appendQuoteEvidence(snapshot,rows,[],now);
+  for(const key of ['bid_size','ask_size','mark_price'])assert.equal(Object.hasOwn(q,key),false);
+ }
+});
+test('conflicting depth or mark at the same receipt cannot supply arbitrary evidence',()=>{
+ for(const fields of [{bid_size:2},{ask_size:3},{mark_price:'.295'}]){
+  const other={...observation,quote:{...observation.quote,...fields}};
+  for(const rows of [[observation,other],[other,observation]])assert.equal(appendQuoteEvidence(snapshot,rows,[],now).length,0);
+ }
+});
 test('guidance distinguishes metadata, price limit and refresh problems',()=>{
  assert.match(quoteGuidance({reasons:['NONSTANDARD_OR_UNKNOWN_MULTIPLIER']}),/refreshing the price cannot/);
  assert.match(quoteGuidance({reasons:['STALE_QUOTE']}),/Refresh matched/);

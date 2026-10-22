@@ -64,8 +64,9 @@ remain empty. The template is not a completed review or a training example.
    original clocks into tab recovery and quote exports.
 2. Match exact contracts once and fetch quotes. Complete the evidence reviews
    using sources actually available at their recorded times. Record original
-   displayed size and pricing benchmark separately: the current quote export
-   does not contain either, so it cannot fill those fields by itself. Keep the
+   displayed size and pricing benchmark separately. Production exports lack
+   these fields; the draft collector retains optional displayed sizes and a
+   provider mark, but still requires a reviewed pricing benchmark. Keep the
    underlying source material with its actual observation/availability times.
 3. Fill the actual reviewer identity, completion time, candidate direction,
    dated session (`YYYY-MM-DD` Eastern) and explicit risk plan. A call worksheet
@@ -124,3 +125,20 @@ truth of a source, the independence of reviewers, executable depth or fills.
 Keep the original evidence for review. A passing intake remains an offline
 research record; profitability, calibration, holdout evaluation and production
 activation are still unproven.
+# Provider book evidence in the draft collector
+
+The draft private quote collector preserves optional `bid_size`, `ask_size`, and
+`mark_price` through export and tab recovery, together with the original quote
+and receipt timestamps. Sizes are displayed contracts. A reported zero is kept;
+missing or malformed values remain unknown. Older quotes do not supply missing
+fields on newer quotes. Conflicting copies at the same receipt are withheld.
+
+These fields do not certify executable liquidity or fill quality. The provider
+mark is not an independent fair-value benchmark. A reviewer must still record
+the intended quantity, inspect depth freshness and sufficiency, declare a pricing
+benchmark and method, and complete the risk plan before the decision cutoff.
+The intake does not automatically convert these optional fields into ratings or
+completed supporting-evidence reviews. Legacy exports remain usable with these
+fields unknown. This collector change is part of draft PR #96 and is not live
+until that code is separately released.
+
