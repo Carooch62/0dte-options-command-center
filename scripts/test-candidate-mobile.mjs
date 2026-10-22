@@ -85,6 +85,7 @@ try{
  await page.route('**/private/plaid/robinhood/quotes',async r=>r.fulfill({json:{received_at:await page.evaluate(()=>new Date().toISOString()),observations:[{quote:{instrument_id:id,bid_price:'.02',ask_price:'.03',updated_at:now}}]}}));
  await page.getByRole('button',{name:'Refresh matched option quotes',exact:true}).click();
  await page.getByText('The spread exceeds the quote-check limit.',{exact:false}).waitFor();
+ assert.match(await page.locator('td[data-label="Quote check"]').innerText(),/Spread: \$0.010 \/ 40.0% of midpoint; limits: \$0.10 and 30% of midpoint/);
  await page.reload();await page.getByText('Restored this tab’s session',{exact:false}).first().waitFor();
  const wideDownload=page.waitForEvent('download');
  await page.getByRole('button',{name:'Export private quote observations',exact:true}).click();
