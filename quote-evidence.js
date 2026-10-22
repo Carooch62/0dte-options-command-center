@@ -22,7 +22,10 @@ export function quoteDiagnostics(record){
  return result;
 }
 export function quoteGuidance(row){
- if(row.reasons.length)return row.reasons.map(reason=>messages[reason]||reason).join(' ');
+ if(row.reasons.length)return row.reasons.map(reason=>{
+  if(reason!=='WIDE_SPREAD'||!Number.isFinite(row.spread)||!Number.isFinite(row.spread_pct))return messages[reason]||reason;
+  return `${messages[reason]} Spread: $${row.spread.toFixed(3)} / ${row.spread_pct.toFixed(1)}% of midpoint; limits: $0.10 and 30% of midpoint. Both limits must pass.${Number.isFinite(row.ask)&&row.ask>.30?' Live ask is also above $0.30.':''}`;
+ }).join(' ');
  return row.premium_status==='ABOVE_LIMIT'?'Live ask is above $0.30. This contract is outside the price limit; reload the batch or recheck later.':'Quote check passed and live ask is within $0.30. Setup and market-session checks remain separate.';
 }
 export function appendQuoteEvidence(snapshot,observations,history,now=Date.now()){
