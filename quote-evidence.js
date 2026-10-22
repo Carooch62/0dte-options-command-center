@@ -106,7 +106,7 @@ export function captureAction(windows){
  const open=windows.filter(w=>w.state==='OPEN').sort((a,b)=>a.closes-b.closes)[0];
  const next=open||windows.filter(w=>w.state==='UPCOMING').sort((a,b)=>a.target-b.target)[0];
  const missed=windows.filter(w=>w.state==='MISSING').length;
- if(!next)return `Capture windows finished: ${windows.filter(w=>w.state==='CAPTURED').length}/${windows.length} captured. Export this session. Missing windows stay missing.`;
+ if(!next)return `Capture windows finished: ${windows.filter(w=>w.state==='CAPTURED').length}/${windows.length} captured. Export this session. Original provider timestamps remain required.`;
  const time=value=>new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',hour:'numeric',minute:'2-digit',second:'2-digit'}).format(new Date(value));
  const remaining=Math.floor(next.seconds/60)+':'+String(next.seconds%60).padStart(2,'0');
  const horizon=windows.filter(w=>w.minutes===next.minutes),complete=horizon.filter(w=>w.state==='CAPTURED').length;

@@ -44,7 +44,7 @@
 <button class="primary" id="resolve" aria-describedby="resolve-help" disabled>Match contracts and fetch live quotes</button>
 <p id="resolve-help" class="control-help">Load a batch first.</p>
 <p id="validation-clock" aria-live="off">Validation clock starts after the first passing fetched quote.</p>
-<details><summary>Capture countdowns by contract</summary><div id="capture-windows" aria-live="off"></div><p class="muted">Refresh while a window is open and check for CAPTURED. If the provider timestamp is before the target, refresh again before the window closes. Failed checks stay excluded. No contract quote received can also mean a failed request or missing contract; review request diagnostics. Missing windows stay missing; the clock never restarts to fill them.</p></details>
+<details><summary>Capture countdowns by contract</summary><div id="capture-windows" aria-live="off"></div><p class="muted">Refresh while a window is open and check for CAPTURED. If the provider timestamp is before the target, refresh again before the window closes. Failed checks stay excluded. No contract quote received can also mean a failed request or missing contract; review request diagnostics. Provider timestamps outside the window stay excluded; the clock never restarts to fill gaps.</p></details>
 <p id="snapshot-info" role="status">No scanner snapshot loaded.</p>
 <details>
 <summary>Snapshot imports and staging fallback</summary>

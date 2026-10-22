@@ -57,5 +57,7 @@ test('capture target and end remain inclusive and future receipts stay unobserve
   const before=captureWindows([entry,q],Date.parse(stamp)-1)[0];
   assert.notEqual(before.state,'CAPTURED');assert.match(before.explanation,/Waiting for this window|No contract quote received/);
  }
+ const lateReceipt={...entry,observed_at:'2026-10-21T17:06:02Z',received_at:'2026-10-21T17:06:03Z'};
+ assert.equal(captureWindows([entry,lateReceipt],Date.parse(lateReceipt.received_at))[0].state,'CAPTURED');
 });
 
