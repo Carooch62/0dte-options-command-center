@@ -111,9 +111,11 @@ test('request timings survive export and reload while provider clocks remain unc
  assert.equal(q.observed_at,observed);assert.equal(q.received_at,received);
  assert.equal(q.request_timing.setup_ms,40);assert.equal(q.request_timing.quote_ms,20);assert.equal(q.request_timing.worker_ms,65);assert.ok(q.request_timing.browser_ms>=0);
  assert.ok(!JSON.stringify(saved).includes('secret'));assert.match(h.get('status').textContent,/Refresh request:/);
+ assert.match(h.get('request-stages').textContent,/Setup: 0.040 s.*Quote retrieval: 0.020 s.*Whole Worker handler: 0.065 s/);
  const exported=quoteEvidenceInput(saved.scanner,saved.history,received);assert.deepEqual(exported.observations[0].request_timing,q.request_timing);
  const resumed=await harness([],h.storage,false);assert.equal(resumed.calls.length,0);
  assert.deepEqual(JSON.parse(h.storage.get(SESSION_KEY)).history[0],q);
+ assert.match(resumed.get('request-stages').textContent,/Setup: 0.040 s/);
 });
 
 

@@ -62,6 +62,7 @@ try{
  assert.match(await page.locator('#validation-clock').innerText(),/5-min:.*10-min:.*15-min:/);assert.equal(exported.entries[0].quote.ask,.31);
  assert.deepEqual(exported.validation_policy.horizons_minutes,[5,10,15]);
  assert.equal(exported.observations[0].request_timing.setup_ms,60);
+ assert.match(await page.locator('#request-stages').textContent(),/Setup: 0.060 s.*Quote retrieval: 0.040 s.*Whole Worker handler: 0.105 s/);
  assert.equal(exported.observations[0].request_timing.setup_mode,'stateless');
  assert.equal(exported.observations[0].request_timing.setup_cache_status,'miss');
  assert.equal(await page.locator('.capture-action').evaluate(el=>getComputedStyle(el).position),'sticky');
@@ -105,6 +106,8 @@ try{
  await page.waitForFunction(()=>document.getElementById('capture-windows').textContent.includes('REFRESH NOW'));
  assert.match(await page.locator('#validation-clock').innerText(),/closes in/);
  assert.match(await page.locator('#capture-action').innerText(),/Refresh now.*5-minute.*ET/);
+ assert.match(await page.locator('#capture-action').innerText(),/0\/1 captured for this horizon/);
+ assert.match(await page.locator('#capture-windows').innerText(),/No contract quote received during this window/);
  assert.ok(await page.locator('#capture-refresh').isEnabled());
  await page.clock.setSystemTime(new Date(Date.parse(exported.entries[0].decision_at)+6*60000+1000));
  await page.clock.runFor(1000);

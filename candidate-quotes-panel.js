@@ -39,7 +39,7 @@ function render(){
  $('capture-windows').replaceChildren();
  const windows=captureWindows(evidenceHistory);$('capture-action').textContent=captureAction(windows);$('capture-refresh').disabled=true;
  const clock=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
- for(const contract of [...new Set(windows.map(w=>w.contract))]){const p=document.createElement('p');p.textContent=contract+' · '+windows.filter(w=>w.contract===contract).map(w=>`${w.minutes}m: ${w.state==='OPEN'?'REFRESH NOW · closes in '+clock(w.seconds):w.state==='UPCOMING'?'opens in '+clock(w.seconds):w.state}${w.failed_checks?' (quote check failed)':''}`).join(' | ');$('capture-windows').append(p);}
+ for(const contract of [...new Set(windows.map(w=>w.contract))]){const p=document.createElement('p');p.textContent=contract+' · '+windows.filter(w=>w.contract===contract).map(w=>`${w.minutes}m: ${w.state==='OPEN'?'REFRESH NOW · closes in '+clock(w.seconds):w.state==='UPCOMING'?'opens in '+clock(w.seconds):w.state} · ${w.explanation}`).join(' | ');$('capture-windows').append(p);}
  $('export-evidence').disabled=busy||!evidenceHistory.length&&!attempts.length;
  $('resolve-help').textContent=busy?'A request is in progress. Wait for it to finish.':!scanner?'Load a batch first.':!scanner.candidates?.length?'This batch has no candidates. Load a current batch with eligible research contracts.':'Ready to match exact contracts and fetch their first quotes.';
  $('export-help').textContent=busy?'Wait for the current request to finish.':evidenceHistory.length||attempts.length?'Ready to export observations and request diagnostics, including failures.':'Fetch quotes before exporting observations.';
@@ -48,6 +48,8 @@ function render(){
  $('last-receipt').textContent=latest?.received_at||'No current quote response';
  const duration=latest?.request_timing?.browser_ms;
  $('request-duration').textContent=Number.isFinite(duration)?`${(duration/1000).toFixed(2)} seconds`:'Not measured for this response';
+ const timing=quoteRequestTiming(latest?.request_timing),seconds=value=>Number.isFinite(value)?(value/1000).toFixed(3)+' s':'Unknown';
+ $('request-stages').textContent=`Setup: ${seconds(timing.setup_ms)} · Quote retrieval: ${seconds(timing.quote_ms)} · Whole Worker handler: ${seconds(timing.worker_ms)} · Browser request: ${seconds(timing.browser_ms)}. Setup ${timing.setup_reused===true?'reused':timing.setup_reused===false?'initialized':'reuse unknown'}.`;
  const generated=Date.parse(scanner?.generated_at),age=(Date.now()-generated)/60000;
  $('snapshot-info').textContent=scanner?`${scannerSource} · Generated: ${scanner.generated_at||'unknown'} · Age: ${Number.isFinite(age)&&age>=0?age.toFixed(1)+' minutes':'unknown'} · Coverage: ${scanner.included_contracts??'unknown'} included / ${scanner.total_contracts??'unknown'} total; ${scanner.omitted_contracts??'unknown'} omitted${scanner.research_rejected_contracts!==undefined?' · '+scanner.research_rejected_contracts+' price-only matches rejected by research screens':''}${scanner.scanned_contracts!==undefined?' · '+scanner.scanned_contracts+' identities examined; batch requires published research screens':''} · Snapshot freshness is separate from quote freshness.`:'No scanner snapshot loaded.';
  $('scanner').disabled=busy;$('research').disabled=busy;
