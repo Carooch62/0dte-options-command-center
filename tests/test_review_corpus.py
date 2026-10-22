@@ -16,6 +16,12 @@ def record(reviewer='reviewer-a'):
 
 
 class ReviewCorpusTests(unittest.TestCase):
+    def test_different_supporting_sources_or_policies_are_not_comparable(self):
+        for key in ('supporting_evidence', 'policy_version', 'policy_sha256', 'method_sha256'):
+            rows = [record(), record('reviewer-b')]
+            rows[1][key] = {'source': 'different evidence'} if key == 'supporting_evidence' else 'different-policy'
+            self.assertEqual(audit_corpus({'records': rows})['reviewer_comparisons'], [])
+
     def test_complete_pair_and_immutable_input(self):
         rows = [record(), record('reviewer-b')]
         rows[1]['component_reviews']['news']['dimensions']['novelty']['rating'] = 4

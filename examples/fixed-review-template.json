@@ -173,7 +173,49 @@
             }
           }
         }
+      },
+      "intraday_bar_end": null,
+      "supporting_evidence": {
+        "depth": {
+          "contract_id": null,
+          "observed_at": null,
+          "available_at": null,
+          "source": null,
+          "evidence": null,
+          "bid_size_contracts": null,
+          "ask_size_contracts": null
+        },
+        "pricing_benchmark": {
+          "contract_id": null,
+          "observed_at": null,
+          "available_at": null,
+          "source": null,
+          "evidence": null,
+          "value": null,
+          "method_version": null
+        },
+        "risk_plan": {
+          "contract_id": null,
+          "observed_at": null,
+          "available_at": null,
+          "source": null,
+          "evidence": null,
+          "intended_contracts": null,
+          "maximum_premium_dollars": null,
+          "maximum_loss_dollars": null,
+          "estimated_round_trip_cost_dollars": null,
+          "cost_basis": null,
+          "underlying_target": null,
+          "underlying_invalidation": null,
+          "exit_plan": null,
+          "broker_deadline_at": null
+        }
       }
     }
-  ]
+  ],
+  "format": "fixed-review-corpus-v1",
+  "policy_version": "fixed-collection-v1",
+  "policy_sha256": null,
+  "prepared_at": null,
+  "selected_reviewer_id": null
 }

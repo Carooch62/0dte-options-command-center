@@ -69,6 +69,9 @@ def audit_corpus(corpus):
         if reasons:
             continue
         evidence = copy.deepcopy({k: record[k] for k in ('component_reviews', 'eligibility_evidence')})
+        for key in ('supporting_evidence', 'policy_version', 'policy_sha256', 'method_sha256'):
+            if key in record:
+                evidence[key] = copy.deepcopy(record[key])
         ratings = {}
         for component, dimensions in RUBRIC.items():
             for dimension in dimensions:

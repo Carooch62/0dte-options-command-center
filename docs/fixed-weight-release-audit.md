@@ -79,9 +79,9 @@ preparation PR alone does not satisfy the integration or research rows.
 | --- | --- | --- |
 | R1 — Production fixes preserved | Prepared | Review the diff against the pinned production base; every change must be explicitly included in the selective port |
 | R2 — Candidate regression checks | Local checks pass; current CI is recorded on the preparation PR | Passing Python/JavaScript and build checks on the exact candidate commit; rerun relevant mobile/Worker checks when integration changes those surfaces |
-| R3 — Review policy frozen | Open | Versioned component rating thresholds, source freshness, liquidity/depth, pricing benchmark, sizing/loss and deadline policies established before prospective collection |
-| R4 — Complete prospective corpus | Open | Exact contracts, frozen packet, actual reviewer identity/completion, original availability clocks, every component dimension and explicit liquidity/risk evidence; report exclusions and reviewer disagreement |
-| R5 — Quote/outcome association | Open | Original private quote exports associated with the same contract and decision cutoff, 5/10/15-minute windows and costs; missing/failed windows remain visible |
+| R3 — Review policy frozen | Collection protocol versioned; scoring calibration remains open | `fixed-collection-v1` fixes reviewed ordinal anchors and input/clock/budget requirements. Raw-feature mappings and calibrated numeric rating/acceptance thresholds remain required before activation |
+| R4 — Complete prospective corpus | Worksheet and combined intake ready; actual records open | Exact contracts, frozen packet, actual reviewer identity/completion, original availability clocks, every component dimension and explicit liquidity/risk evidence; report exclusions and reviewer disagreement |
+| R5 — Quote/outcome association | Binding and declared capture targets implemented; actual outcomes open | Original private quote exports associated with the same contract and decision cutoff, 5/10/15-minute windows and costs; missing/failed windows remain visible |
 | R6 — Comparable evaluation | Open | Same-input current-baseline and fixed-score rankings, chronological calibration/holdout split, predeclared metrics and acceptance criteria; report coverage and uncertainty |
 | R7 — Scanner integration | Open | Evidence-backed component adapter and opt-in activation switch; exact source/cutoff binding; missing components withhold the score; eligibility gates cannot be offset by weights |
 | R8 — Dashboard and ordering | Open | Traceable component contributions, qualified/live-price status and clear withholding reasons; default ordering changes only under the activation switch; test ties and missing scores |
@@ -115,17 +115,20 @@ node scripts/build-assets.mjs
 git diff --check
 ```
 
-For each real reviewed packet, run `review_corpus.py` for completeness and
-`fixed_composite.py` for admission/scoring. Inspect both reports. Keep resulting
-private reports outside the public checkout. Null template values are pending
-work and must fail admission.
+For the new collection protocol, follow [prospective collection](fixed-review-collection.md).
+`fixed_review_intake.py` freezes an independently audited source/batch, prepares
+a blank bound worksheet and browser import, then combines review completeness,
+source/clock/gate checks and the fixed scorer in a single intake report. Keep
+private reports outside the public checkout. Null template values remain pending
+work and fail admission. The older component/corpus CLIs remain research tools;
+they are not substitutes for this collection protocol's admission checks.
 
 The review template is a corpus worksheet (`records`), not a scoring snapshot
-(`candidates`). After auditing it, select one completed review per exact
-candidate at the same declared cutoff and packet, preserving the original
-record fields, and put those selected records in the scoring snapshot's
-`candidates` array. Keep its `as_of` and `packet_id` bound to those records.
-Do not average reviewers automatically or copy incomplete/withheld reviews.
+(`candidates`). Combined intake selects the explicitly declared reviewer,
+preserves source records, and emits a derived scoring snapshot plus outcome
+input. The declared decision follows actual review and browser quote-request
+completion; the earlier transport-test clock is preserved separately. No
+reviewers are averaged and no missing dimensions or outcomes are backfilled.
 
 Rollback for this preparation PR is removal of its additive offline modules,
 synthetic tests and documentation. It has no production imports or activation
