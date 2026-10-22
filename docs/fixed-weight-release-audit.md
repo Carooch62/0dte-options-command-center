@@ -78,7 +78,7 @@ preparation PR alone does not satisfy the integration or research rows.
 | Gate | Current status | Required evidence |
 | --- | --- | --- |
 | R1 — Production fixes preserved | Prepared | Review the diff against the pinned production base; every change must be explicitly included in the selective port |
-| R2 — Candidate regression checks | Local checks pass; CI pending | Passing Python/JavaScript and build checks on the exact candidate commit; rerun relevant mobile/Worker checks when integration changes those surfaces |
+| R2 — Candidate regression checks | Local checks pass; current CI is recorded on the preparation PR | Passing Python/JavaScript and build checks on the exact candidate commit; rerun relevant mobile/Worker checks when integration changes those surfaces |
 | R3 — Review policy frozen | Open | Versioned component rating thresholds, source freshness, liquidity/depth, pricing benchmark, sizing/loss and deadline policies established before prospective collection |
 | R4 — Complete prospective corpus | Open | Exact contracts, frozen packet, actual reviewer identity/completion, original availability clocks, every component dimension and explicit liquidity/risk evidence; report exclusions and reviewer disagreement |
 | R5 — Quote/outcome association | Open | Original private quote exports associated with the same contract and decision cutoff, 5/10/15-minute windows and costs; missing/failed windows remain visible |
