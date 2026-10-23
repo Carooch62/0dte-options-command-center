@@ -70,6 +70,13 @@ test('option refresh clock and crossed book are reported without declaring verif
  const result=normalizeQuotes({results:[{quote:{instrument_id:id,bid_price:'.30',ask_price:'.20',updated_at:'2026-10-08T13:59:58Z',delta:'.4'}}]},operation,now);
  assert.equal(result.observations[0].clocks.refresh.age_seconds,2);assert.equal(result.observations[0].book_status,'CROSSED');
 });
+test('provider optional book fields survive Worker normalization without account metadata',()=>{
+ const id='f7eca220-0433-41ad-be23-fd44f0a53773',operation=quoteRequest({kind:'option',instrument_ids:[id]}),now=Date.parse('2026-10-08T14:00:00Z');
+ const result=normalizeQuotes({results:[{quote:{instrument_id:id,bid_price:'.29',ask_price:'.30',bid_size:0,ask_size:7,mark_price:'.295',updated_at:'2026-10-08T13:59:58Z',account_number:'PRIVATE'}}]},operation,now);
+ const q=result.observations[0].quote;
+ assert.equal(q.bid_size,0);assert.equal(q.ask_size,7);assert.equal(q.mark_price,'.295');
+ assert.equal(q.updated_at,'2026-10-08T13:59:58Z');assert.ok(!JSON.stringify(result).includes('PRIVATE'));
+});
 test('authenticated quote path measures setup and retrieval without changing freshness claims',async t=>harness(async({env,auth,calls,setUpstream})=>{
  let elapsed=0;t.mock.method(performance,'now',()=>elapsed);
  const started=await handleRobinhood(request('connect','POST',auth,{}),env),target=new URL((await started.json()).authorization_url);

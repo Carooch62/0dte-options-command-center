@@ -45,7 +45,7 @@ try{
  const now=await page.evaluate(()=>new Date().toISOString()),id='22222222-2222-2222-2222-222222222222',contract={ticker:'TEST',strike:100,side:'call',expiry:'2099-01-01'};
  await page.route('**/private/plaid/robinhood/candidates',r=>r.fulfill({json:{snapshot:{generated_at:now,included_contracts:1,total_contracts:1,qualifying_contracts:1,omitted_contracts:0,candidates:[{ticker:'TEST',options:[{...contract,contract_id:'TEST20990101C00100000'}]}]}}}));
  await page.route('**/private/plaid/robinhood/resolve',r=>r.fulfill({json:{results:[{contract,status:'EXACT_METADATA_MATCH',instrument:{id,chain_symbol:'TEST',strike_price:100,type:'call',expiration_date:'2099-01-01',state:'active',tradability:'tradable',trade_value_multiplier:100,sellout_datetime:'2099-01-01T19:45:00Z'}}]}}));
- await page.route('**/private/plaid/robinhood/quotes',async r=>r.fulfill({json:{received_at:await page.evaluate(()=>new Date().toISOString()),request_timing:{setup_ms:60,quote_ms:40,worker_ms:105,setup_reused:false,setup_mode:'stateless',setup_cache_status:'miss'},observations:[{quote:{instrument_id:id,bid_price:'.30',ask_price:'.31',updated_at:now}}]}}));
+ await page.route('**/private/plaid/robinhood/quotes',async r=>r.fulfill({json:{received_at:await page.evaluate(()=>new Date().toISOString()),request_timing:{setup_ms:60,quote_ms:40,worker_ms:105,setup_reused:false,setup_mode:'stateless',setup_cache_status:'miss'},observations:[{quote:{instrument_id:id,bid_price:'.30',ask_price:'.31',bid_size:0,ask_size:7,mark_price:'.305',updated_at:now}}]}}));
  await page.route('**/data/staging-shadow-evidence-latest.json',r=>r.fulfill({json:{format:'shadow-evidence-v1',packet_id:'a'.repeat(64),scan_id:'staging-test',generated_at:now,captured_at:now,market_session:'OPEN',candidates:[{candidate_id:'TEST20990101C00100000',ticker:'TEST',contract:{contract_id:'TEST20990101C00100000',strike:100,side:'call',expiry:'2099-01-01'}}]}}));
  await page.getByRole('button',{name:'Load staging validation batch',exact:true}).click();
  await page.getByText('Loaded 1 staging contracts',{exact:false}).waitFor();
@@ -72,6 +72,9 @@ try{
  assert.equal(exported.observations[0].observed_at,now);
  assert.equal(exported.observations[0].metadata_multiplier,100);
  assert.deepEqual(exported.observations[0].quote_check_reasons,[]);
+ assert.equal(exported.observations[0].bid_size,0);
+ assert.equal(exported.observations[0].ask_size,7);
+ assert.equal(exported.observations[0].mark_price,.305);
  await page.reload();await page.getByText('Restored this tab’s session',{exact:false}).first().waitFor();
  assert.ok(await page.getByRole('button',{name:'Refresh matched option quotes',exact:true}).isEnabled());
  await page.locator('#verified-only').check();assert.equal(await page.locator('#rows tr').count(),0);await page.locator('#verified-only').uncheck();
@@ -93,6 +96,11 @@ try{
  const failed=wide.observations.at(-1);
  assert.equal(failed.metadata_multiplier,100);assert.equal(failed.multiplier,null);
  assert.deepEqual(failed.quote_check_reasons,['WIDE_SPREAD']);
+ assert.equal(Object.hasOwn(failed,'bid_size'),false,'a newer quote must not borrow earlier optional depth');
+ assert.equal(Object.hasOwn(failed,'mark_price'),false,'a newer quote must not borrow an earlier mark');
+ assert.equal(wide.observations[0].bid_size,0,'earlier reported zero survives reload and a later refresh');
+ assert.equal(wide.observations[0].ask_size,7);
+ assert.equal(wide.observations[0].mark_price,.305);
  assert.equal(wide.entries.length,1); // Failed refresh cannot replace the earlier passing entry.
  await page.route('**/private/plaid/robinhood/quotes',r=>r.fulfill({status:401,json:{error:'Private sign in required'}}));
  await page.getByRole('button',{name:'Refresh matched option quotes',exact:true}).click();
