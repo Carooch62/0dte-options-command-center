@@ -18,6 +18,9 @@ try{
  await page.route('**/health',r=>r.fulfill({json:{environment:'staging'}}));
  await page.route('**/data/candidate-snapshot.json',r=>r.fulfill({json:{generated_at:'2026-10-12T14:00:00Z',candidates:[{ticker:'TEST',options:[{contract_id:'SYNTHETIC-LONG-CONTRACT-NAME-261012C00100000',strike:100,side:'call',expiry:'2026-10-12'}]}]}}));
  await page.goto(`http://127.0.0.1:${server.address().port}/`);
+ assert.equal(await page.locator('#capture-refresh').innerText(),'Load current $0.30 batch');
+ assert.ok(await page.locator('#capture-refresh').isEnabled());
+ assert.match(await page.locator('.project-nav a').first().getAttribute('href'),/dashboard_liquid.html$/);
  let followedSignIn=0;
  await page.route('https://private-sign-in.invalid/**',r=>{followedSignIn++;return r.abort();});
  await page.route('**/private/plaid/robinhood/status',r=>r.fulfill({status:302,headers:{Location:'https://private-sign-in.invalid/login'}}));
@@ -52,9 +55,17 @@ try{
  assert.match(await page.locator('#snapshot-info').innerText(),/STAGING VALIDATION/);
  await page.getByRole('button',{name:'Load current $0.30 scanner batch',exact:true}).click();
  await page.getByText('Loaded 1 contracts',{exact:false}).waitFor();
- await page.getByRole('button',{name:'Match contracts and fetch live quotes',exact:true}).click();
+ assert.match(await page.locator('#capture-refresh').innerText(),/Match contracts/);
+ await page.locator('#capture-refresh').click();
  await page.getByText('Above $0.30 · outside budget',{exact:true}).waitFor();
  await page.getByText('Live ask is above $0.30.',{exact:false}).waitFor();
+ assert.equal(await page.locator('#capture-refresh').innerText(),'Refresh captured batch');
+ assert.match(await page.locator('#batch-counts').innerText(),/1 selected contracts.*1 matched.*0 unmatched/);
+ assert.match(await page.locator('td[data-label="Setup eligibility"]').innerText(),/Not evaluated/);
+ assert.match(await page.locator('#workflow-help').innerText(),/does not load a newer scanner batch/);
+ await page.locator('#rows .quote-details summary').click();
+ await page.clock.runFor(1000);
+ assert.ok(await page.locator('#rows .quote-details').evaluate(el=>el.open),'provider details stay open as quote ages tick');
  const downloadPromise=page.waitForEvent('download');
  await page.getByRole('button',{name:'Export private quote observations',exact:true}).click();
  const download=await downloadPromise,exported=JSON.parse(await readFile(await download.path(),'utf8'));
@@ -135,6 +146,9 @@ try{
  await page.locator('#status').filter({hasText:'Expected scanner candidates'}).waitFor();
  assert.deepEqual(await page.evaluate(()=>JSON.parse(sessionStorage.getItem('private-quote-session-v1')).history),historyBefore);
  assert.equal(await page.locator('#rows tr').count(),1,'invalid file replacement must preserve cohort');
+ await page.clock.setSystemTime(new Date(Date.parse(exported.entries[0].decision_at)+17*60000));
+ await page.clock.runFor(1000);
+ assert.equal(await page.locator('#capture-refresh').innerText(),'Export captured observations');
  console.log(`${width}px: loader, capture countdown, failure recovery, evidence preservation, no overflow passed`);
  assert.deepEqual(errors,[]);
  }finally{await page.screenshot({path:`test-results/mobile/${width}-final.png`,fullPage:true});await writeFile(`test-results/mobile/${width}-errors.json`,JSON.stringify(errors));await context.tracing.stop({path:`test-results/mobile/${width}-trace.zip`});await context.close();}
@@ -183,6 +197,7 @@ try{
  }finally{await context.close();}
  }
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}
+
 
 
 

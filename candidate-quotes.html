@@ -5,20 +5,24 @@
 <title>Private candidate quote check</title>
 <style>body{font:16px system-ui;background:#101826;color:#ecf1fa;max-width:1000px;margin:auto;padding:24px}a{color:#80c8ff}label,button{display:block;margin:20px 0}td,th{padding:12px;text-align:left;border-bottom:1px solid #40516a}.scroll{overflow:auto}p{line-height:1.6}*{box-sizing:border-box}input{max-width:100%}button{min-height:44px;padding:10px;font:inherit;cursor:pointer}td{overflow-wrap:anywhere}table{width:100%;table-layout:fixed}th,td{vertical-align:top}details{margin:24px 0}summary{cursor:pointer}@media(max-width:480px){body{padding:16px}h1{font-size:26px}input{display:block;margin-top:8px}thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}table,tbody,tr,td{display:block;width:100%}tr{padding:12px;background:#1b283c;border-radius:12px;margin:12px 0}td{font-size:15px;padding:8px 0;border:0;display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:4px}td::before{content:attr(data-label);color:#bbc9da}button{width:100%}}</style>
 <link rel="stylesheet" href="./connection-ui.css">
+<style>.batch-card{padding:14px 18px;margin:16px 0;border:1px solid #cce6ff30;border-radius:18px;background:#14233bd9}.batch-card p{margin:6px 0;overflow-wrap:anywhere}.capture-action .control-help{margin:4px 0;font-size:13px}.quote-details{grid-column:1/-1;max-width:100%;font-size:13px;margin:8px 0}.quote-details summary{min-height:36px;padding:6px 0}.setup-status{font-size:13px;border:1px solid #c8ddff40;border-radius:10px;padding:6px 8px;display:inline-block}.capture-state{border-left:3px solid #a4c4e0;padding:8px 12px;margin:8px 0;overflow-wrap:anywhere}#workflow-stage{font-size:12px;margin:4px 0}.capture-action button{margin:8px 0}th,td{overflow-wrap:anywhere}@media(min-width:760px){table th:first-child{width:24%}}@media(prefers-reduced-transparency:reduce){.batch-card{background:#14233b}}</style>
 <body class="connection-page">
 <nav class="project-nav" aria-label="Command Center">
 <span class="brand">0DTE · COMMAND CENTER</span>
-<a href="https://carooch62.github.io/0dte-options-command-center/dashboard_glass.html">Scanner</a>
+<a href="https://carooch62.github.io/0dte-options-command-center/dashboard_liquid.html">Scanner</a>
 <a href="https://0dte-options-command-center.h69htk56cq.workers.dev/candidate-quotes" aria-current="page">Quotes</a>
 <a href="https://0dte-options-command-center.h69htk56cq.workers.dev/brokerage.html">Connections</a>
 </nav>
 <div class="eyebrow">PRIVATE · ROBINHOOD QUOTES</div>
 <h1>Private candidate quote check</h1>
-<aside class="capture-action" aria-label="Next capture">
+<aside class="capture-action" aria-label="Next action">
 <strong id="capture-action" aria-live="off">Match contracts and fetch a passing quote to start capture windows.</strong>
-<button class="primary" id="capture-refresh" disabled>Refresh for capture</button>
-<small>Tap manually, then check for CAPTURED. Keep this tab awake; provider timestamps must fit the window. No automatic quote polling.</small>
+<button class="primary" id="capture-refresh" aria-describedby="workflow-help" disabled>Load current $0.30 batch</button>
+<p id="workflow-help" class="control-help">Load a batch to begin.</p>
+<p id="workflow-stage" class="muted">Load → Match &amp; fetch → Refresh same batch → Export</p>
+<small>During capture, tap manually, then check for CAPTURED. Keep this tab awake; provider timestamps must fit the window. No automatic quote polling.</small>
 </aside>
+<section class="batch-card" aria-label="Captured batch"><h2>Captured batch</h2><p id="batch-identity">No batch loaded.</p><p id="batch-counts"></p><small>Quote refreshes preserve these contracts. New scanner results are not checked automatically. Export before replacing the batch.</small></section>
 <p>
 <a href="./shadow-review.html">Open staging evidence review queue</a>
 </p>
@@ -34,14 +38,14 @@
 <h2>1 · Load a research batch</h2>
 <p>Load up to 20 scanner contracts with research asks of $0.30 or less that pass the scanner’s quote, volume, strike-distance, delta and spread screens. At most two contracts per ticker. Then resolve their exact Robinhood metadata and refresh their live quotes. Review the scan age before using this batch.</p>
 <div class="quote-controls">
-<button class="primary" id="load-current">Load current $0.30 scanner batch</button>
+<button id="load-current">Load current $0.30 scanner batch</button>
 <button id="load-validation">Load staging validation batch</button>
 </div>
 <p class="muted">Scanner asks are research prices. Robinhood quotes are fetched separately below. A quote can pass its quality check while its live ask exceeds $0.30; those contracts are outside the budget.</p>
 </section>
 <section>
 <h2>2 · Match and fetch quotes</h2>
-<button class="primary" id="resolve" aria-describedby="resolve-help" disabled>Match contracts and fetch live quotes</button>
+<button id="resolve" aria-describedby="resolve-help" disabled>Match contracts and fetch live quotes</button>
 <p id="resolve-help" class="control-help">Load a batch first.</p>
 <p id="validation-clock" aria-live="off">Validation clock starts after the first passing fetched quote.</p>
 <details><summary>Capture countdowns by contract</summary><div id="capture-windows" aria-live="off"></div><p class="muted">Refresh while a window is open and check for CAPTURED. If the provider timestamp is before the target, refresh again before the window closes. Failed checks stay excluded. No contract quote received can also mean a failed request or missing contract; review request diagnostics. Provider timestamps outside the window stay excluded; the clock never restarts to fill gaps.</p></details>
@@ -55,7 +59,7 @@
 <label>Robinhood research snapshot <input id="research" type="file" accept=".json">
 </label>
 </details>
-<button class="primary" id="refresh" aria-describedby="refresh-help" disabled>Refresh matched option quotes</button>
+<button id="refresh" aria-describedby="refresh-help" disabled>Refresh matched option quotes</button>
 <p id="refresh-help" class="control-help">Load a batch, then match contracts to enable refresh. Waiting five minutes does not enable this button.</p>
 <div class="timing-grid" aria-label="Quote timing">
 <div>
@@ -101,6 +105,7 @@
 <th>Age (seconds)</th>
 <th>$0.30 live ask</th>
 <th>Quote check</th>
+<th>Setup eligibility</th>
 </tr>
 </thead>
 <tbody id="rows">
@@ -108,10 +113,11 @@
 </table>
 </div>
 </section>
-<script type="module" src="./candidate-quotes-panel.js">
+<script type="module" src="./candidate-quotes-panel.js?v=20261023-workflow">
 </script>
 </body>
 </html>
+
 
 
 

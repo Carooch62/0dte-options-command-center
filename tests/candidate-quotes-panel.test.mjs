@@ -21,6 +21,41 @@ async function harness(responses=[],storage=new Map(),prime=true,consent=()=>tru
  await load('research',{format:'robinhood-research-v1',retrieved_at:now,accounts:[],bars:[],observations:[{instrument:{id,chain_symbol:'SPY',strike_price:778,type:'call',expiration_date:'2026-10-12',trade_value_multiplier:100,state:'active',tradability:'tradable',sellout_datetime:'2099-01-01T00:00:00Z'},quote:{instrument_id:id,bid_price:'.80',ask_price:'.81',updated_at:now},received_at:now}]});
  }return {get,load,tick,calls,storage};
 }
+test('primary workflow advances from loading to matching without background requests',async()=>{
+ const h=await harness([Response.json({snapshot:{generated_at:new Date().toISOString(),scan_id:'fixed-test',candidates:[{ticker:'TEST',options:[{strike:100,side:'call',expiry:'2099-01-01'}]}],included_contracts:1,qualifying_contracts:3,omitted_contracts:2}})],new Map(),false);
+ assert.match(h.get('capture-refresh').textContent,/Load current/);
+ await h.get('capture-refresh').onclick();
+ assert.match(h.get('capture-refresh').textContent,/Match contracts/);
+ assert.match(h.get('batch-identity').textContent,/fixed-test/);
+ assert.match(h.get('batch-counts').textContent,/1 selected contracts.*0 matched.*1 unmatched/);
+ h.tick();assert.equal(h.calls.length,1);
+});
+test('passing quote and budget checks do not establish setup eligibility',async()=>{
+ const h=await harness();const row=h.get('rows').children[0];
+ assert.equal(row.children.length,6);
+ assert.equal(row.children[3].textContent,'Above $0.30 · outside budget');
+ assert.match(row.children[5].textContent,/Not evaluated/);
+ assert.match(h.get('capture-refresh').textContent,/Refresh captured batch/);
+ assert.match(h.get('workflow-help').textContent,/does not load a newer scanner batch/);
+});
+test('capture refresh keeps the batch identity and original contract cohort',async()=>{
+ const h=await harness([Response.json({received_at:new Date().toISOString(),observations:[]})]);
+ const before=JSON.parse(h.storage.get(SESSION_KEY)).scanner;
+ await h.get('capture-refresh').onclick();
+ assert.deepEqual(JSON.parse(h.storage.get(SESSION_KEY)).scanner,before);
+ assert.match(h.get('batch-counts').textContent,/1 selected contracts.*1 matched.*0 unmatched/);
+ assert.equal(h.calls[0][0],'/private/plaid/robinhood/quotes');
+});
+test('finished capture windows direct the primary action to export without fetching',async()=>{
+ const id='bbdbf613-f3e0-4f68-9cc7-fc090ca84e24',now=new Date().toISOString();
+ const h=await harness([Response.json({received_at:now,observations:[{quote:{instrument_id:id,bid_price:'.29',ask_price:'.30',updated_at:now}}]})]);
+ await h.get('refresh').onclick();
+ const original=Date.now;try{Date.now=()=>Date.parse(now)+17*60000;h.tick();
+ assert.match(h.get('capture-refresh').textContent,/Export captured/);
+ let exported=false;h.get('export-evidence').onclick=()=>{exported=true;};
+ h.get('capture-refresh').onclick();assert.equal(exported,true);assert.equal(h.calls.length,1);
+ }finally{Date.now=original;}
+});
 test('invalid scanner import preserves the existing snapshot and mapping',async()=>{
  const h=await harness();assert.equal(h.get('rows').children.length,1);assert.equal(h.get('refresh').disabled,false);
  await h.load('scanner',{wrong:true});h.tick();assert.equal(h.get('rows').children.length,1);assert.equal(h.get('refresh').disabled,false);assert.match(h.get('status').textContent,/Expected scanner candidates/);
@@ -31,8 +66,12 @@ test('capture refresh shares manual request handler and does not start backgroun
  await h.get('capture-refresh').onclick();assert.equal(h.calls.length,1);
  assert.equal(h.calls[0][0],'/private/plaid/robinhood/quotes');
  h.tick();assert.equal(h.calls.length,1);
- const empty=await harness([],new Map(),false);assert.equal(empty.get('capture-refresh').disabled,true);
- await empty.get('capture-refresh').onclick();assert.equal(empty.calls.length,0);
+ const empty=await harness([Response.json({snapshot:{generated_at:new Date().toISOString(),candidates:[],included_contracts:0}})],new Map(),false);
+ assert.equal(empty.get('capture-refresh').disabled,false);
+ assert.equal(empty.calls.length,0);
+ await empty.get('capture-refresh').onclick();assert.equal(empty.calls.length,1);
+ assert.equal(empty.calls[0][0],'/private/plaid/robinhood/candidates');
+ empty.tick();assert.equal(empty.calls.length,1);
 });
 test('connection check immediately shows progress and retains its retry after a sign-in redirect',async()=>{
  let finish;
@@ -175,3 +214,4 @@ test('successful staging replacement clears captured history only after validati
  await h.get('refresh').onclick();assert.equal(JSON.parse(h.storage.get(SESSION_KEY)).history.length,1);
  await h.get('load-scanner').onclick();const after=JSON.parse(h.storage.get(SESSION_KEY));assert.deepEqual(after.history,[]);assert.deepEqual(after.observations,[]);assert.equal(h.get('refresh').disabled,true);
 });
+
