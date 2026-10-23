@@ -8,7 +8,8 @@ const uuid=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 export function providerBookEvidence(quote){
  const result={};
  for(const key of ['bid_size','ask_size'])if(typeof quote?.[key]==='number'&&Number.isSafeInteger(quote[key])&&quote[key]>=0)result[key]=quote[key];
- const mark=number(quote?.mark_price);
+ const rawMark=quote?.mark_price;
+ const mark=typeof rawMark==='number'||typeof rawMark==='string'&&/^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(rawMark.trim())?number(rawMark):NaN;
  if(Number.isFinite(mark)&&mark>0)result.mark_price=mark;
  return result;
 }

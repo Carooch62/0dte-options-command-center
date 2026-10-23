@@ -4,7 +4,8 @@
 Its canonical SHA-256 is recorded in every prepared corpus and review. A changed
 file has a changed fingerprint and cannot silently reinterpret an older corpus.
 Any policy revision needs a new version and a separately declared collection.
-The worksheet also fingerprints the four scoring/admission modules. A different
+The worksheet also fingerprints all nine scoring, intake, request-clock,
+market-calendar and source-audit modules used by this workflow. A different
 implementation cannot silently rescore the same frozen review; retain the
 original candidate commit for reproduction.
 The scoring rubric remains provisional; freezing collection is not evidence of
@@ -18,9 +19,9 @@ predictive quality or a completed release gate.
 | Missing inputs | Withhold the whole score. Do not infer a neutral rating, redistribute weight or convert a raw scanner score into the five components |
 | Decision | An explicitly declared regular-session cutoff after worksheet preparation, actual review completion and a completed successful quote request; all evidence availability must precede the cutoff |
 | Quotes | Latest response available at the cutoff, standard multiplier 100, passing checks, positive uncrossed book, provider age at most 60 seconds, ask at most $0.30, spread at most $0.10 and 30% of midpoint |
-| Stock bars | Original completed bar end from the frozen packet, at or before the decision and at most eight minutes old |
-| News | Successful coverage checked less than 15 minutes earlier, current assessed events and explicit event links; event age and review chronology retain their separate existing checks |
-| Depth | Original displayed bid/ask sizes in contracts, contemporaneous with the intended quantity; both sides must cover that quantity. Displayed size is not a promised fill |
+| Stock bars | Original completed bar end from the frozen packet, no later than snapshot generation, at or before the decision and at most eight minutes old |
+| News | Successful coverage checked before actual review completion and less than 15 minutes before the decision, current assessed events and explicit event links; event age and review chronology retain their separate existing checks |
+| Depth | Original displayed bid/ask sizes in contracts, contemporaneous with the intended quantity; both sides must cover that quantity. A newer exported size below intended quantity overrides an earlier positive review. Displayed size is not a promised fill |
 | Pricing | A contemporaneous benchmark value with an explicit method and source. No benchmark is manufactured from a missing value; no automatic undervaluation claim is made |
 | Risk | Explicit intended contracts, maximum premium and maximum-loss budgets, estimated round-trip costs and basis, target, invalidation, exit plan and future broker deadline; the standard long-option premium plus declared costs must fit the loss budget |
 | Provenance | Exact candidate, packet, policy fingerprint, source clocks and selected reviewer; supporting depth, benchmark and risk evidence must exist by actual review completion |
@@ -96,6 +97,7 @@ the existing fixed scorer only for admitted reviews. It emits the audit,
 withholding reasons, fixed contributions and a derived outcome input, with
 canonical input hashes. An invalid newest quote never falls back to an older
 passing response. Failed or unfinished latest requests block a decision; a
+tie in request start times is ambiguous and blocks admission. A
 missing contract or empty response cannot reuse its earlier book. The original
 quote receipt must be consistent with the latest completed request interval;
 inconsistent browser/server clocks are withheld rather than interpreted as
@@ -125,7 +127,8 @@ truth of a source, the independence of reviewers, executable depth or fills.
 Keep the original evidence for review. A passing intake remains an offline
 research record; profitability, calibration, holdout evaluation and production
 activation are still unproven.
-# Provider book evidence in the draft collector
+
+## Provider book evidence in the draft collector
 
 The draft private quote collector preserves optional `bid_size`, `ask_size`, and
 `mark_price` through export and tab recovery, together with the original quote
@@ -141,4 +144,10 @@ The intake does not automatically convert these optional fields into ratings or
 completed supporting-evidence reviews. Legacy exports remain usable with these
 fields unknown. This collector change is part of draft PR #96 and is not live
 until that code is separately released.
+
+Method fingerprints made before the expanded intake fingerprint are obsolete
+for this implementation. Prepare a new prospective worksheet; do not rewrite
+an old worksheet's hash to bypass the version check. Keep its original code
+and records for reproduction. The fingerprint binds repository source, not
+installed dependency versions or the truth of supplied evidence.
 

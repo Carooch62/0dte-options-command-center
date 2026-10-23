@@ -23,7 +23,7 @@ test('optional evidence rejects malformed sizes and marks without inventing zero
   const fields=quoteDiagnostics({bid_size:value,ask_size:value});
   assert.deepEqual(fields,{});
  }
- for(const value of [undefined,null,0,-1,'',true,{},Infinity,'NaN'])assert.deepEqual(quoteDiagnostics({mark_price:value}),{});
+ for(const value of [undefined,null,0,-1,'',true,{},Infinity,'NaN','0x10','0b1','0o7'])assert.deepEqual(quoteDiagnostics({mark_price:value}),{});
  assert.deepEqual(quoteDiagnostics({bid_size:0,ask_size:2,mark_price:'.295'}),{bid_size:0,ask_size:2,mark_price:.295});
 });
 test('optional evidence does not borrow depth or mark from older observations',()=>{

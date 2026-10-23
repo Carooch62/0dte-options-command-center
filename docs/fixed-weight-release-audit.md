@@ -25,7 +25,7 @@ candidate port.
 
 | Area | Finding | Candidate treatment |
 | --- | --- | --- |
-| Private quotes | Staging predates production setup reuse, manual request recovery, capture evidence and spread explanations | Retain production files intact |
+| Private quotes | Staging predates production setup reuse, manual request recovery, capture evidence and spread explanations | Retain current production behavior; explicitly add optional displayed depth/mark retention to the draft collector |
 | Delivery and pipeline | Staging predates compact dashboard delivery, sparse scan checkout and combined fetch improvements | Retain production files intact |
 | Deployment and Access | Production has binding-readiness checks and protected private routes | Retain production Worker, deployment workflow and configuration intact |
 | Fixed composite | Staging has an offline evidence-reviewed calculation and component contributions | Port the offline calculation and its dependency closure for review |
@@ -37,8 +37,11 @@ candidate port.
 The copied runtime modules are `fixed_composite.py`, `component_scoring.py`,
 `news_research.py`, `shadow_replay.py` and `review_corpus.py`. They import only
 one another and the Python standard library. Production scanner, normalization,
-execution, quote, Worker, browser and workflow files are unchanged in this
-preparation candidate. No module is wired into production ordering yet.
+execution, Worker and workflow files are unchanged in this preparation candidate.
+The draft quote collector additionally changes `candidate-quotes.js`,
+`quote-evidence.js` and `quote-session.js` to retain optional provider sizes and
+mark with their original clocks. These changes require a separate collector
+release and signed-in smoke check. No module is wired into production ordering yet.
 
 Tests are carried over with a standalone synthetic news fixture, removing their
 dependency on staging's modified scanner normalization. This checks the port
@@ -131,5 +134,8 @@ completion; the earlier transport-test clock is preserved separately. No
 reviewers are averaged and no missing dimensions or outcomes are backfilled.
 
 Rollback for this preparation PR is removal of its additive offline modules,
-synthetic tests and documentation. It has no production imports or activation
-switch. R9 separately requires a tested rollback for the future live adapter.
+synthetic tests and documentation, plus reverting the three collector modules
+to their prior versions if those are released. Existing optional evidence fields
+are ignored by the prior collector's allowlist; original exports should be kept.
+The scoring modules have no production imports or activation switch. R9
+separately requires a tested rollback for the future live adapter.

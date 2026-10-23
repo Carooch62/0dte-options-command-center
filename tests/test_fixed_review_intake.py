@@ -5,10 +5,11 @@ from pathlib import Path
 import subprocess
 from datetime import timedelta
 import unittest
+from unittest.mock import patch
 
 from component_scoring import RUBRIC
 from fixed_release_fixtures import event
-from fixed_review_intake import POLICY, admit, clock, digest, freeze, prepare, scanner_import
+from fixed_review_intake import POLICY, admit, clock, digest, freeze, prepare, scanner_import, method_fingerprint
 from test_candidate_batch_audit import fixtures as source_fixtures
 
 CUTOFF = '2026-10-23T14:00:00Z'
@@ -176,12 +177,71 @@ class FixedReviewIntakeTests(unittest.TestCase):
             c['records'][0]['supporting_evidence']['depth'].update(change)
             self.assertEqual(admit(p, c, e)['admitted_count'], 0)
 
+    def test_news_coverage_must_exist_before_actual_review_completion(self):
+        p, c, e = inputs()
+        c['records'][0]['news_checked_at'] = '2026-10-23T13:59:51Z'
+        result = admit(p, c, e)
+        self.assertEqual(result['admitted_count'], 0)
+        self.assertIn('NEWS_COVERAGE_MUST_PRECEDE_REVIEW', result['withheld'][0]['reasons'])
+
+    def test_latest_provider_depth_cannot_be_overridden_by_reviewed_depth(self):
+        for fields in ({'bid_size': 0, 'ask_size': 3}, {'bid_size': 3, 'ask_size': 0},
+                       {'bid_size': -1}, {'ask_size': '3'}, {'ask_size': True}):
+            with self.subTest(fields=fields):
+                p, c, e = inputs()
+                e['observations'][0].update(fields)
+                result = admit(p, c, e)
+                self.assertEqual(result['admitted_count'], 0)
+                self.assertIn('LATEST_PROVIDER_DEPTH_INSUFFICIENT_OR_INVALID', result['withheld'][0]['reasons'])
+
+    def test_ambiguous_same_start_requests_are_rejected_in_either_order(self):
+        for reverse in (False, True):
+            p, c, e = inputs()
+            e['requests'] = [{'operation': 'quotes', 'code': code, 'started_at': CUTOFF,
+                              'finished_at': CUTOFF, 'browser_ms': 0} for code in ('SUCCESS', 'NETWORK')]
+            if reverse:
+                e['requests'].reverse()
+            e['observations'][0]['received_at'] = CUTOFF
+            with self.assertRaisesRegex(ValueError, 'Ambiguous quote request start'):
+                admit(p, c, e)
+
+    def test_provider_depth_is_checked_against_actual_intended_quantity(self):
+        for size, count in ((1, 0), (2, 1), (3, 1)):
+            p, c, e = inputs()
+            risk = c['records'][0]['supporting_evidence']['risk_plan']
+            risk.update(intended_contracts=2, maximum_premium_dollars=60, maximum_loss_dollars=60)
+            e['observations'][0].update(bid_size=size, ask_size=size)
+            self.assertEqual(admit(p, c, e)['admitted_count'], count)
+
+    def test_intake_and_source_audit_changes_invalidate_old_worksheets(self):
+        original = Path.read_bytes
+        for path in ('fixed_review_intake.py', 'review_corpus.py', 'quote_latency.py',
+                     'market_clock.py', 'audit-candidate-batch.py'):
+            p, c, e = inputs()
+            def changed_bytes(file):
+                return original(file) + (b'\n# Changed rules\n' if file.name == path else b'')
+            with patch.object(Path, 'read_bytes', changed_bytes):
+                self.assertNotEqual(method_fingerprint(), c['method_sha256'])
+                with self.assertRaisesRegex(ValueError, 'fingerprint'):
+                    admit(p, c, e)
+
     def test_source_bar_clock_cannot_be_replaced_with_later_time(self):
         p, c, e = inputs()
         c['records'][0]['intraday_bar_end'] = '2026-10-23T13:59:00Z'
         r = admit(p, c, e)
         self.assertEqual(r['admitted_count'], 0)
         self.assertIn('BAR_CLOCK_MUST_MATCH_FROZEN_PACKET', r['withheld'][0]['reasons'])
+
+    def test_source_bar_cannot_finish_after_the_snapshot_was_generated(self):
+        p, c, e = inputs()
+        p['generated_at'] = '2026-10-23T13:54:00Z'
+        p['packet_id'] = digest({k: v for k, v in p.items() if k != 'packet_id'})
+        c['packet_id'] = p['packet_id']
+        c['records'][0]['evidence_set_id'] = p['packet_id']
+        e['scanner_context'].update(packet_id=p['packet_id'], generated_at=p['generated_at'])
+        result = admit(p, c, e)
+        self.assertEqual(result['admitted_count'], 0)
+        self.assertIn('SOURCE_BAR_AFTER_PACKET_GENERATION', result['withheld'][0]['reasons'])
 
     def test_missing_selected_review_is_withheld_and_duplicate_selection_rejected(self):
         p, c, e = inputs()

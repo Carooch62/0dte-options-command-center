@@ -24,8 +24,10 @@ def digest(value):
 
 
 def method_fingerprint():
-    paths = ('component_scoring.py', 'fixed_composite.py', 'news_research.py', 'shadow_replay.py')
-    return digest({name: hashlib.sha256(Path(__file__).with_name(name).read_bytes()).hexdigest() for name in paths})
+    paths = ('component_scoring.py', 'fixed_composite.py', 'news_research.py', 'shadow_replay.py',
+             'fixed_review_intake.py', 'review_corpus.py', 'quote_latency.py', 'market_clock.py',
+             'scripts/audit-candidate-batch.py')
+    return digest({name: hashlib.sha256((Path(__file__).parent / name).read_bytes()).hexdigest() for name in paths})
 
 
 def packet_rows(packet):
@@ -167,6 +169,9 @@ def record_reasons(row, candidate, quote, cutoff):
     supporting = supporting if isinstance(supporting, dict) else {}
     depth, benchmark, risk = [supporting.get(k) for k in ('depth', 'pricing_benchmark', 'risk_plan')]
     reviewed = clock(row.get('reviewed_at'))
+    checked = clock(row.get('news_checked_at'))
+    if reviewed is None or checked is None or checked > reviewed:
+        reasons.append('NEWS_COVERAGE_MUST_PRECEDE_REVIEW')
     for item in (depth, benchmark, risk):
         if (not isinstance(item, dict) or item.get('contract_id') != row['candidate_id']
                 or reviewed is None or clock(item.get('available_at')) is None or clock(item['available_at']) > reviewed):
@@ -194,6 +199,12 @@ def record_reasons(row, candidate, quote, cutoff):
     if quote is None:
         reasons.append('PASSING_QUOTE_AT_DECISION_REQUIRED')
     else:
+        # Reviewed earlier depth cannot override contradictory depth in the final book.
+        # Legacy exports still require the separate reviewed depth evidence above.
+        if any(key in quote and (type(quote[key]) is not int or type(quantity) is not int
+                                or quantity <= 0 or not quantity <= quote[key] <= 9007199254740991)
+               for key in ('bid_size', 'ask_size')):
+            reasons.append('LATEST_PROVIDER_DEPTH_INSUFFICIENT_OR_INVALID')
         bid, ask = quote.get('bid'), quote.get('ask')
         valid = (numeric(bid, positive=True) and numeric(ask, positive=True) and bid <= ask
                  and ask <= POLICY['maximum_live_ask']
@@ -248,6 +259,8 @@ def admit(packet, corpus, quote_export):
         raise ValueError('Malformed retained request diagnostics')
     quote_attempts = [row for row in attempts if row['operation'] == 'quotes' and clock(row['started_at']) <= cutoff]
     ordered_attempts = sorted(quote_attempts, key=lambda row: clock(row['started_at']))
+    if len({clock(row['started_at']) for row in ordered_attempts}) != len(ordered_attempts):
+        raise ValueError('Ambiguous quote request start times do not establish one latest response')
     if any(clock(right['started_at']) < clock(left['finished_at'])
            for left, right in zip(ordered_attempts, ordered_attempts[1:])):
         raise ValueError('Overlapping quote requests do not establish one decision response')
@@ -292,6 +305,9 @@ def admit(packet, corpus, quote_export):
                               or not clock(latest_attempt['started_at']) <= clock(q['received_at']) <= clock(latest_attempt['finished_at']))):
             q = None
         reasons += record_reasons(row, candidates[ident], q, cutoff)
+        source_bar = clock(candidates[ident]['stock'].get('bar_end'))
+        if source_bar is not None and source_bar > clock(packet['generated_at']):
+            reasons.append('SOURCE_BAR_AFTER_PACKET_GENERATION')
         if reasons:
             withheld.append({'candidate_id': ident, 'reasons': sorted(set(reasons))})
         else:
