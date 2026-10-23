@@ -69,6 +69,8 @@ function render(){
  const generated=Date.parse(scanner?.generated_at),age=(Date.now()-generated)/60000;
  $('snapshot-info').textContent=scanner?`${scannerSource} · Generated: ${scanner.generated_at||'unknown'} · Age: ${Number.isFinite(age)&&age>=0?age.toFixed(1)+' minutes':'unknown'} · Coverage: ${scanner.included_contracts??'unknown'} included / ${scanner.total_contracts??'unknown'} total; ${scanner.omitted_contracts??'unknown'} omitted${scanner.research_rejected_contracts!==undefined?' · '+scanner.research_rejected_contracts+' price-only matches rejected by research screens':''}${scanner.scanned_contracts!==undefined?' · '+scanner.scanned_contracts+' identities examined; batch requires published research screens':''} · Snapshot freshness is separate from quote freshness.`:'No scanner snapshot loaded.';
  $('scanner').disabled=busy;$('research').disabled=busy;
+ // Read the live disclosure state before rebuilding; toggle events may be queued behind an age tick.
+ for(const detail of $('rows').querySelectorAll?.('details[data-contract]')||[]){const key=detail.getAttribute('data-contract');if(detail.open)openQuoteDetails.add(key);else openQuoteDetails.delete(key);}
  $('rows').replaceChildren();if(!scanner){$('refresh').disabled=true;$('quote-summary').textContent='No quotes checked.';renderWorkflow([]);return [];}
  const rows=candidateQuotes(scanner,observations);
  const within=rows.filter(r=>r.status==='QUOTE_CHECK_PASSED'&&r.premium_status==='WITHIN_LIMIT').length,above=rows.filter(r=>r.status==='QUOTE_CHECK_PASSED'&&r.premium_status==='ABOVE_LIMIT').length;
@@ -79,7 +81,7 @@ function render(){
  const labels=['Contract','Bid / ask','Age (seconds)','$0.30 live ask','Quote check','Setup eligibility'];
  const values=[row.contract,row.bid===undefined?'Unknown':`${row.bid} / ${row.ask}`,Number.isFinite(row.age_seconds)?row.age_seconds.toFixed(1):'Unknown',row.premium_status==='WITHIN_LIMIT'?'Within $0.30':row.premium_status==='ABOVE_LIMIT'?'Above $0.30 · outside budget':'Unknown · quote check required',quoteGuidance(row),'Not evaluated · research screens only'];
  for(const value of values){const td=document.createElement('td');td.textContent=value;td.setAttribute?.('data-label',labels[tr.children.length]);tr.append(td);}
- const details=document.createElement('details');details.className='quote-details';details.open=openQuoteDetails.has(row.contract);
+ const details=document.createElement('details');details.className='quote-details';details.setAttribute?.('data-contract',row.contract);details.open=openQuoteDetails.has(row.contract);
  details.ontoggle=()=>{if(!details.isConnected)return;if(details.open)openQuoteDetails.add(row.contract);else openQuoteDetails.delete(row.contract);};
  const summary=document.createElement('summary');summary.textContent='Spread, cost & provider details';details.append(summary);
  const note=document.createElement('p'),number=v=>Number.isFinite(v)?String(v):'Unknown';
