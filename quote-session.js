@@ -3,6 +3,7 @@ import {candidateQuotes,providerBookEvidence} from './candidate-quotes.js';
 import {quoteRequestTiming} from './quote-timing.js';
 import {quoteDiagnostics} from './quote-evidence.js';
 import {safeRequestAttempts} from './private-request.js';
+import {millis} from './robinhood-review.js';
 export const SESSION_KEY='private-quote-session-v1';
 export const SESSION_MAX_AGE=24*60*60*1000;
 const pick=(value,keys)=>Object.fromEntries(keys.filter(k=>value?.[k]!==undefined).map(k=>[k,value[k]]));
@@ -25,7 +26,13 @@ export function restoreSession(raw,now=Date.now()){
  if(!safe)throw Error('Empty saved session');
  if(safe.requests.some(r=>Date.parse(r.finished_at)>now))throw Error('Invalid saved request clock');
  if(safe.scanner)candidateQuotes(safe.scanner,safe.observations,now);
- for(const q of safe.history)if(typeof q.contract_id!=='string'||!Number.isFinite(Date.parse(q.received_at))||!Number.isFinite(Date.parse(q.observed_at))||Date.parse(q.observed_at)>Date.parse(q.received_at)||Date.parse(q.received_at)>now)throw Error('Invalid saved observation clock');
+ for(const q of safe.history){
+  const received=millis(q.received_at),observed=millis(q.observed_at);
+  // A failed provider clock is retained diagnostic evidence, never a usable quote.
+  // Require the explicit rejection marker; receipt clocks must still be valid.
+  const rejectedClock=q.quote_check==='REQUIRES_RECHECK'&&q.multiplier===null&&q.quote_check_reasons?.includes('INVALID_QUOTE_CLOCK')&&typeof q.observed_at==='string'&&q.observed_at.length>0&&q.observed_at.length<=80;
+  if(typeof q.contract_id!=='string'||!Number.isFinite(received)||received>now||(!Number.isFinite(observed)||observed>received)&&!rejectedClock)throw Error('Invalid saved observation clock');
+ }
  return safe;
 }
 

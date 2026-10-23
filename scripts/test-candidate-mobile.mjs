@@ -113,6 +113,30 @@ try{
  assert.equal(wide.observations[0].ask_size,7);
  assert.equal(wide.observations[0].mark_price,.305);
  assert.equal(wide.entries.length,1); // Failed refresh cannot replace the earlier passing entry.
+ // A rejected provider clock must remain diagnostic without poisoning tab recovery.
+ await page.clock.runFor(1000);
+ await page.route('**/private/plaid/robinhood/quotes',async r=>{
+  const received=await page.evaluate(()=>new Date().toISOString());
+  const observed=new Date(Date.parse(received)+160).toISOString().replace('Z','442632Z');
+  return r.fulfill({json:{received_at:received,observations:[{quote:{instrument_id:id,bid_price:'.30',ask_price:'.31',bid_size:22,ask_size:118,mark_price:'.305',updated_at:observed}}]}});
+ });
+ await page.getByRole('button',{name:'Refresh matched option quotes',exact:true}).click();
+ await page.getByText('The quote time is missing or inconsistent.',{exact:false}).waitFor();
+ const beforeClockReload=await page.evaluate(()=>JSON.parse(sessionStorage.getItem('private-quote-session-v1')).history);
+ const invalidClock=beforeClockReload.at(-1);
+ assert.equal(invalidClock.multiplier,null);
+ assert.deepEqual(invalidClock.quote_check_reasons,['INVALID_QUOTE_CLOCK']);
+ assert.ok(Date.parse(invalidClock.observed_at)>Date.parse(invalidClock.received_at));
+ await page.reload();await page.getByText('Restored this tab’s session',{exact:false}).first().waitFor();
+ assert.deepEqual(await page.evaluate(()=>JSON.parse(sessionStorage.getItem('private-quote-session-v1')).history),beforeClockReload);
+ assert.ok(await page.getByRole('button',{name:'Refresh matched option quotes',exact:true}).isEnabled());
+ const clockDownload=page.waitForEvent('download');
+ await page.getByRole('button',{name:'Export private quote observations',exact:true}).click();
+ const clockExport=JSON.parse(await readFile(await (await clockDownload).path(),'utf8'));
+ assert.deepEqual(clockExport.observations,beforeClockReload);
+ assert.equal(clockExport.entries.length,1);
+ assert.equal(clockExport.entries[0].decision_at,exported.entries[0].decision_at);
+ assert.equal(clockExport.observations.at(-1).multiplier,null);
  await page.route('**/private/plaid/robinhood/quotes',r=>r.fulfill({status:401,json:{error:'Private sign in required'}}));
  await page.getByRole('button',{name:'Refresh matched option quotes',exact:true}).click();
  await page.locator('#status').filter({hasText:'Private sign-in required.'}).waitFor();
