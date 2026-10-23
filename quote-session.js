@@ -1,5 +1,5 @@
 // Tab-scoped recovery only: never persist credentials, accounts or holdings.
-import {candidateQuotes} from './candidate-quotes.js';
+import {candidateQuotes,providerBookEvidence} from './candidate-quotes.js';
 import {quoteRequestTiming} from './quote-timing.js';
 import {quoteDiagnostics} from './quote-evidence.js';
 import {safeRequestAttempts} from './private-request.js';
@@ -13,7 +13,7 @@ export function sessionPayload(scanner,observations,history,source,now=Date.now(
  snapshot.candidates=scanner.candidates.map(c=>({ticker:c.ticker,options:[...(c.options||[]),...Object.values(c.expiry_groups||{}).flatMap(g=>g?.options||[])].map(o=>pick(o,['contract_id','strike','side','expiry']))}));
  if(snapshot.candidates.reduce((n,c)=>n+c.options.length,0)>20)throw Error('Recovery supports bounded batches of at most 20 contracts. Export observations before leaving.');
  const withTiming=x=>{const timing=quoteRequestTiming(x.request_timing);return Object.keys(timing).length?{request_timing:timing}:{};};
- const mapped=observations.map(x=>({instrument:pick(x.instrument,['id','chain_symbol','strike_price','type','expiration_date','trade_value_multiplier','state','tradability','sellout_datetime']),quote:pick(x.quote,['instrument_id','bid_price','ask_price','updated_at']),received_at:x.received_at,...withTiming(x)}));
+ const mapped=observations.map(x=>({instrument:pick(x.instrument,['id','chain_symbol','strike_price','type','expiration_date','trade_value_multiplier','state','tradability','sellout_datetime']),quote:{...pick(x.quote,['instrument_id','bid_price','ask_price','updated_at']),...providerBookEvidence(x.quote)},received_at:x.received_at,...withTiming(x)}));
  const evidence=history.slice(-2000).map(q=>({...pick(q,['contract_id','observed_at','received_at','bid','ask','source','multiplier','quote_check']),...quoteDiagnostics(q),...withTiming(q)}));
  return {format:'private-quote-session-v1',saved_at:now,scanner:snapshot,observations:mapped,history:evidence,source:String(source).slice(0,200),requests};
 }

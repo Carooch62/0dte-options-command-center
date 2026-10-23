@@ -3,6 +3,16 @@ import {millis} from './robinhood-review.js';
 import {quoteRequestTiming} from './quote-timing.js';
 const number=v=>typeof v==='number'||typeof v==='string'&&v.trim()!==''?Number(v):NaN;
 const uuid=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+// Optional provider evidence: sizes are contracts; mark is not an independent benchmark.
+// Keep missing/invalid fields absent, and preserve a reported zero size.
+export function providerBookEvidence(quote){
+ const result={};
+ for(const key of ['bid_size','ask_size'])if(typeof quote?.[key]==='number'&&Number.isSafeInteger(quote[key])&&quote[key]>=0)result[key]=quote[key];
+ const rawMark=quote?.mark_price;
+ const mark=typeof rawMark==='number'||typeof rawMark==='string'&&/^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(rawMark.trim())?number(rawMark):NaN;
+ if(Number.isFinite(mark)&&mark>0)result.mark_price=mark;
+ return result;
+}
 export function candidateQuotes(snapshot,observations,now=Date.now()){
  if(!Array.isArray(snapshot?.candidates)||!Array.isArray(observations)||!Number.isFinite(now))throw Error('Scanner snapshot and Robinhood observations required');
  const rows=[];
@@ -16,10 +26,11 @@ export function candidateQuotes(snapshot,observations,now=Date.now()){
  const x=[...matches].sort((a,b)=>millis(b.received_at)-millis(a.received_at))[0],i=x.instrument,q=x.quote||{};
  row.instrument_id=i.id;
  const latestCopies=matches.filter(value=>millis(value.received_at)===millis(x.received_at));
- const signature=value=>JSON.stringify([value.instrument?.id,value.instrument?.state,value.instrument?.tradability,number(value.instrument?.trade_value_multiplier),value.instrument?.sellout_datetime,value.quote?.instrument_id,value.quote?.updated_at,number(value.quote?.bid_price),number(value.quote?.ask_price),quoteRequestTiming(value.request_timing)]);
+ const signature=value=>JSON.stringify([value.instrument?.id,value.instrument?.state,value.instrument?.tradability,number(value.instrument?.trade_value_multiplier),value.instrument?.sellout_datetime,value.quote?.instrument_id,value.quote?.updated_at,number(value.quote?.bid_price),number(value.quote?.ask_price),providerBookEvidence(value.quote),quoteRequestTiming(value.request_timing)]);
  if(new Set(latestCopies.map(signature)).size>1){row.reasons.push('CONFLICTING_QUOTE_OBSERVATIONS');row.status='REQUIRES_RECHECK';rows.push(row);continue;}
  // Retain the exact evaluated observation clocks and allowlisted timings.
  row.observed_at=q.updated_at;row.received_at=x.received_at;
+ Object.assign(row,providerBookEvidence(q));
  row.request_timing=quoteRequestTiming(x.request_timing);
  if(!uuid.test(i.id)||q.instrument_id!==i.id)row.reasons.push('QUOTE_ID_MISMATCH');
  const multiplier=number(i.trade_value_multiplier);

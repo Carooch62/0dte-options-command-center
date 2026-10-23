@@ -1,4 +1,4 @@
-import {candidateQuotes} from './candidate-quotes.js';
+import {candidateQuotes,providerBookEvidence} from './candidate-quotes.js';
 import {quoteRequestTiming} from './quote-timing.js';
 import {safeRequestAttempts} from './private-request.js';
 export const VALIDATION_MINUTES=Object.freeze([5,10,15]);
@@ -16,7 +16,7 @@ const messages={
  WIDE_SPREAD:'The spread exceeds the quote-check limit. Refresh to recheck; the current book fails this screen.'
 };
 export function quoteDiagnostics(record){
- const result={};
+ const result=providerBookEvidence(record);
  if(Object.hasOwn(record,'metadata_multiplier'))result.metadata_multiplier=typeof record.metadata_multiplier==='number'&&Number.isFinite(record.metadata_multiplier)&&record.metadata_multiplier>0?record.metadata_multiplier:null;
  if(Array.isArray(record.quote_check_reasons))result.quote_check_reasons=[...new Set(record.quote_check_reasons.filter(r=>typeof r==='string'&&Object.hasOwn(messages,r)))].slice(0,10);
  return result;
@@ -36,7 +36,7 @@ export function appendQuoteEvidence(snapshot,observations,history,now=Date.now()
   const record={contract_id:row.contract,observed_at:row.observed_at,received_at:row.received_at,
    bid:row.bid??null,ask:row.ask??null,source:'Robinhood Quotes',
    multiplier:row.status==='QUOTE_CHECK_PASSED'?100:null,quote_check:row.status,
-   ...quoteDiagnostics({metadata_multiplier:row.metadata_multiplier??null,quote_check_reasons:row.reasons})};
+   ...quoteDiagnostics({...providerBookEvidence(row),metadata_multiplier:row.metadata_multiplier??null,quote_check_reasons:row.reasons})};
   const timing=quoteRequestTiming(row.request_timing);if(Object.keys(timing).length)record.request_timing=timing;
   if(!next.some(p=>p.contract_id===record.contract_id&&p.observed_at===record.observed_at&&p.received_at===record.received_at))next.push(record);
  }
@@ -58,6 +58,7 @@ export function quoteEvidenceInput(snapshot,history,now=new Date().toISOString()
   limitations:['Private browser-local observations, exported only on request. No account or holdings data.',
    'Decision cutoff is first passing quote receipt, not the earlier scanner timestamp.',
    'Quotes are not executions; observations are collected only when you request refresh.',
+   'Optional bid_size and ask_size are provider-displayed contracts at the original quote timestamp; zero means no displayed size and missing means unknown. mark_price is a provider mark, not an independent pricing benchmark. These fields do not change quote checks.',
    'multiplier is set only for passing quote checks; metadata_multiplier and quote_check_reasons are diagnostic evidence, not eligibility.',
    'At most 2000 observations retained; tab recovery expires after 24 hours. Export for durable retention.'],
   validation_policy:{horizons_minutes:VALIDATION_MINUTES,window_tolerance_seconds:60,entry:'ask',exit:'bid'}};
