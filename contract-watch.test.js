@@ -10,3 +10,8 @@ test('rejects old, duplicate, missing and reverse-direction data',()=>{
  assert.equal(watchTransitions([watch],before,{...after,candidates:[]},now).length,0);
  assert.equal(watchTransitions([watch],before,{...after,candidates:[{ticker:'TTD',direction:'DOWN',execution_state:'TRIGGERED'}]},now).length,0);
 });
+test('rejects an expired option, stale prior scan, and unchanged WATCH state',()=>{
+ assert.equal(watchTransitions([{...watch,expiry:'2026-10-30'}],before,after,now).length,0);
+ assert.equal(watchTransitions([watch],{...before,generated_at:'2026-11-02T14:55:00Z'},after,now).length,0);
+ assert.equal(watchTransitions([watch],before,{...after,candidates:[{ticker:'TTD',direction:'UP',execution_state:'WATCH'}]},now).length,0);
+});
