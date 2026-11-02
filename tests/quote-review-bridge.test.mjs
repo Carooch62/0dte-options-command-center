@@ -4,11 +4,11 @@ import {quoteOnlyResearchPack} from '../quote-review-bridge.js';
 import {mergeResearchPack,robinhoodResearch,validateRobinhoodPack} from '../robinhood-review.js';
 import {appendQuoteEvidence} from '../quote-evidence.js';
 import {sessionPayload,restoreSession} from '../quote-session.js';
-const stamp='2026-11-02T15:31:00Z',id='a22ed0de-dcc3-40e3-84af-7632143fa80a';
-const snapshot={scan_id:'synthetic-scan',market_session:'OPEN',candidates:[{ticker:'XLF',options:[{contract_id:'XLF261102C00057500',side:'call',expiry:'2026-11-02',strike:57.5}]}]};
-const instrument={id,chain_symbol:'XLF',type:'call',expiration_date:'2026-11-02',strike_price:'57.5',state:'active',tradability:'tradable',trade_value_multiplier:'100',sellout_datetime:'2026-11-02T20:45:00Z',account_number:'never export'};
+const stamp='2026-11-02T15:31:00Z',id='11111111-1111-4111-8111-111111111111';
+const snapshot={scan_id:'synthetic-scan',market_session:'OPEN',candidates:[{ticker:'TEST',options:[{contract_id:'TEST261102C00057500',side:'call',expiry:'2026-11-02',strike:57.5}]}]};
+const instrument={id,chain_symbol:'TEST',type:'call',expiration_date:'2026-11-02',strike_price:'57.5',state:'active',tradability:'tradable',trade_value_multiplier:'100',sellout_datetime:'2026-11-02T20:45:00Z',account_number:'never export'};
 const observation={instrument,quote:{instrument_id:id,bid_price:'0.10',ask_price:'0.11',updated_at:stamp,delta:'0.44',theta:'-0.27',mark_price:'0.105',bid_size:20,ask_size:30,account_number:'secret'},received_at:'2026-11-02T15:31:01Z'};
-const original=()=>({format:'robinhood-research-v1',retrieved_at:'2026-11-02T18:15:00Z',accounts:[{account_key:'private',orders:[]}],observations:[],bars:[{symbol:'XLF',interval:'5minute',bounds:'regular',bars:[]}],private_research_extensions:{keep:'private'}});
+const original=()=>({format:'robinhood-research-v1',retrieved_at:'2026-11-02T18:15:00Z',accounts:[{account_key:'private',orders:[]}],observations:[],bars:[{symbol:'TEST',interval:'5minute',bounds:'regular',bars:[]}],private_research_extensions:{keep:'private'}});
 test('manual quote captures preserve their own bid/ask, clocks and Greeks through tab recovery',()=>{
  const evidence=appendQuoteEvidence(snapshot,[observation],[],Date.parse('2026-11-02T15:31:02Z'));
  assert.equal(evidence.length,1);assert.equal(evidence[0].theta,-0.27);assert.equal(evidence[0].delta,0.44);
