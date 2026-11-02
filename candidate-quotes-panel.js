@@ -1,8 +1,8 @@
 import {quoteOnlyResearchPack} from './quote-review-bridge.js';
 import {candidateQuotes} from './candidate-quotes.js';
 import {validateRobinhoodPack} from './robinhood-review.js';
-import {quoteGuidance,appendQuoteEvidence,quoteEvidenceInput,scannerFromEvidencePacket,validationTiming,captureWindows,captureAction} from './quote-evidence.js';
-import {SESSION_KEY,sessionPayload,restoreSession} from './quote-session.js';
+import {quoteGuidance,appendQuoteEvidence,quoteEvidenceInput,scannerFromEvidencePacket,validationTiming,captureWindows,captureAction} from './quote-evidence.js?v=20261102-quote-bridge';
+import {SESSION_KEY,sessionPayload,restoreSession} from './quote-session.js?v=20261102-quote-bridge';
 import {quoteRequestTiming} from './quote-timing.js';
 import {requestJSON,safeRequestAttempts} from './private-request.js';
 const $=id=>document.getElementById(id);
