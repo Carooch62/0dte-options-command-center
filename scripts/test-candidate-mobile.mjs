@@ -5,7 +5,7 @@ import {createServer} from 'node:http';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 await mkdir('test-results/mobile',{recursive:true});
 import assert from 'node:assert/strict';
-const server=createServer(async(req,res)=>{try{const path=req.url==='/'?'candidate-quotes.html':req.url.slice(1).split('?')[0];if(!['private-request.js','candidate-quotes.html','candidate-quotes-panel.js','candidate-quotes.js','robinhood-review.js','quote-evidence.js','quote-session.js','quote-timing.js','connection-ui.css','brokerage.html','dashboard-broker.js','dashboard-broker-logic.js','brokerage-history.js','execution-evidence.js','robinhood-panel.js','robinhood-connect.js'].includes(path)){res.writeHead(404);res.end();return;}res.setHeader('Content-Type',path.endsWith('.js')?'text/javascript':path.endsWith('.css')?'text/css':'text/html');res.end(await readFile(new URL('../'+path,import.meta.url)));}catch{res.writeHead(500);res.end();}});
+const server=createServer(async(req,res)=>{try{const path=req.url==='/'?'candidate-quotes.html':req.url.slice(1).split('?')[0];if(!['private-request.js','candidate-quotes.html','candidate-quotes-panel.js','quote-review-bridge.js','candidate-quotes.js','robinhood-review.js','quote-evidence.js','quote-session.js','quote-timing.js','connection-ui.css','brokerage.html','dashboard-broker.js','dashboard-broker-logic.js','brokerage-history.js','execution-evidence.js','robinhood-panel.js','robinhood-connect.js'].includes(path)){res.writeHead(404);res.end();return;}res.setHeader('Content-Type',path.endsWith('.js')?'text/javascript':path.endsWith('.css')?'text/css':'text/html');res.end(await readFile(new URL('../'+path,import.meta.url)));}catch{res.writeHead(500);res.end();}});
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 let browser;
 try{
@@ -70,6 +70,18 @@ try{
  await page.getByRole('button',{name:'Export private quote observations',exact:true}).click();
  const download=await downloadPromise,exported=JSON.parse(await readFile(await download.path(),'utf8'));
  assert.equal(exported.entries.length,1);
+ assert.ok(await page.getByRole('button',{name:'Export quotes for brokerage review',exact:true}).isEnabled());
+ const quoteOnlyDownload=page.waitForEvent('download');
+ await page.getByRole('button',{name:'Export quotes for brokerage review',exact:true}).click();
+ const quoteOnly=JSON.parse(await readFile(await (await quoteOnlyDownload).path(),'utf8'));
+ assert.equal(quoteOnly.coverage_mode,'observations_only');
+ assert.equal(quoteOnly.observations.length,1);
+ assert.deepEqual(quoteOnly.accounts,[]);
+ assert.deepEqual(quoteOnly.bars,[]);
+ assert.equal(quoteOnly.observations[0].quote.bid_price,.30);
+ assert.equal(quoteOnly.observations[0].quote.ask_price,.31);
+ assert.equal(quoteOnly.observations[0].quote.updated_at,now);
+ assert.equal(quoteOnly.observations[0].received_at,exported.entries[0].quote.received_at);
  assert.match(await page.locator('#validation-clock').innerText(),/5-min:.*10-min:.*15-min:/);assert.equal(exported.entries[0].quote.ask,.31);
  assert.deepEqual(exported.validation_policy.horizons_minutes,[5,10,15]);
  assert.equal(exported.observations[0].request_timing.setup_ms,60);
