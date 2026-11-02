@@ -1,7 +1,7 @@
 import {decodeArchive} from './brokerage-history.js?v=20261007-evidence';
 import {requestJSON} from './private-request.js';
 import {validateExecutionPack} from './execution-evidence.js?v=20261007-evidence';
-import {validatePack,researchDataset,plaidReviewPack,reconcile} from './dashboard-broker-logic.js?v=20261007-evidence';
+import {validatePack,researchDataset,plaidReviewPack,reconcile,providerEventSessionDate} from './dashboard-broker-logic.js?v=20261007-evidence';
 const $=id=>document.getElementById(id),esc=x=>String(x??'Unknown').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=x=>x===null||x===undefined?'Unknown':new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(x);
 const key='0dteBrokerReviewV1';let syncedPack=null;let pack=null,history=[],historyError='',executionRecords=[];
@@ -54,8 +54,8 @@ function renderPlaid(snapshot){
  const accounts=new Map((snapshot.accounts||[]).map(x=>[x.account_id,x]));
  const row=(...cells)=>`<tr>${cells.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`;
  const holdings=(snapshot.holdings||[]).map(h=>row(accounts.get(h.account_id)?.name||'Account',securities.get(h.security_id)?.ticker_symbol||securities.get(h.security_id)?.name||'Security',h.quantity,h.institution_value,h.institution_price_as_of||'Unknown')).join('');
- const trades=(snapshot.transactions||[]).slice(0,100).map(t=>row(t.date,t.name||t.type,securities.get(t.security_id)?.ticker_symbol||'Security',t.quantity,t.amount,t.fees??'Unknown')).join('');
- plaidView.innerHTML=`<p>Last collected: ${esc(snapshot.retrieved_at)} · Provider records ${esc(snapshot.transactions?.length)} / ${esc(snapshot.coverage?.total_transactions)} · ${snapshot.coverage?.complete?'complete for requested date range':'incomplete'}</p><h3>Holdings</h3><table><tr><th>Account</th><th>Security</th><th>Quantity</th><th>Reported value</th><th>Price date</th></tr>${holdings}</table><h3>Latest provider transactions (up to 100)</h3><table><tr><th>Date</th><th>Action</th><th>Security</th><th>Provider quantity (units unverified)</th><th>Amount</th><th>Fees</th></tr>${trades}</table>`;
+ const trades=(snapshot.transactions||[]).slice(0,100).map(t=>row(t.date??'Unknown',providerEventSessionDate(t)||'Unknown',t.name||t.type,securities.get(t.security_id)?.ticker_symbol||'Security',t.quantity,t.amount,t.fees??'Unknown')).join('');
+ plaidView.innerHTML=`<p>Last collected: ${esc(snapshot.retrieved_at)} · Provider records ${esc(snapshot.transactions?.length)} / ${esc(snapshot.coverage?.total_transactions)} · ${snapshot.coverage?.complete?'complete for requested date range':'incomplete'}</p><h3>Holdings</h3><table><tr><th>Account</th><th>Security</th><th>Quantity</th><th>Reported value</th><th>Price date</th></tr>${holdings}</table><h3>Latest provider transactions (up to 100)</h3><p class="muted">Settlement date can be later than the trading session. Provider event date is calculated in New York time from transaction_datetime and may reflect order submission, not a confirmed fill. Unknown timestamps remain Unknown.</p><table><tr><th>Settlement date</th><th>Provider event date (ET)</th><th>Action</th><th>Security</th><th>Provider quantity (units unverified)</th><th>Amount</th><th>Fees</th></tr>${trades}</table>`;
 }
 async function loadPlaid(){
  try{const s=await privateApi('status');plaidButtons(s.connected);plaidStatus.textContent=s.connected?`Connected. Last collected: ${s.last_updated||'waiting for first sync'}.${s.sync_error?` Latest error: ${s.sync_error.message}`:''}`:'Ready to connect through Plaid.';if(s.connected)renderPlaid((await privateApi('snapshot')).snapshot);else {plaidView.textContent='';if(pack===syncedPack){pack=null;for(const id of ['summary','trades','issues','holdings'])$(id).textContent='';$('export').disabled=true;$('status').textContent='No active brokerage snapshot.';}syncedPack=null;}}
