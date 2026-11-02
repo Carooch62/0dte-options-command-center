@@ -74,3 +74,12 @@ Provider validation should cover the exact callback `https://0dte-options-comman
 The owner requested that Connect be re-enabled to retry in Chrome and inspect the failure. This instruction supersedes the prior pause for manual sign-in attempts. Deployment may enable the connection only when encrypted private bindings and all three protected route checks pass. It reports `MANUAL_RETRY_UNVERIFIED`; this is not provider validation or a live scanner feed. Automated polling remains off.
 
 For the next failure, inspect Chrome Developer Tools > Network with Preserve log enabled before starting sign-in. Locate the failed authorization request and inspect its HTTP status and JSON error `detail`. The generic error-page HTML does not contain enough evidence to diagnose callback rejection. Record only those diagnostic fields, without authorization headers, cookies, codes, or full callback URLs. Do not change the registered redirect or substitute another platform's client.
+
+
+## Manual quote-only brokerage bridge (November 2)
+
+After matching exact contracts and manually fetching quotes on the protected candidate-quotes page, choose **Export quotes for brokerage review**. It writes a local `robinhood-research-v1` file with `coverage_mode: "observations_only"`, the frozen scanner scan ID, selected contract metadata and previously captured provider bid/ask/quote-refresh clocks. Optional Greeks are retained only from the same fetched response, never retroactively assigned. Missing or conflicting metadata cannot create reconstructed observations. The source contains no accounts, holdings or orders.
+
+Open the private Connections page, **import the complete trade/order snapshot first**, then import this quote-only file under **Import Robinhood snapshot**. The quote-only import merges samples into existing research without erasing already verified fills or underlying bars. A full import remains authoritative for order coverage. The merged review still lives only in that page session: choose Export Robinhood research before leaving.
+
+Quote-only samples have `session_status: "unverified"` until independently checked against the official market calendar. Provider `updated_at` is a quote-refresh clock and does not establish separate exchange bid/ask or Greek calculation clocks. Captured quotes are not orders, fills, historical bid-ask candles, or pre-entry ML features unless collection genuinely preceded the trade. No automatic polling, changes to scanner rankings, remote private-data storage or production model activation are introduced.
