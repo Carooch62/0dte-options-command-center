@@ -1,7 +1,7 @@
 import {decodeArchive} from './brokerage-history.js?v=20261007-evidence';
 import {requestJSON} from './private-request.js';
 import {validateExecutionPack} from './execution-evidence.js?v=20261007-evidence';
-import {validatePack,researchDataset,plaidReviewPack,reconcile,providerEventSessionDate} from './dashboard-broker-logic.js?v=20261007-evidence';
+import {validatePack,researchDataset,plaidReviewPack,reconcile,providerEventSessionDate} from './dashboard-broker-logic.js?v=20261102-event-date';
 const $=id=>document.getElementById(id),esc=x=>String(x??'Unknown').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=x=>x===null||x===undefined?'Unknown':new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(x);
 const key='0dteBrokerReviewV1';let syncedPack=null;let pack=null,history=[],historyError='',executionRecords=[];
