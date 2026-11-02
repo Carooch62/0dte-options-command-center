@@ -9,6 +9,16 @@ export function validateRobinhoodPack(p){
  for(const o of p.observations)if(!o.instrument?.id||o.quote?.instrument_id!==o.instrument.id||!Number.isFinite(millis(o.received_at)))throw Error('Quote/contract identity or collection time missing');
  return p;
 }
+// Quote-only files preserve reconciled orders and prior underlying bars.
+export function mergeResearchPack(previous,next){
+ next=validateRobinhoodPack(next);
+ const quoteOnly=next.coverage_mode==='observations_only';
+ if(quoteOnly&&(next.accounts.length||next.bars.length))throw Error('Quote-only imports cannot contain accounts or bars');
+ if(previous)previous=validateRobinhoodPack(previous);
+ const observations=mergeObservations(previous?.observations||[],next.observations);
+ if(!quoteOnly)return {...next,observations};
+ return previous?{...previous,observations}:next;
+}
 export function quoteReview(o,now=Date.now()){
  const q=o.quote,i=o.instrument,bid=num(q.bid_price),ask=num(q.ask_price),t=millis(q.updated_at),received=millis(o.received_at);
  const age=Number.isFinite(t)?(now-t)/1000:null,ageAtCollection=Number.isFinite(t)?(received-t)/1000:null;
