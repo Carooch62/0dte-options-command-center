@@ -1,4 +1,4 @@
-import {validateRobinhoodPack,robinhoodResearch,mergeResearchPack} from './robinhood-review.js?v=20261007-rh';
+import {validateRobinhoodPack,robinhoodResearch,mergeResearchPack} from './robinhood-review.js?v=20261102-quote-bridge';
 const $=id=>document.getElementById(id),esc=x=>String(x??'Unknown').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let current=null;
 const table=(headers,rows)=>'<div class="scroll"><table><tr>'+headers.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr>'+rows.map(r=>'<tr>'+r.map(c=>'<td>'+esc(c)+'</td>').join('')+'</tr>').join('')+'</table></div>';
