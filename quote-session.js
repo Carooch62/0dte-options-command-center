@@ -1,7 +1,7 @@
 // Tab-scoped recovery only: never persist credentials, accounts or holdings.
 import {candidateQuotes,providerBookEvidence} from './candidate-quotes.js';
 import {quoteRequestTiming} from './quote-timing.js';
-import {quoteDiagnostics} from './quote-evidence.js';
+import {quoteDiagnostics} from './quote-evidence.js?v=20261102-quote-bridge';
 import {safeRequestAttempts} from './private-request.js';
 import {millis} from './robinhood-review.js';
 export const SESSION_KEY='private-quote-session-v1';
