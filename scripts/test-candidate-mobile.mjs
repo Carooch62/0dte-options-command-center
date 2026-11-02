@@ -246,7 +246,7 @@ try{
   ]}]};
  await page.locator('#rh-file').setInputFiles({name:'synthetic-full-trade.json',
   mimeType:'application/json',buffer:Buffer.from(JSON.stringify(fullTrade))});
- await page.locator('#rh-status').getByText(/2 executions; 1 matched round trips/).waitFor();
+ await page.locator('#rh-status').filter({hasText:'2 executions; 1 matched round trips'}).waitFor();
  assert.match(await page.locator('#rh-fills').innerText(),/10\.00/);
  await page.locator('#rh-file').setInputFiles({name:'synthetic-quote-only.json',
   mimeType:'application/json',buffer:Buffer.from(JSON.stringify(quoteOnlySample))});
