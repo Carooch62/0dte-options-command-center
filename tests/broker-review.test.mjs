@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {parseOption,reconcile,scannerComparison,researchDataset} from '../dashboard-broker-logic.js';
+import {parseOption,reconcile,scannerComparison,researchDataset,providerEventSessionDate} from '../dashboard-broker-logic.js';
 const buy={account_key:'test',investment_transaction_id:'b',ticker_symbol:'TEST261006C00100000',transaction_datetime:'2026-10-06T15:00:00Z',type:'buy',name:'buy 1.000 TEST call to open',price:.2,quantity:100,amount:20,fees:.04};
 const sell={...buy,investment_transaction_id:'s',transaction_datetime:'2026-10-06T15:30:00Z',type:'sell',name:'sell 1.000 TEST call to close',quantity:-100,amount:-30,price:.3};
 const pack=rows=>({format:'broker-review-v1',retrieved_at:'2026-10-07T01:00:00Z',transactions:rows,holdings:[]});
@@ -20,4 +20,18 @@ test('conflicting transaction identity across symbols invalidates both affected 
   const r=reconcile(pack(rows));assert.equal(r.trades.length,0);assert.match(r.issues.map(i=>i.reason).join(),/Conflicting duplicate/);
  }
  assert.equal(reconcile(pack([buy,sell,{...buy,account_key:'separate'}])).trades.length,1);
+});
+
+test('settlement date is not treated as a provider trade session or verified fill',()=>{
+ const b={...buy,date:'2026-10-08'};
+ const s={...sell,date:'2026-10-08'};
+ assert.equal(providerEventSessionDate(b),'2026-10-06');
+ assert.equal(providerEventSessionDate({date:'2026-10-08',transaction_datetime:null}),null);
+ assert.equal(providerEventSessionDate({date:'2026-10-08',transaction_datetime:'bad'}),null);
+ assert.equal(providerEventSessionDate({date:'2026-11-02',transaction_datetime:'2026-11-02T00:30:00Z'}),'2026-11-01');
+ const t=reconcile(pack([b,s])).trades[0];
+ assert.equal(t.time,b.transaction_datetime);
+ assert.equal(t.execution_time_verified,false);
+ const scans=[{scan_id:'same-session',generated_at:'2026-10-06T14:55:00Z',candidate_state:[{ticker:'TEST',direction:'UP'}]},{scan_id:'settlement-session',generated_at:'2026-10-08T14:55:00Z',candidate_state:[{ticker:'TEST',direction:'DOWN'}]}];
+ assert.equal(scannerComparison(t,scans).scan_id,'same-session');
 });
