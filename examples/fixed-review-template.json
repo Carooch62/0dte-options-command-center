@@ -1,0 +1,221 @@
+{
+  "purpose": "Unfilled prospective review template. Nulls are missing evidence, not neutral scores.",
+  "packet_id": null,
+  "as_of": null,
+  "records": [
+    {
+      "session": null,
+      "as_of": null,
+      "reviewed_at": null,
+      "reviewer_id": null,
+      "evidence_set_id": null,
+      "candidate_id": null,
+      "ticker": null,
+      "direction": null,
+      "news_status": null,
+      "news_checked_at": null,
+      "news_items": [],
+      "news_event_evidence": [],
+      "eligibility_evidence": {
+        "liquidity": {
+          "observed_at": null,
+          "available_at": null,
+          "source": null,
+          "evidence": null,
+          "passed": null,
+          "policy_version": null
+        },
+        "risk": {
+          "observed_at": null,
+          "available_at": null,
+          "source": null,
+          "evidence": null,
+          "passed": null,
+          "policy_version": null
+        }
+      },
+      "component_reviews": {
+        "news": {
+          "candidate_id": null,
+          "event_ids": [],
+          "dimensions": {
+            "directional_support": {
+              "rating": null,
+              "observed_at": null,
+              "available_at": null,
+              "source": null,
+              "evidence": null
+            },
+            "materiality": {
+              "rating": null,
+              "observed_at": null,
+              "available_at": null,
+              "source": null,
+              "evidence": null
+            },
+            "surprise": {
+              "rating": null,
+              "observed_at": null,
+              "available_at": null,
+              "source": null,
+              "evidence": null
+            },
+            "novelty": {
+              "rating": null,
+              "observed_at": null,
+              "available_at": null,
+              "source": null,
+              "evidence": null
+            }
+          }
+        },
+        "patterns": {
+          "candidate_id": null,
+          "dimensions": {
+            "setup_structure": {
+              "rating": null,
+              "observed_at": null,
+              "available_at": null,
+              "source": null,
+              "evidence": null
+            },
+            "trend_alignment": {
+              "rating": null,
+              "observed_at": null,
+              "available_at": null,
+              "source": null,
+              "evidence": null
+            },
+            "trigger_confirmation": {
+              "rating": null,
+              "observed_at": null,
+              "available_at": null,
+              "source": null,
+              "evidence": null
+            }
+          }
+        },
+        "volume": {
+          "candidate_id": null,
+          "dimensions": {
+            "relative_volume": {
+              "rating": null,
+              "observed_at": null,
+              "available_at": null,
+              "source": null,
+              "evidence": null
+            },
+            "directional_participation": {
+              "rating": null,
+              "observed_at": null,
+              "available_at": null,
+              "source": null,
+              "evidence": null
+            },
+            "follow_through": {
+              "rating": null,
+              "observed_at": null,
+              "available_at": null,
+              "source": null,
+              "evidence": null
+            }
+          }
+        },
+        "options": {
+          "candidate_id": null,
+          "dimensions": {
+            "spread_quality": {
+              "rating": null,
+              "observed_at": null,
+              "available_at": null,
+              "source": null,
+              "evidence": null
+            },
+            "depth_quality": {
+              "rating": null,
+              "observed_at": null,
+              "available_at": null,
+              "source": null,
+              "evidence": null
+            },
+            "pricing_quality": {
+              "rating": null,
+              "observed_at": null,
+              "available_at": null,
+              "source": null,
+              "evidence": null
+            }
+          }
+        },
+        "risk_reward": {
+          "candidate_id": null,
+          "dimensions": {
+            "payoff_quality": {
+              "rating": null,
+              "observed_at": null,
+              "available_at": null,
+              "source": null,
+              "evidence": null
+            },
+            "invalidation_quality": {
+              "rating": null,
+              "observed_at": null,
+              "available_at": null,
+              "source": null,
+              "evidence": null
+            },
+            "execution_feasibility": {
+              "rating": null,
+              "observed_at": null,
+              "available_at": null,
+              "source": null,
+              "evidence": null
+            }
+          }
+        }
+      },
+      "intraday_bar_end": null,
+      "supporting_evidence": {
+        "depth": {
+          "contract_id": null,
+          "observed_at": null,
+          "available_at": null,
+          "source": null,
+          "evidence": null,
+          "bid_size_contracts": null,
+          "ask_size_contracts": null
+        },
+        "pricing_benchmark": {
+          "contract_id": null,
+          "observed_at": null,
+          "available_at": null,
+          "source": null,
+          "evidence": null,
+          "value": null,
+          "method_version": null
+        },
+        "risk_plan": {
+          "contract_id": null,
+          "observed_at": null,
+          "available_at": null,
+          "source": null,
+          "evidence": null,
+          "intended_contracts": null,
+          "maximum_premium_dollars": null,
+          "maximum_loss_dollars": null,
+          "estimated_round_trip_cost_dollars": null,
+          "cost_basis": null,
+          "underlying_target": null,
+          "underlying_invalidation": null,
+          "exit_plan": null,
+          "broker_deadline_at": null
+        }
+      }
+    }
+  ],
+  "format": "fixed-review-corpus-v1",
+  "policy_version": "fixed-collection-v1",
+  "policy_sha256": null,
+  "prepared_at": null,
+  "selected_reviewer_id": null
+}
