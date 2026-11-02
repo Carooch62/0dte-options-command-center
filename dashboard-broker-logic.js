@@ -3,6 +3,15 @@ import {applyExecutionEvidence} from './execution-evidence.js?v=20261007-evidenc
 const num=v=>v===null||v===undefined||v===''?null:Number.isFinite(Number(v))?Number(v):null;
 const timestamp=v=>Date.parse(typeof v==='string'?v.replace(/(\.\d{3})\d+(?=Z|[+-]\d\d:\d\d$)/,'$1'):v);
 const iso=v=>typeof v==='string'&&/T.*(?:Z|[+-]\d\d:\d\d)$/.test(v)&&Number.isFinite(timestamp(v));
+
+// Plaid's `date` is the provider settlement date; `transaction_datetime` is an
+// earlier provider event/order time, NOT a verified fill. Unknown times stay unknown.
+export function providerEventSessionDate(record){
+ if(!iso(record?.transaction_datetime))return null;
+ const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(timestamp(record.transaction_datetime)));
+ const part=k=>parts.find(p=>p.type===k)?.value;
+ return `${part('year')}-${part('month')}-${part('day')}`;
+}
 export function parseOption(symbol){
  const m=String(symbol||'').match(/^([A-Z]{1,6})(\d{2})(\d{2})(\d{2})([CP])(\d{8})$/);
  if(!m)return null;
