@@ -1,7 +1,8 @@
+import {quoteOnlyResearchPack} from './quote-review-bridge.js';
 import {candidateQuotes} from './candidate-quotes.js';
 import {validateRobinhoodPack} from './robinhood-review.js';
-import {quoteGuidance,appendQuoteEvidence,quoteEvidenceInput,scannerFromEvidencePacket,validationTiming,captureWindows,captureAction} from './quote-evidence.js';
-import {SESSION_KEY,sessionPayload,restoreSession} from './quote-session.js';
+import {quoteGuidance,appendQuoteEvidence,quoteEvidenceInput,scannerFromEvidencePacket,validationTiming,captureWindows,captureAction} from './quote-evidence.js?v=20261102-quote-bridge';
+import {SESSION_KEY,sessionPayload,restoreSession} from './quote-session.js?v=20261102-quote-bridge';
 import {quoteRequestTiming} from './quote-timing.js';
 import {requestJSON,safeRequestAttempts} from './private-request.js';
 const $=id=>document.getElementById(id);
@@ -57,6 +58,7 @@ function render(){
  const clock=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
  for(const contract of [...new Set(windows.map(w=>w.contract))]){const p=document.createElement('p');p.className='capture-state';p.textContent=contract+' · '+windows.filter(w=>w.contract===contract).map(w=>`${w.minutes}m: ${w.state==='OPEN'?'REFRESH NOW · closes in '+clock(w.seconds):w.state==='UPCOMING'?'opens in '+clock(w.seconds):w.state} · ${w.explanation}`).join(' | ');$('capture-windows').append(p);}
  $('export-evidence').disabled=busy||!evidenceHistory.length&&!attempts.length;
+  $('export-review-quotes').disabled=busy||!evidenceHistory.length;
  $('resolve-help').textContent=busy?'A request is in progress. Wait for it to finish.':!scanner?'Load a batch first.':!scanner.candidates?.length?'This batch has no candidates. Load a current batch with eligible research contracts.':'Ready to match exact contracts and fetch their first quotes.';
  $('export-help').textContent=busy?'Wait for the current request to finish.':evidenceHistory.length||attempts.length?'Ready to export observations and request diagnostics, including failures.':'Fetch quotes before exporting observations.';
  $('refresh-help').textContent=busy?'A request is in progress. Wait for it to finish.':'Load a batch, then match contracts to enable refresh. Waiting five minutes does not enable this button.';
@@ -171,3 +173,13 @@ $('export-evidence').onclick=()=>{
 
 
 
+
+$('export-review-quotes').onclick=()=>{
+ if(busy||!evidenceHistory.length)return;
+ try{
+  const pack=quoteOnlyResearchPack(scanner,observations,evidenceHistory,new Date().toISOString());
+  const url=URL.createObjectURL(new Blob([JSON.stringify(pack,null,2)],{type:'application/json'})),a=document.createElement('a');
+  a.href=url;a.download='private-robinhood-quote-only.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  $('status').textContent='Private quote-only snapshot exported. Import into Connections after a full order snapshot to preserve your fills.';
+ }catch(e){$('status').textContent='Quote-only export failed: '+e.message;}
+};

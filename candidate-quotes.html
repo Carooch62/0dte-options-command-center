@@ -81,6 +81,8 @@
 <section>
 <h2>3 · Capture and export</h2>
 <button id="export-evidence" aria-describedby="export-help" disabled>Export private quote observations</button>
+<button id="export-review-quotes" aria-describedby="quote-review-help" disabled>Export quotes for brokerage review</button>
+<p id="quote-review-help" class="control-help">Quote-only private file for Connections. Import your filled-trade research first, then this file. Quotes are not verified fills or entry-time signals.</p>
 <p id="export-help" class="control-help">Fetch quotes before exporting observations.</p>
 <button id="clear-session" disabled>Clear this quote session</button>
 <p id="session-info" role="status">
@@ -113,7 +115,7 @@
 </table>
 </div>
 </section>
-<script type="module" src="./candidate-quotes-panel.js?v=20261023-workflow">
+<script type="module" src="./candidate-quotes-panel.js?v=20261102-research-bridge">
 </script>
 </body>
 </html>

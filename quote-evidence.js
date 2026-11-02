@@ -18,6 +18,10 @@ const messages={
 export function quoteDiagnostics(record){
  const result=providerBookEvidence(record);
  if(Object.hasOwn(record,'metadata_multiplier'))result.metadata_multiplier=typeof record.metadata_multiplier==='number'&&Number.isFinite(record.metadata_multiplier)&&record.metadata_multiplier>0?record.metadata_multiplier:null;
+ for(const key of ['delta','gamma','theta','vega','rho','implied_volatility','open_interest','volume']){
+  const value=record?.[key];
+  if((typeof value==='number'&&Number.isFinite(value))||(typeof value==='string'&&value.trim()!==''&&Number.isFinite(Number(value))))result[key]=Number(value);
+ }
  if(Array.isArray(record.quote_check_reasons))result.quote_check_reasons=[...new Set(record.quote_check_reasons.filter(r=>typeof r==='string'&&Object.hasOwn(messages,r)))].slice(0,10);
  return result;
 }
@@ -33,10 +37,13 @@ export function appendQuoteEvidence(snapshot,observations,history,now=Date.now()
  for(const row of rows){
   if(!row.instrument_id)continue;
   if(!row.observed_at||!row.received_at)continue;
+  // Only preserve Greeks attached to this identical quote response; independent Greek timestamps remain unknown.
+  const same=observations.find(x=>x.instrument?.id===row.instrument_id&&x.quote?.updated_at===row.observed_at&&x.received_at===row.received_at);
+  const greeks=Object.fromEntries(['delta','gamma','theta','vega','rho','implied_volatility','open_interest','volume'].filter(k=>same?.quote?.[k]!==undefined).map(k=>[k,same.quote[k]]));
   const record={contract_id:row.contract,observed_at:row.observed_at,received_at:row.received_at,
    bid:row.bid??null,ask:row.ask??null,source:'Robinhood Quotes',
    multiplier:row.status==='QUOTE_CHECK_PASSED'?100:null,quote_check:row.status,
-   ...quoteDiagnostics({...providerBookEvidence(row),metadata_multiplier:row.metadata_multiplier??null,quote_check_reasons:row.reasons})};
+   ...quoteDiagnostics({...providerBookEvidence(row),...greeks,metadata_multiplier:row.metadata_multiplier??null,quote_check_reasons:row.reasons})};
   const timing=quoteRequestTiming(row.request_timing);if(Object.keys(timing).length)record.request_timing=timing;
   if(!next.some(p=>p.contract_id===record.contract_id&&p.observed_at===record.observed_at&&p.received_at===record.received_at))next.push(record);
  }
