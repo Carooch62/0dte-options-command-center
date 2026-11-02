@@ -256,7 +256,7 @@ try{
  const merged=JSON.parse(await readFile(await (await mergedDownload).path(),'utf8'));
  assert.equal(merged.orders.fills.length,2);
  assert.equal(merged.orders.round_trips.length,1);
- assert.equal(merged.orders.round_trips[0].gross,10);
+ assert.ok(Math.abs(merged.orders.round_trips[0].gross-10)<1e-8,'synthetic gross profit should be $10');
  assert.equal(merged.orders.round_trips[0].net,null,'fees remain unknown');
  assert.equal(merged.source_pack.accounts[0].orders.length,2,'quote-only import must preserve full order coverage');
  assert.equal(merged.source_pack.observations.length,1,'one exact-matched timed quote survived');
