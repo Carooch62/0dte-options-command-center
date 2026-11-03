@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 const server=createServer(async(req,res)=>{try{const path=req.url==='/'?'candidate-quotes.html':req.url.slice(1).split('?')[0];if(!['private-request.js','candidate-quotes.html','candidate-quotes-panel.js','quote-review-bridge.js','candidate-quotes.js','robinhood-review.js','quote-evidence.js','quote-session.js','quote-timing.js','connection-ui.css','brokerage.html','dashboard-broker.js','dashboard-broker-logic.js','brokerage-history.js','execution-evidence.js','robinhood-panel.js','robinhood-connect.js'].includes(path)){res.writeHead(404);res.end();return;}res.setHeader('Content-Type',path.endsWith('.js')?'text/javascript':path.endsWith('.css')?'text/css':'text/html');res.end(await readFile(new URL('../'+path,import.meta.url)));}catch{res.writeHead(500);res.end();}});
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 let browser;
+let quoteOnlySample=null;
 try{
  browser=await chromium.launch({headless:true});
  for(const width of [390,430]){
@@ -82,6 +83,7 @@ try{
  assert.equal(quoteOnly.observations[0].quote.ask_price,.31);
  assert.equal(quoteOnly.observations[0].quote.updated_at,now);
  assert.equal(quoteOnly.observations[0].received_at,exported.entries[0].quote.received_at);
+ if(width===390)quoteOnlySample=quoteOnly;
  assert.match(await page.locator('#validation-clock').innerText(),/5-min:.*10-min:.*15-min:/);assert.equal(exported.entries[0].quote.ask,.31);
  assert.deepEqual(exported.validation_policy.horizons_minutes,[5,10,15]);
  assert.equal(exported.observations[0].request_timing.setup_ms,60);
@@ -226,6 +228,40 @@ try{
  await page.locator('#rh-quotes').getByText('Missing or inconsistent quote clock',{exact:false}).waitFor();
  assert.match(await page.locator('#rh-quotes').innerText(),/Missing or inconsistent quote clock/);
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'imported review page overflow');
+
+ // Exercise the full private handoff on a phone: full executed trade -> quote-only -> merged export.
+ // This is synthetic data served locally; no real brokerage calls or private records.
+ assert.ok(quoteOnlySample?.observations?.length===1,'expected synthetic quote-only export from candidate page');
+ await page.locator('#rh-clear').click();
+ const syntheticId='22222222-2222-2222-2222-222222222222';
+ const filledOrder=(orderId,side,price,at)=>({id:orderId,chain_symbol:'TEST',created_at:at,
+  trade_value_multiplier:'100',processed_quantity:'2',placed_agent:'user',
+  legs:[{option_id:syntheticId,expiration_date:'2099-01-01',strike_price:'100',
+   option_type:'call',side,position_effect:side==='buy'?'open':'close',
+   executions:[{id:'synthetic-'+orderId,quantity:'2',price,timestamp:at}]}]});
+ const fullTrade={format:'robinhood-research-v1',retrieved_at:stamp,observations:[],bars:[],
+  accounts:[{account_key:'synthetic-account',coverage_note:'Synthetic test only',orders:[
+   filledOrder('open','buy','0.10','2026-10-30T14:30:00Z'),
+   filledOrder('close','sell','0.15','2026-10-30T14:35:00Z')
+  ]}]};
+ await page.locator('#rh-file').setInputFiles({name:'synthetic-full-trade.json',
+  mimeType:'application/json',buffer:Buffer.from(JSON.stringify(fullTrade))});
+ await page.locator('#rh-status').filter({hasText:'2 executions; 1 matched round trips'}).waitFor();
+ assert.match(await page.locator('#rh-fills').innerText(),/10\.00/);
+ await page.locator('#rh-file').setInputFiles({name:'synthetic-quote-only.json',
+  mimeType:'application/json',buffer:Buffer.from(JSON.stringify(quoteOnlySample))});
+ await page.locator('#rh-quotes').getByText('SCANNER_BATCH_RESEARCH',{exact:false}).waitFor();
+ const mergedDownload=page.waitForEvent('download');
+ await page.getByRole('button',{name:'Export Robinhood research',exact:true}).click();
+ const merged=JSON.parse(await readFile(await (await mergedDownload).path(),'utf8'));
+ assert.equal(merged.orders.fills.length,2);
+ assert.equal(merged.orders.round_trips.length,1);
+ assert.ok(Math.abs(merged.orders.round_trips[0].gross-10)<1e-8,'synthetic gross profit should be $10');
+ assert.equal(merged.orders.round_trips[0].net,null,'fees remain unknown');
+ assert.equal(merged.source_pack.accounts[0].orders.length,2,'quote-only import must preserve full order coverage');
+ assert.equal(merged.source_pack.observations.length,1,'one exact-matched timed quote survived');
+ assert.equal(merged.source_pack.observations[0].quote.instrument_id,syntheticId);
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'merged review page overflow');
  }
  await page.screenshot({path:`test-results/mobile/${width}-connections-${state}.png`,fullPage:true});
  }
