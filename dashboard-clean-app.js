@@ -152,16 +152,39 @@ const earlyPanel=document.createElement('section');earlyPanel.className='panel';
 earlyPanel.innerHTML='<h2>EARLY WATCH · shadow research</h2><p class="smallnote">Pre-breakout pattern hypotheses, not entry signals. Requires a company catalyst, compression, quiet volume, directional structure and proximity to a level. Uses completed bars only. Existing ranking and contract gates remain unchanged.</p><div id="earlyWatchList"></div>';
 $('candidateBoard').before(earlyPanel);
 const contractWatchPanel=document.createElement('section');contractWatchPanel.className='panel';contractWatchPanel.id='contractWatchPanel';
-contractWatchPanel.innerHTML='<h2>Contract watch</h2><p class="smallnote">Saved on this device. Status changes come from published delayed research; verify live Robinhood quotes before any decision. In-page alerts appear while this page reloads. Discord monitoring requires an explicit private sync and remains off until the service is enabled.</p><div id="contractWatchList" role="status" aria-live="polite"></div><button type="button" id="syncContractWatches">Sync watches for Discord</button><p id="watchSyncStatus" class="smallnote" role="status"></p>';
+contractWatchPanel.innerHTML='<h2>Contract watch</h2><p class="smallnote">Saved on this device. Status changes come from published delayed research; verify live Robinhood quotes before any decision. In-page alerts appear while this page reloads. Discord monitoring requires an explicit private sync and remains off until the service is enabled.</p><div id="contractWatchList" role="status" aria-live="polite"></div><button type="button" id="syncContractWatches">Sync watches for Discord</button> <button type="button" id="testWatchDiscord" disabled>Send Discord test message</button><p id="watchSyncStatus" class="smallnote" role="status"></p>';
 $('candidateBoard').before(contractWatchPanel);
 if(location.origin!==API){$('syncContractWatches').disabled=true;$('watchSyncStatus').innerHTML=`Open the <a href="${API}/dashboard_clean.html" target="_blank" rel="noopener">Cloudflare dashboard</a> to sign in and sync watches privately.`;}
 async function syncContractWatches(){
  if(location.origin!==API)return;
  const status=$('watchSyncStatus');status.textContent='Syncing private watches…';
- try{const response=await fetch('/private/watch',{method:'PUT',headers:{'Content-Type':'application/json','X-Requested-With':'ContractWatch'},body:JSON.stringify({watches:contractWatches}),credentials:'same-origin'});const result=await response.json();if(!response.ok)throw Error(result.error||`HTTP ${response.status}`);status.textContent=`${result.count} watches saved privately. Discord delivery ${result.enabled?'enabled':'not enabled yet'}.`;}
+ try{
+  const response=await fetch('/private/watch',{method:'PUT',headers:{'Content-Type':'application/json','X-Requested-With':'ContractWatch'},body:JSON.stringify({watches:contractWatches}),credentials:'same-origin'});const result=await response.json();if(!response.ok)throw Error(result.error||`HTTP ${response.status}`);
+  status.textContent='Write accepted. Reading the private list back…';
+  for(let attempt=0;attempt<3;attempt++){
+   if(attempt)await new Promise(resolve=>setTimeout(resolve,attempt*1200));
+   const check=await fetch('/private/watch',{credentials:'same-origin',cache:'no-store'});const saved=await check.json();if(!check.ok)throw Error(saved.error||`Read-back HTTP ${check.status}`);
+   $('testWatchDiscord').disabled=!saved.test_available;
+   if(saved.revision===result.revision&&saved.watches.length===result.count&&saved.watches.map(watchKey).sort().join('\n')===contractWatches.map(watchKey).sort().join('\n')){
+    status.textContent=`Confirmed ${saved.watches.length} watches privately. Discord delivery ${saved.enabled?'enabled':'not enabled yet'}.`;return;
+   }
+  }
+  status.textContent='Write accepted, but read-back is still pending. Cloudflare storage may take up to a minute to converge; refresh and check again before enabling alerts.';
+ }
  catch(e){status.textContent=`Private sync failed: ${e.message}. Local watches remain on this device; Discord list may differ.`;}
 }
 $('syncContractWatches').onclick=syncContractWatches;
+if(location.origin===API)fetch('/private/watch',{credentials:'same-origin',cache:'no-store'}).then(async response=>{
+ if(!response.ok)return;const saved=await response.json();$('testWatchDiscord').disabled=!saved.test_available;
+ $('watchSyncStatus').textContent=`Private list: ${saved.watches.length} watches. Device list: ${contractWatches.length}. Discord delivery ${saved.enabled?'enabled':'not enabled yet'}. Sync after any change.`;
+}).catch(()=>{});
+$('testWatchDiscord').onclick=async()=>{
+ if(!confirm('Send one TEST ONLY message to your configured Discord channel now?'))return;
+ const button=$('testWatchDiscord'),status=$('watchSyncStatus');button.disabled=true;status.textContent='Sending one Discord test message…';
+ try{const response=await fetch('/private/watch',{method:'POST',headers:{'Content-Type':'application/json','X-Requested-With':'ContractWatch'},credentials:'same-origin',body:JSON.stringify({action:'test'})});const result=await response.json();if(!response.ok)throw Error(result.error||`HTTP ${response.status}`);status.textContent='Discord test message accepted. Check your channel. Scheduled alerts remain controlled by the separate enable switch.';}
+ catch(e){status.textContent=`Discord test failed: ${e.message}. No scheduled alerts were enabled.`;}
+ finally{button.disabled=false;}
+};
 function renderContractWatches(){
  const rows=new Map((data?.candidates||[]).map(x=>[x.ticker,x]));
  $('contractWatchList').innerHTML=contractWatches.length?contractWatches.map(w=>{
