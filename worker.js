@@ -1,6 +1,7 @@
 import {handleRobinhood} from './robinhood-live.js';
 import {handleShadowResearch} from './shadow-research.js';
 import {handlePlaid,scheduledPlaidSync} from './plaid-sync.js';
+import {handleWatchService,scheduledWatchCheck} from './watch-service.js';
 const REPO = 'Carooch62/0dte-options-command-center';
 const WORKFLOW = 'market-scan.yml';
 const VERSION = '2026-09-30.6-contract-reasons';
@@ -40,10 +41,14 @@ export async function scheduledScan(env,now=new Date()) {
 export default {
   async scheduled(controller,env) {
     if(env.APP_ENV==='preview')return;
-    const result=await scheduledScan(env,new Date(controller.scheduledTime));
-    console.log(JSON.stringify({scheduler:result,scheduled_at:controller.scheduledTime}));
+    try{const result=await scheduledScan(env,new Date(controller.scheduledTime));console.log(JSON.stringify({scheduler:result,scheduled_at:controller.scheduledTime}));}
+    catch(e){console.log(JSON.stringify({scheduler:'failed',error:e.message}));}
     // Existing five-minute trigger: collect a private brokerage snapshot hourly during the session.
     const now=new Date(controller.scheduledTime);
+    if(regularWeekday(now)){
+      try{console.log(JSON.stringify({watch_monitor:await scheduledWatchCheck(env,Date.now())}));}
+      catch(e){console.log(JSON.stringify({watch_monitor:'failed',error:e.message}));}
+    }
     if(regularWeekday(now)&&new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',minute:'2-digit'}).format(now)==='31') {
       const status=await scheduledPlaidSync(env);
       console.log(JSON.stringify({plaid_sync:status,scheduled_at:controller.scheduledTime}));
@@ -57,6 +62,9 @@ export default {
     }
     if(url.pathname.startsWith('/private/plaid/robinhood/')) {
       try{return await handleRobinhood(request,env)}catch{return response({ok:false,error:'Private Robinhood service unavailable'},502,request)}
+    }
+    if(url.pathname.startsWith('/private/watch')) {
+      try{return await handleWatchService(request,env)}catch{return response({ok:false,error:'Private watch service unavailable'},502,request)}
     }
     if(url.pathname.startsWith('/private/plaid/')) {
       try{return await handlePlaid(request,env)}catch(e){return response({ok:false,error:e.message},502,request)}
