@@ -152,8 +152,16 @@ const earlyPanel=document.createElement('section');earlyPanel.className='panel';
 earlyPanel.innerHTML='<h2>EARLY WATCH · shadow research</h2><p class="smallnote">Pre-breakout pattern hypotheses, not entry signals. Requires a company catalyst, compression, quiet volume, directional structure and proximity to a level. Uses completed bars only. Existing ranking and contract gates remain unchanged.</p><div id="earlyWatchList"></div>';
 $('candidateBoard').before(earlyPanel);
 const contractWatchPanel=document.createElement('section');contractWatchPanel.className='panel';contractWatchPanel.id='contractWatchPanel';
-contractWatchPanel.innerHTML='<h2>Contract watch</h2><p class="smallnote">Saved on this device. Status changes come from published delayed research; verify live Robinhood quotes before any decision. Alerts appear here only while this page reloads.</p><div id="contractWatchList" role="status" aria-live="polite"></div>';
+contractWatchPanel.innerHTML='<h2>Contract watch</h2><p class="smallnote">Saved on this device. Status changes come from published delayed research; verify live Robinhood quotes before any decision. In-page alerts appear while this page reloads. Discord monitoring requires an explicit private sync and remains off until the service is enabled.</p><div id="contractWatchList" role="status" aria-live="polite"></div><button type="button" id="syncContractWatches">Sync watches for Discord</button><p id="watchSyncStatus" class="smallnote" role="status"></p>';
 $('candidateBoard').before(contractWatchPanel);
+if(location.origin!==API){$('syncContractWatches').disabled=true;$('watchSyncStatus').innerHTML=`Open the <a href="${API}/dashboard_clean.html" target="_blank" rel="noopener">Cloudflare dashboard</a> to sign in and sync watches privately.`;}
+async function syncContractWatches(){
+ if(location.origin!==API)return;
+ const status=$('watchSyncStatus');status.textContent='Syncing private watches…';
+ try{const response=await fetch('/private/watch',{method:'PUT',headers:{'Content-Type':'application/json','X-Requested-With':'ContractWatch'},body:JSON.stringify({watches:contractWatches}),credentials:'same-origin'});const result=await response.json();if(!response.ok)throw Error(result.error||`HTTP ${response.status}`);status.textContent=`${result.count} watches saved privately. Discord delivery ${result.enabled?'enabled':'not enabled yet'}.`;}
+ catch(e){status.textContent=`Private sync failed: ${e.message}. Local watches remain on this device; Discord list may differ.`;}
+}
+$('syncContractWatches').onclick=syncContractWatches;
 function renderContractWatches(){
  const rows=new Map((data?.candidates||[]).map(x=>[x.ticker,x]));
  $('contractWatchList').innerHTML=contractWatches.length?contractWatches.map(w=>{
