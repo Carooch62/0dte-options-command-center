@@ -14,11 +14,19 @@ export function discordWatchMessage(event) {
 }
 
 export async function sendDiscordWatchEvent(event,env,fetcher=fetch) {
+  return sendDiscordPayload(discordWatchMessage(event),env,fetcher);
+}
+
+export async function sendDiscordTestMessage(env,fetcher=fetch) {
+  return sendDiscordPayload({content:'TEST ONLY — 0DTE Command Center Discord connection check. No contract triggered; no trade action is indicated.',allowed_mentions:{parse:[]}},env,fetcher);
+}
+
+async function sendDiscordPayload(payload,env,fetcher) {
   const webhook=env?.DISCORD_WATCH_WEBHOOK_URL;
   if(!webhook)return {status:'not-configured'};
   let url;try{url=new URL(webhook);}catch{throw Error('Invalid Discord webhook configuration');}
   if(url.protocol!=='https:'||url.hostname!=='discord.com'||!/^\/api\/webhooks\/\d+\/[A-Za-z0-9_-]+$/.test(url.pathname))throw Error('Invalid Discord webhook configuration');
-  let response;try{response=await fetcher(url.toString(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(discordWatchMessage(event)),signal:AbortSignal.timeout(10000)});}catch{throw Error('Discord delivery network failure');}
+  let response;try{response=await fetcher(url.toString(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:AbortSignal.timeout(10000)});}catch{throw Error('Discord delivery network failure');}
   if(!response.ok)throw Error(`Discord delivery HTTP ${response.status}`);
   return {status:'sent'};
 }
