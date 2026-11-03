@@ -27,7 +27,9 @@ export async function handleWatchService(request,env){
  const body=await request.json().catch(()=>null),watches=body?.watches;
  if(!Array.isArray(watches)||watches.length>20||watches.some(w=>!cleanWatch(w)))return reply({ok:false,error:'Invalid watch list'},400);
  const unique=[...new Map(watches.map(w=>{const clean=cleanWatch(w);return [watchKey(clean),clean]})).values()];
- const state=await read(env);await env.PLAID_STORE.put(KEY,JSON.stringify({...state,watches:unique}));
+ const state=await read(env);
+ const changed=JSON.stringify((state.watches||[]).map(watchKey).sort())!==JSON.stringify(unique.map(watchKey).sort());
+ await env.PLAID_STORE.put(KEY,JSON.stringify({...state,watches:unique,...(changed?{previous:null,deliveredKeys:[],last_error:null}:{})}));
  return reply({ok:true,count:unique.length,enabled:env.WATCH_ALERTS_ENABLED==='true'&&!!env.DISCORD_WATCH_WEBHOOK_URL});
 }
 
