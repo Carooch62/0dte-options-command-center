@@ -1,0 +1,33 @@
+import {createServer} from 'node:http';
+import {readFile} from 'node:fs/promises';
+import {createRequire} from 'node:module';
+import assert from 'node:assert/strict';
+const {chromium}=createRequire(import.meta.url)('playwright');
+const files=new Set(['dashboard_clean.html','dashboard-clean-app.js','dashboard-logic.js','dashboard-delivery.js','dashboard-mobile.css','connection-ui.css','trade-review.js','signal-checklist.js','refresh-progress.js','contract-watch.js']);
+const server=createServer(async(req,res)=>{try{const path=new URL(req.url,'http://localhost').pathname.slice(1);if(!files.has(path)){res.writeHead(404);res.end();return;}res.setHeader('Content-Type',path.endsWith('.js')?'text/javascript':path.endsWith('.css')?'text/css':'text/html');res.end(await readFile(new URL('../'+path,import.meta.url)));}catch{res.writeHead(500);res.end();}});
+await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+let browser;
+try{
+ browser=await chromium.launch({headless:true});
+ const page=await browser.newPage({viewport:{width:390,height:844},timezoneId:'America/New_York'}),errors=[];
+ page.on('pageerror',e=>errors.push(e.message));
+ await page.clock.install({time:new Date('2026-11-02T14:50:00Z')});
+ const row=execution_state=>({ticker:'TEST',direction:'UP',price:10,score:1,execution_state,bar_end:'2026-11-02T14:45:00Z',options:[],eligible_contracts:[],preferred_contracts:[],news_items:[],chain_status:'SUCCESS'});
+ const base={market_session:'OPEN',session_open_at:'2026-11-02T14:30:00Z',session_close_at:'2026-11-02T21:00:00Z',coverage:{},candidates:[row('WATCH')]};
+ let scan={...base,scan_id:'old',generated_at:'2026-11-02T14:45:00Z'};
+ await page.addInitScript(()=>localStorage.setItem('0dteContractWatches',JSON.stringify([{ticker:'TEST',direction:'UP',contract_id:'TEST261106C00011000',expiry:'2026-11-06',side:'call',strike:11}])));
+ await page.route('**/data/**',route=>route.fulfill({json:route.request().url().includes('market-dashboard.json')?scan:{status:'SUCCESS'}}));
+ await page.route('https://**/*',route=>route.request().url().includes('/health')?route.fulfill({json:{latestRun:null}}):route.abort());
+ await page.goto(`http://127.0.0.1:${server.address().port}/dashboard_clean.html`);
+ await page.locator('#contractWatchList').filter({hasText:'TEST'}).waitFor();
+ assert.match(await page.locator('#contractWatchList').innerText(),/WATCH/);
+ scan={...base,scan_id:'new',generated_at:'2026-11-02T14:49:00Z',candidates:[row('TRIGGERED')]};
+ await page.locator('#check').click();
+ await page.locator('#contractWatchList').filter({hasText:'live quote and setup recheck required'}).waitFor();
+ assert.deepEqual(errors,[]);
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+ await page.locator('[data-remove-watch]').click();
+ assert.match(await page.locator('#contractWatchList').innerText(),/No contracts saved/);
+ console.log('Contract watch render, transition, removal and mobile width passed');
+ await page.close();
+}finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}
