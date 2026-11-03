@@ -33,8 +33,9 @@ class PrivateQuoteCoverageTests(unittest.TestCase):
                 'retrieved_at': self.ts(20), 'accounts': [], 'bars': [], 'observations': obs}
 
     def test_valid_followups_are_counted_without_claiming_ml_ready(self):
-        p = self.pack([self.observation(0), self.observation(5),
-                       self.observation(10), self.observation(15)])
+        p = self.pack([self.observation(0), self.observation(5, provider_offset_seconds=2),
+                       self.observation(10, provider_offset_seconds=2),
+                       self.observation(15, provider_offset_seconds=2)])
         r = audit([p, p])
         self.assertEqual(r['source_files'], 2)
         self.assertEqual(r['deduplicated_quotes'], 4)
