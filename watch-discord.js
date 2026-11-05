@@ -17,6 +17,14 @@ export async function sendDiscordWatchEvent(event,env,fetcher=fetch) {
   return sendDiscordPayload(discordWatchMessage(event),env,fetcher);
 }
 
+export async function sendDiscordVerifiedOptionAlert(alert,env,fetcher=fetch) {
+  if(!alert||!/^[-A-Za-z0-9_:]{1,200}$/.test(alert.key||'')||
+    typeof alert.text!=='string'||alert.text.length>1800||
+    typeof alert.link!=='string'||!alert.text.includes(alert.link)||
+    !/^https:\/\/(?:www\.)?robinhood\.com\//.test(alert.link))throw Error('Invalid verified option alert');
+  return sendDiscordPayload({content:alert.text,allowed_mentions:{parse:[]}},env,fetcher);
+}
+
 export async function sendDiscordTestMessage(env,fetcher=fetch) {
   return sendDiscordPayload({content:'TEST ONLY — 0DTE Command Center Discord connection check. No contract triggered; no trade action is indicated.',allowed_mentions:{parse:[]}},env,fetcher);
 }
