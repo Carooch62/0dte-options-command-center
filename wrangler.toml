@@ -28,6 +28,9 @@ new_sqlite_classes = ["ScanCoordinator"]
 binding = "PLAID_STORE"
 id = "c141007029b0432abe871df0e27c3bdf"
 
+[vars]
+FAST_SCAN_ENABLED = "true"
+
 # Branch previews intentionally have no brokerage storage or private connection.
 # Never copy the production PLAID_STORE ID into this block.
 [previews]
