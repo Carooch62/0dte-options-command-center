@@ -14,9 +14,54 @@ function response(body, status=200, request) {
 }
 function headers(env) {return {Authorization:`Bearer ${env.GITHUB_TOKEN}`,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','User-Agent':'0DTE-Command-Center'};}
 async function api(path,env,options={}) {
-  const r=await fetch(`https://api.github.com/repos/${REPO}/${path}`,{...options,headers:{...headers(env),...options.headers},signal:AbortSignal.timeout(15000)});
-  if(!r.ok)throw new Error(`GitHub HTTP ${r.status}`);
+  const r=await fetch(`https://api.github.com/repos/${REPO}/${path}`,{...options,headers:{...headers(env),...options.headers},signal:AbortSignal.timeout(options.timeoutMs??15000)});
+  if(!r.ok)throw Object.assign(new Error(`GitHub HTTP ${r.status}`),{status:r.status});
   return r.status===204?null:r.json();
+}
+const scanRuns=`actions/workflows/${WORKFLOW}/runs?branch=main&per_page=30`;
+const runMatches=(run,id)=>run.display_title?.startsWith(`Scan ${id} (`);
+const dispatchScan=(env,id,mode)=>api(`actions/workflows/${WORKFLOW}/dispatches`,env,{
+  method:'POST',headers:{'Content-Type':'application/json'},timeoutMs:7000,
+  body:JSON.stringify({ref:'main',inputs:{scan_mode:mode,request_id:id}})
+});
+const guard=(env)=>env.SCAN_COORDINATOR.get(env.SCAN_COORDINATOR.idFromName('production-market-scan'));
+
+// Serialize the GitHub list-and-dispatch operation across cron and dashboard requests.
+export class ScanCoordinator {
+  constructor(state,env){this.state=state;this.env=env;}
+
+  async fetch(request){
+    return this.state.blockConcurrencyWhile(async()=>{
+      const {id,mode,scheduled}=await request.json();
+      const pending=await this.state.storage.get('pending');
+      const {workflow_runs:runs}=await api(scanRuns,this.env,{timeoutMs:7000});
+      if(pending){
+        if(runs.some(run=>runMatches(run,pending.id))||Date.now()>=pending.until){
+          await this.state.storage.delete('pending');
+        }else{
+          return Response.json({status:pending.id===id?'already-requested':'already-running'});
+        }
+      }
+      if(runs.some(run=>runMatches(run,id)))return Response.json({status:'already-requested'});
+      if(runs.some(run=>run.status!=='completed'))return Response.json({status:'already-running'});
+      if(scheduled&&!regularWeekday(new Date()))return Response.json({status:'outside-session'});
+      // A timed-out dispatch may have succeeded. Let GitHub surface it before retrying.
+      await this.state.storage.put('pending',{id,until:Date.now()+120000});
+      try{await dispatchScan(this.env,id,mode);}
+      catch(error){
+        if([401,403,404,422,429].includes(error.status))await this.state.storage.delete('pending');
+        return Response.json({status:'dispatch-uncertain'}, {status:502});
+      }
+      return Response.json({status:'dispatched'});
+    });
+  }
+}
+
+async function requestScan(env,id,mode,scheduled){
+  const result=await guard(env).fetch('https://scan-coordinator/dispatch',{
+    method:'POST',body:JSON.stringify({id,mode,scheduled})
+  });
+  return (await result.json()).status;
 }
 export function regularWeekday(now) {
   const parts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(now).map(p=>[p.type,p.value]));
@@ -27,6 +72,10 @@ export async function scheduledScan(env,now=new Date()) {
   if(env.APP_ENV==='preview')return 'preview-disabled';
   if(!regularWeekday(now))return 'outside-session';
   if(!env.GITHUB_TOKEN)throw Error('Refresh service is not configured');
+  if(env.SCAN_COORDINATOR){
+    const interval=env.FAST_SCAN_ENABLED==='true'?60000:300000;
+    return requestScan(env,'scheduled-'+Math.floor(now.getTime()/interval),'manual',true);
+  }
   const d=await api(`actions/workflows/${WORKFLOW}/runs?branch=main&per_page=30`,env);
   const unfinished=d.workflow_runs.find(r=>r.status!=='completed');
   if(unfinished){
@@ -41,10 +90,13 @@ export async function scheduledScan(env,now=new Date()) {
 export default {
   async scheduled(controller,env) {
     if(env.APP_ENV==='preview')return;
-    try{const result=await scheduledScan(env,new Date(controller.scheduledTime));console.log(JSON.stringify({scheduler:result,scheduled_at:controller.scheduledTime}));}
-    catch(e){console.log(JSON.stringify({scheduler:'failed',error:e.message}));}
-    // Existing five-minute trigger: collect a private brokerage snapshot hourly during the session.
     const now=new Date(controller.scheduledTime);
+    const legacyTick=now.getUTCMinutes()%5===1;
+    if(legacyTick||(env.FAST_SCAN_ENABLED==='true'&&env.SCAN_COORDINATOR)){
+      try{const result=await scheduledScan(env,now);console.log(JSON.stringify({scheduler:result,scheduled_at:controller.scheduledTime}));}
+      catch(e){console.log(JSON.stringify({scheduler:'failed',error:e.message}));}
+    }
+    if(!legacyTick)return;
     if(regularWeekday(now)){
       try{console.log(JSON.stringify({watch_monitor:await scheduledWatchCheck(env,Date.now())}));}
       catch(e){console.log(JSON.stringify({watch_monitor:'failed',error:e.message}));}
@@ -101,6 +153,12 @@ export default {
         const id=body.request_id||crypto.randomUUID();
         if(!/^[a-zA-Z0-9-]{8,80}$/.test(id))return response({ok:false,error:'Invalid request ID'},400,request);
         const mode=body.scan_mode==='second-wave'?'second-wave':'manual';
+        if(env.SCAN_COORDINATOR){
+          const status=await requestScan(env,id,mode,false);
+          if(status==='already-running')return response({ok:false,error:'A scan is already running or starting. Check the current scan before retrying.'},409,request);
+          if(status!=='dispatched'&&status!=='already-requested')return response({ok:false,error:'Dispatch could not be confirmed. Check scanner status before retrying.'},502,request);
+          return response({ok:true,status:'ACCEPTED',request_id:id},202,request);
+        }
         await api(`actions/workflows/${WORKFLOW}/dispatches`,env,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ref:'main',inputs:{scan_mode:mode,request_id:id}})});
         return response({ok:true,status:'ACCEPTED',request_id:id},202,request);
       }
