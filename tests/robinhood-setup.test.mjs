@@ -2,16 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 const script=new URL('../scripts/setup-robinhood-client.mjs',import.meta.url).href;
-function setup({publicCallback=false,missingStorage=false,transientMetadata=false}={}){
+function setup({publicCallback=false,missingStorage=false,transientMetadata=false,alreadyConfigured=false}={}){
  const runner=`
  process.env.CLOUDFLARE_ACCOUNT_ID='mock-account';process.env.CLOUDFLARE_API_TOKEN='PRIVATE-DEPLOYMENT-TOKEN';delete process.env.GITHUB_STEP_SUMMARY;
  const writes=[];let metadataReads=0;
  globalThis.setTimeout=callback=>{queueMicrotask(callback);return 0;};
  globalThis.fetch=async(url,options={})=>{
   if(url.includes('api.cloudflare.com')){
-   if(url.endsWith('/secrets')){writes.push(JSON.parse(options.body));return Response.json({success:true,result:{}});}
+   if(url.endsWith('/secrets')){if(${alreadyConfigured})throw Error('Configured Worker must not be rewritten');writes.push(JSON.parse(options.body));return Response.json({success:true,result:{}});}
    if(url.endsWith('/settings')&&${transientMetadata}&&metadataReads++===0)return Response.json({success:true,result:{}});
-   if(url.endsWith('/settings'))return Response.json({success:true,result:{bindings:['ROBINHOOD_CLIENT_ID','ROBINHOOD_REDIRECT_URI',${missingStorage?'':"'PLAID_STORE',"}'PLAID_ENCRYPTION_KEY','CF_ACCESS_TEAM_DOMAIN','CF_ACCESS_AUD','CF_ACCESS_EMAIL'].map(name=>({name,type:'secret_text',text:'PRIVATE-BINDING-VALUE'}))}});
+   if(url.endsWith('/settings'))return Response.json({success:true,result:{bindings:['ROBINHOOD_CLIENT_ID','ROBINHOOD_REDIRECT_URI',${missingStorage?'':"'PLAID_STORE',"}'PLAID_ENCRYPTION_KEY','CF_ACCESS_TEAM_DOMAIN','CF_ACCESS_AUD','CF_ACCESS_EMAIL'${alreadyConfigured?",'ROBINHOOD_CONNECTION_ENABLED'":''}].map(name=>({name,type:'secret_text',text:'PRIVATE-BINDING-VALUE'}))}});
    return Response.json({success:false},{status:403});
   }
   if(${publicCallback}&&url.endsWith('/callback'))return new Response('Unprotected',{status:200});
@@ -31,3 +31,12 @@ test('an unprotected callback cannot activate quote connection',()=>{const {outp
 test('missing encrypted storage cannot activate quote connection',()=>{const {output,code}=setup({missingStorage:true});assert.equal(code,1);assert.match(output,/Enabled: UNCHANGED/);assert.match(output,/"connection_flag_updated":false/);});
 
 test('temporary empty metadata cannot disable the existing connection',()=>{const {output,code}=setup({transientMetadata:true});assert.equal(code,0);assert.match(output,/Enabled: true/);assert.match(output,/"metadata_attempts":2/);assert.ok(!output.includes('Enabled: false'));});
+
+test('a routine deploy with existing bindings verifies Access without rewriting secrets',()=>{
+ const {output,code}=setup({alreadyConfigured:true});
+ assert.equal(code,0);
+ assert.match(output,/"private_prerequisites_ready":true/);
+ assert.match(output,/"existing_connection_flag_preserved":true/);
+ assert.match(output,/"client_bindings_added":0/);
+ assert.match(output,/Enabled: UNCHANGED/);
+});
