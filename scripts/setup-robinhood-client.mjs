@@ -11,14 +11,21 @@ async function api(path,options={}){
  if(!r.ok||!data.success)throw Error('Cloudflare configuration API HTTP '+r.status);
  return data.result;
 }
-// Public OAuth client metadata. These are not user tokens.
+const settingsPath='/workers/scripts/'+worker+'/settings';
+let settings;
+const inspect=()=>inspectWorkerBindings(async()=>{settings=await api(settingsPath);return settings;});
+let inspection=await inspect();
+let clientBindingsAdded=0;
+// Provision missing client metadata only. Deployments must preserve existing bindings.
 for(const [name,text] of Object.entries({
  ROBINHOOD_CLIENT_ID:"LtLiNmbs9owbYfWgBlC68Z2VujIPuvGoAiSYr8xW",
  ROBINHOOD_REDIRECT_URI:'https://0dte-options-command-center.h69htk56cq.workers.dev/private/plaid/robinhood/callback'
 })){
+ if(!inspection.missing.includes(name))continue;
  await api('/workers/scripts/'+worker+'/secrets',{method:'PUT',body:JSON.stringify({name,text,type:'secret_text'})});
+ clientBindingsAdded++;
 }
-const inspection=await inspectWorkerBindings(()=>api('/workers/scripts/'+worker+'/settings'));
+if(clientBindingsAdded)inspection=await inspect();
 const missing=inspection.missing;
 let accessRoutes=null,accessInspection='available';
 try{
@@ -41,8 +48,10 @@ const privatePrerequisitesReady=missing.length===0&&guarded;
 // only; registration and Access checks do not prove provider authorization.
 const enabled=privatePrerequisitesReady;
 // Incomplete metadata must not turn off an already-authorized connection.
-if(enabled)await api('/workers/scripts/'+worker+'/secrets',{method:'PUT',body:JSON.stringify({name:'ROBINHOOD_CONNECTION_ENABLED',text:'true',type:'secret_text'})});
-const result={registered_client_configured:true,manual_connection_enabled:enabled?true:null,connection_flag_updated:enabled,metadata_attempts:inspection.attempts,private_prerequisites_ready:privatePrerequisitesReady,authorization_status:enabled?'MANUAL_RETRY_UNVERIFIED':'SETUP_REQUIRED',protected_routes:guards.map(({path,protected:guard})=>({path,protected:guard})),missing_bindings:missing,access_inspection:accessInspection,access_routes:accessRoutes,automatic_polling_enabled:false};
+const existingFlag=settings?.bindings?.some(binding=>binding.name==='ROBINHOOD_CONNECTION_ENABLED')===true;
+const enableConnection=enabled&&!existingFlag;
+if(enableConnection)await api('/workers/scripts/'+worker+'/secrets',{method:'PUT',body:JSON.stringify({name:'ROBINHOOD_CONNECTION_ENABLED',text:'true',type:'secret_text'})});
+const result={registered_client_configured:true,manual_connection_enabled:enableConnection?true:null,connection_flag_updated:enableConnection,existing_connection_flag_preserved:existingFlag,client_bindings_added:clientBindingsAdded,metadata_attempts:inspection.attempts,private_prerequisites_ready:privatePrerequisitesReady,authorization_status:enabled?(existingFlag?'EXISTING_CONFIGURATION':'MANUAL_RETRY_UNVERIFIED'):'SETUP_REQUIRED',protected_routes:guards.map(({path,protected:guard})=>({path,protected:guard})),missing_bindings:missing,access_inspection:accessInspection,access_routes:accessRoutes,automatic_polling_enabled:false};
 console.log('Robinhood setup: '+JSON.stringify(result));
 if(process.env.GITHUB_STEP_SUMMARY)appendFileSync(process.env.GITHUB_STEP_SUMMARY,'\nRobinhood setup (no credentials):\n\n```json\n'+JSON.stringify(result,null,2)+'\n```\n');
 
