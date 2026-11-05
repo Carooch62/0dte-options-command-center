@@ -97,6 +97,32 @@ async function marketClient(token,required,authorizationExpiresAt){
  call.setup_cache_status=setup.cache_status;
  return call;
 }
+// Internal read-only entry point for the opt-in alert pilot. No new public route.
+export async function quoteWatchContracts(env, input) {
+ if(env.APP_ENV==='preview'||env.WATCH_QUOTE_PILOT_ENABLED!=='true'||!configured(env))return {status:'disabled'};
+ const contracts=contractRequest({contracts:input});
+ if(contracts.length>3)throw Error('Alert pilot permits at most three contracts per scan');
+ const saved=await connection(env);
+ if(!saved||saved.expires_at<=Date.now()+120000)return {status:'reconnect-required'};
+ const call=await marketClient(saved.access_token,['get_option_chains','get_option_instruments','get_option_quotes'],saved.expires_at);
+ const matches=await resolveContracts(contracts,call);
+ const instruments=matches.filter(match=>match.status==='EXACT_METADATA_MATCH').map(match=>match.instrument);
+ if(!instruments.length)return {status:'checked',observations:[]};
+ const operation=quoteRequest({kind:'option',instrument_ids:instruments.map(instrument=>instrument.id)});
+ const data=await call(operation.name,operation.arguments);
+ const receivedAt=Date.now();
+ const normalized=normalizeQuotes(data,operation,receivedAt);
+ const byId=new Map(instruments.map(instrument=>[instrument.id,instrument]));
+ return {
+  status:'checked',
+  observations:normalized.observations.map(({quote})=>({
+   instrument:byId.get(quote.instrument_id),
+   quote,
+   received_at:new Date(receivedAt).toISOString()
+  }))
+ };
+}
+
 export async function handleRobinhood(request,env){
  const requestStarted=performance.now();
  const url=new URL(request.url),path=url.pathname;

@@ -2,6 +2,7 @@ import {handleRobinhood} from './robinhood-live.js';
 import {handleShadowResearch} from './shadow-research.js';
 import {handlePlaid,scheduledPlaidSync} from './plaid-sync.js';
 import {handleWatchService,scheduledWatchCheck} from './watch-service.js';
+import {runWatchQuotePilot} from './watch-quote-pilot.js';
 const REPO = 'Carooch62/0dte-options-command-center';
 const WORKFLOW = 'market-scan.yml';
 const VERSION = '2026-09-30.6-contract-reasons';
@@ -97,6 +98,10 @@ export default {
       catch(e){console.log(JSON.stringify({scheduler:'failed',error:e.message}));}
     }
     if(!legacyTick)return;
+    if(regularWeekday(now)&&env.WATCH_QUOTE_PILOT_ENABLED==='true'){
+      try{console.log(JSON.stringify({watch_quote_pilot:await runWatchQuotePilot(env)}));}
+      catch{console.log(JSON.stringify({watch_quote_pilot:{status:'verification-failed'}}));}
+    }
     if(regularWeekday(now)){
       try{console.log(JSON.stringify({watch_monitor:await scheduledWatchCheck(env,Date.now())}));}
       catch(e){console.log(JSON.stringify({watch_monitor:'failed',error:e.message}));}
