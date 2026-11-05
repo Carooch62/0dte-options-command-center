@@ -25,6 +25,8 @@ export function prepareVerifiedOptionAlert(candidate,observation,link,scan,now=D
  const identity=`${candidate.ticker} $${option.strike} ${option.side.toUpperCase()} exp ${option.expiry}`;
  return {
   key:`${scan.scan_id}:${instrument.id}`,instrument_id:instrument.id,
+  ticker:candidate.ticker,side:option.side,strike:Number(option.strike),expiry:option.expiry,
+  bid:row.bid,ask:row.ask,observed_at:row.observed_at,
   text:`OPTION SETUP TO REVIEW — ${identity}. Verified Robinhood bid ${cents(row.bid)} / ask ${cents(row.ask)} (about ${cents(row.ask*100)} per 100-share contract); delta ${signedDelta.toFixed(2)}, volume ${volume}. Quote refreshed ${row.observed_at}; scan published ${scan.generated_at}. Prices can change. Review the contract and current quote before buying. ${url.href}`,
   link:url.href
  };
