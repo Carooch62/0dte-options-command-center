@@ -2,6 +2,7 @@ import json
 import os
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 import scanner
@@ -55,3 +56,25 @@ class CorePrefetchTests(unittest.TestCase):
             output=json.loads((root/'data/market.json').read_text())
             self.assertTrue(all(x['chain_status']=='SOURCE_FAILURE' for x in output['candidates']))
             self.assertEqual(output['option_expansion']['core_prefetch_attempted'],0)
+
+    def test_fresh_trigger_crossings_are_checked_before_rank_and_rotation(self):
+        generated_at = '2026-11-06T15:40:22+00:00'
+        current = {'price': 101, 'direction': 'UP', 'move_5m': 1.1, 'recent_move': 1.2,
+                   'bar_end': '2026-11-06T15:40:00+00:00'}
+        cases = {'BREAK': {}, 'OLD': {'bar_end': '2026-11-06T15:25:00+00:00'},
+                 'OPPOSED': {'recent_move': -1.2}, 'CHECKED': {'chain_attempted': True}}
+        rows = [{**current, 'ticker': ticker, **overrides} for ticker, overrides in cases.items()]
+        rows += [{'ticker': f'R{i}', 'catalyst': True, 'score': i} for i in range(80)]
+        previous = {'generated_at': '2026-11-06T15:38:22+00:00', 'candidates': [
+            {'ticker': ticker, 'price': 99, 'trigger_price': 100, 'direction': 'UP'}
+            for ticker in cases
+        ]}
+        data = {'market_session': 'OPEN', 'generated_at': generated_at, 'candidates': rows}
+        triggered = option_expander.triggered_tickers(data, previous, datetime.fromisoformat(generated_at))
+        self.assertEqual(triggered, {'BREAK', 'CHECKED'})
+        chosen, _, rotation = option_expander.select_candidates(rows, 70, 5, triggered)
+        self.assertEqual(chosen[0]['ticker'], 'BREAK')
+        self.assertNotIn('CHECKED', {x['ticker'] for x in chosen})
+        self.assertEqual((len(chosen), rotation), (70, 10))
+        previous['generated_at'] = '2026-11-05T15:38:22+00:00'
+        self.assertFalse(option_expander.triggered_tickers(data, previous, datetime.fromisoformat(generated_at)))

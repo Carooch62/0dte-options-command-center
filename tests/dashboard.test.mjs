@@ -188,3 +188,12 @@ test('a busy refresh follows the exact existing scan to its publication',()=>{
  assert.equal(busy.busy,true);
  assert.equal(busy.following,false);
 });
+
+import {contractGapLabel} from '../dashboard-logic.js';
+test('contract gaps distinguish unchecked, unavailable and screened chains',()=>{
+ assert.equal(contractGapLabel({chain_status:'NOT_SCANNED'}),'Option chain not checked');
+ assert.equal(contractGapLabel({chain_status:'SOURCE_FAILURE'}),'Option source unavailable');
+ assert.equal(contractGapLabel({chain_status:'NO_EXPIRATION_TODAY'}),'No same-day expiration');
+ assert.equal(contractGapLabel({chain_status:'EMPTY_UNVERIFIED'}),'Option coverage unverified');
+ assert.equal(contractGapLabel({chain_status:'SUCCESS'}),'No qualifying contract');
+});

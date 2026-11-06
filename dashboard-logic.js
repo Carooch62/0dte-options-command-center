@@ -70,6 +70,15 @@ export function riskSummary(settings,trades,ask,qty,now=new Date()) {
   return {cost,dayPL,exposure,alerts};
 }
 
+export function contractGapLabel(row) {
+  if(row.chain_status==='NOT_SCANNED'||row.chain_attempted===false)return 'Option chain not checked';
+  if(row.chain_status==='SOURCE_FAILURE')return 'Option source unavailable';
+  if(row.chain_status==='NO_EXPIRATION_TODAY')return 'No same-day expiration';
+  if(row.chain_status==='NO_EXPIRATION_IN_WINDOW')return 'No expiration in this window';
+  if(row.chain_status==='EMPTY_UNVERIFIED')return 'Option coverage unverified';
+  return 'No qualifying contract';
+}
+
 export function contractExplanation(row,min=.1,max=.3) {
   const matches=selectableContracts(row,min,max);
   if(matches.length)return `${matches.length} contracts pass your price and quality filters. Quotes remain delayed; verify current quotes separately.`;

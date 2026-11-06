@@ -12,6 +12,12 @@ def number(value, default=None):
     except (ValueError, TypeError):
         return default
 
+def directional_momentum(direction, move_5m, move_15m):
+    sign = 1 if direction == 'UP' else -1 if direction == 'DOWN' else 0
+    return bool(sign and move_5m is not None and move_5m * sign > 0
+                and (move_15m is None or move_15m * sign > 0))
+
+
 def parse_time(value, naive_tz=None):
     try:
         if isinstance(value, (int, float)):

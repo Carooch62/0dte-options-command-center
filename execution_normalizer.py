@@ -2,7 +2,7 @@
 """Add execution-state, key-level and feedback intelligence after schema normalization."""
 import json
 from pathlib import Path
-from execution_engine import enrich, update_history
+from execution_engine import enrich, load_previous, update_history
 from outcomes import update as update_outcomes
 from status_memory import attach_last_status
 
@@ -11,25 +11,9 @@ HISTORY = Path("data/scan-history.json")
 FEEDBACK = Path("data/feedback.json")
 
 
-def load_previous():
-    if not HISTORY.exists():
-        return {}
-    try:
-        rows = json.loads(HISTORY.read_text())
-        if not isinstance(rows, list) or not rows:
-            return {}
-        last = rows[-1]
-        return {
-            "generated_at": last.get("generated_at"),
-            "candidates": last.get("candidate_state") or [],
-        }
-    except Exception:
-        return {}
-
-
 def main():
     data = json.loads(DASHBOARD.read_text())
-    previous = load_previous()
+    previous = load_previous(HISTORY)
     data = enrich(data, previous)
     try:
         history = json.loads(HISTORY.read_text())
