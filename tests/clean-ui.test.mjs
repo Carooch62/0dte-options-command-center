@@ -5,7 +5,7 @@ import vm from 'node:vm';
 const source=readFileSync(new URL('../dashboard-clean-app.js',import.meta.url),'utf8');
 test('clean saved view restores the view saved in the same UI',()=>{
  const storage=new Map(),control={value:'UP'},shortcuts={};
- const context={shortcuts,filterDefaults:{direction:'ALL'},$:()=>control,save:(k,v)=>{storage.set(k,v);return true;},read:(k,f)=>storage.get(k)??f,restoreFilters:v=>{control.value=v.direction;},persistFilters:()=>{},render:()=>{}};
+ const context={shortcuts,filterDefaults:{direction:'ALL'},$:()=>control,save:(k,v)=>{storage.set(k,v);return true;},read:(k,f)=>storage.get(k)??f,restoreFilters:v=>{control.value=v.direction;},applyFilters:()=>{}};
  vm.runInNewContext(source.split('\n').find(l=>l.startsWith('shortcuts.onclick=')),context);
  shortcuts.onclick({target:{dataset:{view:'save'}}});control.value='DOWN';
  shortcuts.onclick({target:{dataset:{view:'restore'}}});assert.equal(control.value,'UP');

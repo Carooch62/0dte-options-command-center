@@ -16,7 +16,19 @@ try{
  const base={market_session:'OPEN',session_open_at:'2026-11-02T14:30:00Z',session_close_at:'2026-11-02T21:00:00Z',coverage:{},candidates:[row('WATCH')]};
  let scan={...base,scan_id:'old',generated_at:'2026-11-02T14:45:00Z'};
  await page.addInitScript(()=>localStorage.setItem('0dteContractWatches',JSON.stringify([{ticker:'TEST',direction:'UP',contract_id:'TEST261106C00011000',expiry:'2026-11-06',side:'call',strike:11}])));
- await page.route('**/data/**',route=>route.fulfill({json:route.request().url().includes('market-dashboard.json')?scan:{status:'SUCCESS'}}));
+ const snapshotRequests=[];
+ await page.route('**/data/**',route=>{
+  const path=new URL(route.request().url()).pathname;
+  if(path.endsWith('/market-dashboard-today.json')){
+   snapshotRequests.push('today');
+   return route.fulfill({json:{...scan,delivery_window:'today'}});
+  }
+  if(path.endsWith('/market-dashboard.json')){
+   snapshotRequests.push('full');
+   return route.fulfill({json:{...scan,candidates:scan.candidates.map(candidate=>({...candidate,expiry_groups:{week:{chain_status:'NO_EXPIRATION_IN_WINDOW',options:[]}}}))}});
+  }
+  return route.fulfill({json:{status:'SUCCESS'}});
+ });
  await page.route('https://**/*',route=>route.request().url().includes('/health')?route.fulfill({json:{latestRun:null}}):route.abort());
  await page.goto(`http://127.0.0.1:${server.address().port}/dashboard_clean.html`);
  await page.locator('#contractWatchList').filter({hasText:'TEST'}).waitFor();
@@ -24,6 +36,10 @@ try{
  scan={...base,scan_id:'new',generated_at:'2026-11-02T14:49:00Z',candidates:[row('TRIGGERED')]};
  await page.locator('#check').click();
  await page.locator('#contractWatchList').filter({hasText:'live quote and setup recheck required'}).waitFor();
+ assert.deepEqual(snapshotRequests,['today','today']);
+ await page.locator('#expiration').evaluate(select=>{select.value='week';select.dispatchEvent(new Event('input',{bubbles:true}));});
+ await page.locator('#board').getByText('No expiration in this window',{exact:true}).waitFor();
+ assert.deepEqual(snapshotRequests,['today','today','full']);
  assert.deepEqual(errors,[]);
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
  await page.locator('[data-remove-watch]').click();

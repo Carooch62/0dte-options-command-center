@@ -1,3 +1,4 @@
+import {loadDashboardSnapshot} from './dashboard-delivery.js';
 import {entryReadiness,trendSummary,matchesTrend,quoteKey,observePremiums,premiumChange,positionEstimate,reentryProblem,positionAlerts,validPlan} from './trade-review.js?v=20261002-trend-filters';
 import {watchKey,watchTransitions} from './contract-watch.js';
 import {signalChecklist,earlyWatchVisible} from './signal-checklist.js?v=20261008-rvol-v1';
@@ -124,7 +125,7 @@ restoreFilters(read('0dteCleanDashboardFilters',{}));
 const shortcuts=document.createElement('div');shortcuts.className='controls';shortcuts.setAttribute('aria-label','Saved dashboard views');
 shortcuts.innerHTML='<button data-view="starred">★ Watchlist</button><button data-view="calls">Calls</button><button data-view="puts">Puts</button><button data-view="preferred">$0.10–$0.30</button><button data-view="save">Save this view</button><button data-view="restore">My saved view</button><span id="viewNotice" role="status" class="smallnote">Filters remembered on this device</span>';
 $('activeFilters')?.before(shortcuts);
-shortcuts.onclick=e=>{const view=e.target.dataset.view;if(!view)return;if(view==='save'){const ok=save('0dteCleanSavedView',Object.fromEntries(Object.keys(filterDefaults).map(id=>[id,$(id).value])));$('viewNotice').textContent=ok?'View saved on this device':'Could not save view';return;}if(view==='restore'){const saved=read('0dteCleanSavedView',null);if(!saved){$('viewNotice').textContent='Save a view first';return;}restoreFilters(saved);}else if(view==='starred')$('onlyContracts').value='starred';else if(view==='calls'||view==='puts')$('direction').value=view==='calls'?'UP':'DOWN';else if(view==='preferred'){ $('askMin').value='0.10';$('askMax').value='0.30';$('onlyContracts').value='contracts';}persistFilters();render();};
+shortcuts.onclick=e=>{const view=e.target.dataset.view;if(!view)return;if(view==='save'){const ok=save('0dteCleanSavedView',Object.fromEntries(Object.keys(filterDefaults).map(id=>[id,$(id).value])));$('viewNotice').textContent=ok?'View saved on this device':'Could not save view';return;}if(view==='restore'){const saved=read('0dteCleanSavedView',null);if(!saved){$('viewNotice').textContent='Save a view first';return;}restoreFilters(saved);}else if(view==='starred')$('onlyContracts').value='starred';else if(view==='calls'||view==='puts')$('direction').value=view==='calls'?'UP':'DOWN';else if(view==='preferred'){ $('askMin').value='0.10';$('askMax').value='0.30';$('onlyContracts').value='contracts';}applyFilters();};
 function renderFilterChips(){
  if(!$('activeFilters'))return;
  const labels={thetaMax:'Time decay',expiration:'Expiration',state:'State',direction:'Direction',trendPeriod:'Timeframe',trendDirection:'Trend',trendAlignment:'Alignment',catalyst:'Catalyst',onlyContracts:'Display',sort:'Sort'};
@@ -195,6 +196,13 @@ function renderContractWatches(){
  }).join(''):'<p class="smallnote">No contracts saved. Open a candidate’s contract shortlist and tap Watch this contract.</p>';
 }
 contractWatchPanel.addEventListener('click',e=>{const key=e.target.closest('[data-remove-watch]')?.dataset.removeWatch;if(!key)return;contractWatches=contractWatches.filter(w=>watchKey(w)!==key);save('0dteContractWatches',contractWatches);renderContractWatches();render();});
+function needsFullSnapshot(){
+ return data?.delivery_window==='today'&&$('expiration').value!=='today';
+}
+function applyFilters(){
+ persistFilters();render();
+ if(needsFullSnapshot())void load();
+}
 function render(){if(!data)return;
  renderContractWatches();
  const anchor=boardAnchor();
@@ -204,6 +212,12 @@ function render(){if(!data)return;
  notice('freshness',`${usable?'Research snapshot':'STALE / RESEARCH ONLY'} · generated ${time(data.generated_at)} · ${age===null?'unknown age':value(age,1)+' min old'}. Options remain delayed; unknown quote times cannot confirm an entry.`,usable?'warn':'bad');
  // Update freshness above even while protecting an in-progress entry-plan edit.
  if($('board').contains(document.activeElement)&&document.activeElement.matches('input,textarea,select'))return;
+ if(needsFullSnapshot()){
+   $('board').textContent='Full expiration snapshot required.';
+   $('earlyWatchList').replaceChildren();$('shown').textContent='';
+   renderFilterChips();
+   return;
+ }
  const all=(data.candidates||[]).map(x=>({...expirationView(x,$('expiration').value),prefer_low_theta:$('thetaMax').value!=='off',theta_limit_pct:['prefer','off'].includes($('thetaMax').value)?null:Number($('thetaMax').value)})),counts={};for(const x of all){const s=recordedState(x);counts[s]=(counts[s]||0)+1;}
  const c=data.coverage||{};
  $('stats').innerHTML=[['STOCK ROWS',c.stocks_received??data.scanned_rows??0],['CHAIN ATTEMPTS',c.chains_attempted??'Unknown'],['WITH SAME-DAY CHAIN',c.chains_with_contracts??'Unknown'],['LAST TRIGGERED',counts.TRIGGERED||0],['LAST SECOND-WAVE',counts['SECOND-WAVE']||0],['LAST CONFIRMED',counts['CONFIRMED DELAYED']||0]].map(([a,b])=>`<div class="panel stat"><b>${esc(b)}</b><span>${a}</span></div>`).join('');
@@ -253,8 +267,10 @@ function applyVerifiedRefresh(request,result){
 }
 async function load(manual=false){
  if(loadPromise)return loadPromise;
+ const requestedWindow=$('expiration').value;
  loadPromise=(async()=>{try{
-   const oldId=data?.scan_id,d=await json(DATA+'market-dashboard.json?v='+Date.now());
+   const oldId=data?.scan_id,d=await loadDashboardSnapshot(DATA,requestedWindow,url=>fetch(url,{cache:'no-store',signal:AbortSignal.timeout(20000)}));
+   if(d.delivery_window==='today'&&$('expiration').value!=='today')return;
     checkChanged=!!data&&(d.scan_id||d.generated_at)!==(data.scan_id||data.generated_at);lastChecked=new Date().toISOString();if(checkChanged){previous=data;const seen=new Set(watchEvents.map(e=>e.key));for(const event of watchTransitions(contractWatches,data,d))if(!seen.has(event.key)){watchEvents.unshift(event);seen.add(event.key);}watchEvents=watchEvents.slice(0,100);save('0dteContractWatchEvents',watchEvents);}data=d;dataDownloadFailed=false;premiumHistory=observePremiums(premiumHistory,d.candidates||[],d.generated_at);save('0dtePremiumHistory',premiumHistory);render();renderJournal();
    reloadMessage=`${oldId===d.scan_id?'No newer scan has published.':'Displayed data updated.'} Latest snapshot: ${time(d.generated_at)}.`;
    const health=await json(DATA+'scan-health.json?v='+Date.now()).catch(()=>null);
@@ -273,7 +289,7 @@ async function load(manual=false){
    renderRefresh();
  }catch(e){dataDownloadFailed=true;if(data)render();notice('freshness','Unable to download new results: '+e.message+'. Last displayed snapshot is retained for research.','bad');}
  })();
- try{await loadPromise;}finally{loadPromise=null;}
+ try{await loadPromise;}finally{loadPromise=null;if(requestedWindow!==$('expiration').value)void load();}
 }
 function enableScan(enabled){$('scan').disabled=!enabled;$('wave').disabled=!enabled;}
 async function pollRun(){
@@ -340,8 +356,8 @@ $('export').onclick=()=>{const blob=new Blob([JSON.stringify({version:1,exported
 $('import').onchange=async e=>{try{const f=e.target.files[0];if(!f)return;if(f.size>5_000_000)throw Error('Backup is too large');const b=JSON.parse(await f.text());if(b.version!==1||!Array.isArray(b.trades)||!b.trades.every(t=>validTrade(t)&&validPlan(t)))throw Error('Invalid backup');const ids=new Set(trades.map(t=>t.id));for(const t of b.trades)if(!ids.has(t.id)){trades.push({...t,id:t.id||crypto.randomUUID()});ids.add(t.id);}save('0dteJournal',trades);if(b.settings&&typeof b.settings==='object'){for(const id of ['perTrade','dailyLoss','maxExposure','timeStop','cutoff'])$(id).value=b.settings[id]??'';}stars=[...new Set([...stars,...(Array.isArray(b.stars)?b.stars.filter(x=>typeof x==='string'):[])])];save('0dteStars',stars);renderJournal();render();notice('journalNotice','Backup imported; existing trade IDs were preserved.','ok');}catch(err){notice('journalNotice','Import failed: '+err.message,'bad');}};
 $('board').onclick=e=>{const watch=e.target.closest('[data-watch]')?.dataset.watch;if(watch){let w;try{w=JSON.parse(decodeURIComponent(watch));}catch{return;}const key=watchKey(w);contractWatches=contractWatches.some(v=>watchKey(v)===key)?contractWatches.filter(v=>watchKey(v)!==key):[...contractWatches,w];save('0dteContractWatches',contractWatches);render();return;}const t=e.target.dataset.star;if(!t)return;stars=stars.includes(t)?stars.filter(x=>x!==t):[...stars,t];save('0dteStars',stars);render();};
 $('scan').onclick=()=>startScan('manual');$('wave').onclick=()=>startScan('second-wave');$('check').onclick=()=>load(true);$('auto').onclick=()=>{auto=!auto;startTimer();};$('interval').onchange=startTimer;
-if($('activeFilters'))$('activeFilters').onclick=e=>{const id=e.target.closest('button')?.dataset.clearFilter;if(!id)return;const reset=id==='all'?Object.keys(filterDefaults):id==='price'?['askMin','askMax']:[id];for(const key of reset)$(key).value=filterDefaults[key];persistFilters();render();};
-for(const id of ['thetaMax','expiration','state','direction','trendPeriod','trendDirection','trendAlignment','catalyst','askMin','askMax','onlyContracts','sort'])$(id).addEventListener('input',()=>{persistFilters();render();});
+if($('activeFilters'))$('activeFilters').onclick=e=>{const id=e.target.closest('button')?.dataset.clearFilter;if(!id)return;const reset=id==='all'?Object.keys(filterDefaults):id==='price'?['askMin','askMax']:[id];for(const key of reset)$(key).value=filterDefaults[key];applyFilters();};
+for(const id of ['thetaMax','expiration','state','direction','trendPeriod','trendDirection','trendAlignment','catalyst','askMin','askMax','onlyContracts','sort'])$(id).addEventListener('input',applyFilters);
 for(const id of ['perTrade','dailyLoss','maxExposure','timeStop','cutoff']){$(id).value=settings[id]??'';$(id).addEventListener('input',renderRisk);}
 for(const id of ['riskAsk','riskQty'])$(id).addEventListener('input',renderRisk);
 
