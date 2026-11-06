@@ -236,6 +236,22 @@ def execution_state(x, previous):
     if state in ('CONFIRMED','TRIGGERED') and x.get('momentum_state')=='DECAYING': state='DECAYING'
     return state,crossed
 
+def load_previous(history):
+    if not history.exists():
+        return {}
+    try:
+        rows = json.loads(history.read_text())
+        if not isinstance(rows, list) or not rows:
+            return {}
+        last = rows[-1]
+        return {
+            "generated_at": last.get("generated_at"),
+            "candidates": last.get("candidate_state") or [],
+        }
+    except (OSError, ValueError, AttributeError):
+        return {}
+
+
 def comparable(data, previous):
     a,b=parse_time(data.get('generated_at')),parse_time(previous.get('generated_at'))
     return bool(a and b and a.astimezone(ET).date()==b.astimezone(ET).date() and 0<(a-b).total_seconds()<=900)

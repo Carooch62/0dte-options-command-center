@@ -3,7 +3,7 @@ import json
 import re
 from pathlib import Path
 from datetime import datetime, timezone, date
-from quality import number, freshness, contract_checks, verified_delta, ET
+from quality import number, freshness, contract_checks, verified_delta, directional_momentum, ET
 from pattern_research import attach_early_watch
 
 direct_terms = (
@@ -39,7 +39,7 @@ def normalize(data,now=None):
         x['change_pct']=move;x['rvol']=number(x.get('volume_ratio'));x['cp_ratio']=number(x.get('option_call_put_ratio'))
         x['price_freshness']=freshness(x.get('bar_end'),now,max_age=8)
         current=x['price_freshness']=='RECENT' and data.get('market_session')=='OPEN'
-        directional=bool(sgn and m5 is not None and m5*sgn>0 and (m15 is None or m15*sgn>0))
+        directional=directional_momentum(direction,m5,m15)
         x['momentum_confirmed']=bool(current and directional and abs(m5)>=.25 and number(x.get('volume_ratio'),0)>=1.5)
         x['acceleration_confirmed']=bool(current and directional and abs(m5)>=.25 and number(x.get('volume_acceleration'),0)>=1.25)
         x['direction_confirmed']=current and directional
