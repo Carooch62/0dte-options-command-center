@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "observations": 193,
+  "observations": 194,
   "distinct_sessions": 24,
   "sessions": {
     "2026-09-30": {
@@ -165,10 +165,10 @@
       "timed_followup": 0
     },
     "2026-11-06": {
-      "observations": 41,
+      "observations": 42,
       "quote_timed": 0,
-      "theta_recorded": 41,
-      "spread_recorded": 41,
+      "theta_recorded": 42,
+      "spread_recorded": 42,
       "timed_followup": 0
     }
   },
