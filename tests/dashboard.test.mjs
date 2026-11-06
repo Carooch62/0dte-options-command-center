@@ -125,7 +125,7 @@ test('completed run never locks refresh buttons while publication is checked',()
  assert.equal(refreshBlocksNewRequest({...request,started:now-21*60000,run:{status:'queued'}},now),false);
 });
 
-import {verifiedRefresh} from '../refresh-progress.js';
+import {followExistingScan,verifiedRefresh} from '../refresh-progress.js';
 test('saved unverified refresh reconciles with matching late closed health',()=>{
  const saved={id:'old-request',unverified:true,finished:now,started:now-120000};
  const result=verifiedRefresh(saved,{},[],{status:'CLOSED',request_id:saved.id,updated_at:new Date(now-60000).toISOString()},now);
@@ -174,4 +174,17 @@ test('opening wait completes request without claiming published market data',()=
  const steps=refreshProgress({waiting:true});
  assert.equal(steps.find(s=>s.id==='scan').state,'skipped');assert.equal(steps.at(-1).label,'Waiting for first bar');
  assert.equal(refreshBlocksNewRequest({...result,run:{status:'completed'}},now),false);
+});
+
+test('a busy refresh follows the exact existing scan to its publication',()=>{
+ const request={id:'manual-request',started:1000,requestStatus:'sending'};
+ const following=followExistingScan(request,'scheduled-123456');
+ assert.equal(following.id,'scheduled-123456');
+ assert.equal(refreshProgress({following:following.following})[0].label,'Following existing scan');
+ assert.equal(verifiedRefresh(following,{scan_id:'scheduled-123457'},[],null),null);
+ assert.equal(verifiedRefresh(following,{scan_id:'scheduled-123456'},[],null).receipt.scan_id,'scheduled-123456');
+ const busy=followExistingScan(request,undefined,2000);
+ assert.equal(busy.finished,2000);
+ assert.equal(busy.busy,true);
+ assert.equal(busy.following,false);
 });

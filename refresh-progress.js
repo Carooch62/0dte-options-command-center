@@ -1,15 +1,16 @@
 // Shared status model: every completed stage comes from a response, job step, or published receipt.
-export function refreshProgress({requestStatus='accepted',run=null,published=false,closed=false,waiting=false}={}) {
+export function refreshProgress({requestStatus='accepted',run=null,published=false,closed=false,waiting=false,following=false}={}) {
   const steps=[['request','Request sent'],['queue','Queued'],['prepare','Preparing'],['scan','Scan & validate'],['publish','Publishing'],['complete','Published']].map(([id,label])=>({id,label,state:'waiting',detail:''}));
   const set=(id,state,detail='')=>Object.assign(steps.find(s=>s.id===id),{state,detail});
+  if(following)steps[0].label='Following existing scan';
   if(waiting){for(const s of steps)s.state='done';set('scan','skipped','First five-minute bar is not complete yet');set('publish','skipped','Last snapshot retained');steps[5].label='Waiting for first bar';steps[5].detail='Request finished without a new snapshot';return steps;}
   if(closed){for(const s of steps)s.state='done';set('scan','skipped','Market calendar is closed; no new scan');set('publish','skipped','Last snapshot retained');steps[5].label='Market closed';steps[5].detail='Request finished';return steps;}
   if(published){for(const s of steps)s.state='done';steps[5].detail='Verified in published data';return steps;}
   if(requestStatus==='sending'){set('request','active','Contacting refresh service');return steps;}
   if(requestStatus==='unknown'&&!run){set('request','active','Checking whether the request reached GitHub');return steps;}
   if(requestStatus==='failed'){set('request','failed','Request was rejected');return steps;}
-  set('request','done','Refresh service accepted the request');
-  if(!run){set('queue','active','Waiting for GitHub to register this request');return steps;}
+  set('request','done',following?'A scan was already starting or running':'Refresh service accepted the request');
+  if(!run){set('queue','active',following?'Waiting for GitHub to register the existing scan':'Waiting for GitHub to register this request');return steps;}
   if(['queued','waiting','requested','pending'].includes(run.status)){set('queue','active','Waiting for an available runner');return steps;}
   set('queue','done');
   const jobSteps=run.steps||[],scan=jobSteps.find(s=>s.name==='Scan, enrich, and validate'),publish=jobSteps.find(s=>s.name==='Publish validated data or failure health');
@@ -64,4 +65,11 @@ export function verifiedRefresh(request,data,receipts,health,now=Date.now()){
   return {...request,closed,waiting,receipt,unverified:false,failed:false,verificationStarted:null,
     finished:Number.isFinite(completed)?completed:request.finished||now,
     message:waiting?'Waiting for the first completed five-minute bar; last snapshot retained.':closed?'Market closed · refresh finished.':'Refresh completed.'};
+}
+
+export function followExistingScan(request,activeRequestId,now=Date.now()){
+  const following=typeof activeRequestId==='string'&&/^[a-zA-Z0-9-]{8,80}$/.test(activeRequestId);
+  return {...request,id:following?activeRequestId:request.id,following,requestStatus:'accepted',
+    ...(!following&&{busy:true,finished:now}),
+    message:following?'A scan is already starting or running. Following it through publication.':'A scan is already starting or running. Use Check data to load its results.'};
 }
