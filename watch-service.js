@@ -23,10 +23,27 @@ async function read(env){
 const enabled=env=>env.WATCH_ALERTS_ENABLED==='true'&&!!env.DISCORD_WATCH_WEBHOOK_URL;
 const sameOrigin=(request,url)=>request.headers.get('Origin')===url.origin&&request.headers.get('X-Requested-With')==='ContractWatch';
 
+export function verifiedAlertReadiness(env) {
+ const requirements={
+  scan_scheduler:env.FAST_SCAN_ENABLED==='true'&&!!env.SCAN_COORDINATOR,
+  discord_webhook:!!env.DISCORD_WATCH_WEBHOOK_URL,
+  private_robinhood_connection:env.ROBINHOOD_CONNECTION_ENABLED==='true',
+  hosted_quote_permission:false,
+  exact_contract_link:false
+ };
+ return {ok:true,live:false,quote_pilot_enabled:env.WATCH_QUOTE_PILOT_ENABLED==='true',
+  verified_alerts_enabled:env.WATCH_VERIFIED_ALERTS_ENABLED==='true',
+  requirements,missing:Object.entries(requirements).filter(([,ready])=>!ready).map(([name])=>name)};
+}
+
 export async function handleWatchService(request,env){
  if(!env.PLAID_STORE||!env.CF_ACCESS_AUD||!env.CF_ACCESS_EMAIL||!env.CF_ACCESS_TEAM_DOMAIN)return reply({ok:false,error:'Private watch service not configured'},503);
  if(!await verifyAccess(request,env))return reply({ok:false,error:'Access sign in required'},401);
  const url=new URL(request.url);
+ if(url.pathname==='/private/watch/readiness') {
+  if(request.method!=='GET')return reply({ok:false,error:'GET required'},405);
+  return reply(verifiedAlertReadiness(env));
+ }
  if(url.pathname!=='/private/watch')return reply({ok:false,error:'Not found'},404);
  if(request.method==='GET'){
   const {list,checkpoint}=await read(env);return reply({ok:true,watches:list.watches,revision:list.revision,enabled:enabled(env),test_available:!!env.DISCORD_WATCH_WEBHOOK_URL,last_scan_at:checkpoint.revision===list.revision?checkpoint.previous?.generated_at||null:null});
