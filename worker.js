@@ -5,7 +5,7 @@ import {handleWatchService,scheduledWatchCheck} from './watch-service.js';
 import {runWatchQuotePilot} from './watch-quote-pilot.js';
 const REPO = 'Carooch62/0dte-options-command-center';
 const WORKFLOW = 'market-scan.yml';
-const VERSION = '2026-09-30.6-contract-reasons';
+const VERSION = '2026-11-06.scan-handoff';
 const ORIGINS = new Set(['https://carooch62.github.io','https://0dte-options-command-center.h69htk56cq.workers.dev']);
 function response(body, status=200, request) {
   const origin=request?.headers.get('Origin');
@@ -40,11 +40,15 @@ export class ScanCoordinator {
         if(runs.some(run=>runMatches(run,pending.id))||Date.now()>=pending.until){
           await this.state.storage.delete('pending');
         }else{
-          return Response.json({status:pending.id===id?'already-requested':'already-running'});
+          return Response.json({status:pending.id===id?'already-requested':'already-running',activeRequestId:pending.id});
         }
       }
       if(runs.some(run=>runMatches(run,id)))return Response.json({status:'already-requested'});
-      if(runs.some(run=>run.status!=='completed'))return Response.json({status:'already-running'});
+      const unfinished=runs.find(run=>run.status!=='completed');
+      if(unfinished){
+        const activeRequestId=/^Scan ([a-zA-Z0-9-]{8,80}) \(/.exec(unfinished.display_title)?.[1]??null;
+        return Response.json({status:'already-running',activeRequestId});
+      }
       if(scheduled&&!regularWeekday(new Date()))return Response.json({status:'outside-session'});
       // A timed-out dispatch may have succeeded. Let GitHub surface it before retrying.
       await this.state.storage.put('pending',{id,until:Date.now()+120000});
@@ -62,7 +66,7 @@ async function requestScan(env,id,mode,scheduled){
   const result=await guard(env).fetch('https://scan-coordinator/dispatch',{
     method:'POST',body:JSON.stringify({id,mode,scheduled})
   });
-  return (await result.json()).status;
+  return result.json();
 }
 export function regularWeekday(now) {
   const parts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(now).map(p=>[p.type,p.value]));
@@ -75,7 +79,8 @@ export async function scheduledScan(env,now=new Date()) {
   if(!env.GITHUB_TOKEN)throw Error('Refresh service is not configured');
   if(env.SCAN_COORDINATOR){
     const interval=env.FAST_SCAN_ENABLED==='true'?60000:300000;
-    return requestScan(env,'scheduled-'+Math.floor(now.getTime()/interval),'manual',true);
+    const {status}=await requestScan(env,'scheduled-'+Math.floor(now.getTime()/interval),'manual',true);
+    return status;
   }
   const d=await api(`actions/workflows/${WORKFLOW}/runs?branch=main&per_page=30`,env);
   const unfinished=d.workflow_runs.find(r=>r.status!=='completed');
@@ -159,8 +164,8 @@ export default {
         if(!/^[a-zA-Z0-9-]{8,80}$/.test(id))return response({ok:false,error:'Invalid request ID'},400,request);
         const mode=body.scan_mode==='second-wave'?'second-wave':'manual';
         if(env.SCAN_COORDINATOR){
-          const status=await requestScan(env,id,mode,false);
-          if(status==='already-running')return response({ok:false,error:'A scan is already running or starting. Check the current scan before retrying.'},409,request);
+          const {status,activeRequestId}=await requestScan(env,id,mode,false);
+          if(status==='already-running')return response({ok:false,status:'ALREADY_RUNNING',active_request_id:activeRequestId,error:'A scan is already running or starting. Check the current scan before retrying.'},409,request);
           if(status!=='dispatched'&&status!=='already-requested')return response({ok:false,error:'Dispatch could not be confirmed. Check scanner status before retrying.'},502,request);
           return response({ok:true,status:'ACCEPTED',request_id:id},202,request);
         }

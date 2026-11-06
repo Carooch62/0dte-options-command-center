@@ -1,7 +1,7 @@
 import {entryReadiness,trendSummary,matchesTrend,quoteKey,observePremiums,premiumChange,positionEstimate,reentryProblem,positionAlerts,validPlan} from './trade-review.js?v=20261002-trend-filters';
 import {watchKey,watchTransitions} from './contract-watch.js';
 import {signalChecklist,earlyWatchVisible} from './signal-checklist.js?v=20261008-rvol-v1';
-import {refreshProgress,publishedReceipt,closedReceipt,refreshBlocksNewRequest,publicationCheckExpired,verifiedRefresh} from './refresh-progress.js?v=20261001-opening-bar';
+import {followExistingScan,refreshProgress,publishedReceipt,closedReceipt,refreshBlocksNewRequest,publicationCheckExpired,verifiedRefresh} from './refresh-progress.js?v=20261106-scan-handoff';
 import {thetaDecayPct,expirationView,finite,minutes,snapshotUsable,dataStatus,recordedState,matchesState,robinhoodStockUrl,contractExplanation,contractRank,contractShortlist,displayState,selectableContracts,tradePL,validTrade,riskSummary} from './dashboard-logic.js?v=20261007-readiness';
 const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const API='https://0dte-options-command-center.h69htk56cq.workers.dev';
@@ -231,7 +231,7 @@ function rememberRefresh(r){lastRefresh=r;save('0dteLastRefresh',r);}
 function renderRefresh(){
  const r=active||lastRefresh;
  enableScan(!refreshBlocksNewRequest(active));
- const steps=r?refreshProgress({requestStatus:r.requestStatus,run:r.run,published:!!r.receipt,closed:!!r.closed,waiting:!!r.waiting}):[];
+ const steps=r&&!r.busy?refreshProgress({requestStatus:r.requestStatus,run:r.run,published:!!r.receipt,closed:!!r.closed,waiting:!!r.waiting,following:r.following}):[];
  if(r?.unverified){for(const step of steps)if(step.state==='active'||step.state==='waiting'){step.state='unverified';step.detail='Publication could not be verified';}steps.at(-1).label='Check ended';}
  const elapsed=r?Math.max(0,Math.floor(((r.finished||Date.now())-r.started)/1000)):0;
  let message=r?.message||'Ready to refresh. Live progress will appear here.';
@@ -240,7 +240,7 @@ function renderRefresh(){
  if(r?.waiting)message=`Waiting for the first completed five-minute market bar${r.waiting.retry_after?' at '+time(r.waiting.retry_after):''}. This request finished without new market data. The next scheduled scan will try again; the last snapshot is retained.`;
  if(!active&&schedulerRun?.publicationNote)message=schedulerRun.publicationNote;
  if(active?.run?.publicationNote)message=active.run.publicationNote;
- const current=steps.find(s=>s.state==='active'),title=r?.unverified?'Run finished · data not verified':r?.waiting?'Waiting for first bar':r?.closed?'Market closed':r?.receipt?'Refresh complete':r?.failed?'Refresh interrupted':current?.label||'Scanner updates';
+ const current=steps.find(s=>s.state==='active'),title=r?.unverified?'Run finished · data not verified':r?.waiting?'Waiting for first bar':r?.closed?'Market closed':r?.receipt?'Refresh complete':r?.failed?'Refresh interrupted':r?.busy?'Scan already running':active?.following?'Following existing scan':current?.label||'Scanner updates';
  $('scanProgress').innerHTML=`<div class="refresh-box ${r?.failed?'failed':r?.finished?'finished':''}" role="status" aria-live="polite"><div class="row"><b>${esc(title)}</b><small>${r?.finished?'Finished':active?'In progress':'Ready'}</small></div><p class="refresh-message">${esc(message)}</p><p class="smallnote">Displayed snapshot: ${esc(time(data?.generated_at))}${dataDownloadFailed?' · Download failed; prior snapshot retained.':backendHealth?.error?' · Latest scan reported an error; displayed data may be from an earlier run.':''}</p>${steps.length?`<ol class="refresh-timeline">${steps.map(s=>`<li class="${s.state}" ${s.state==='active'?'aria-current="step"':''} title="${esc(s.detail)}"><span>${s.state==='done'?'✓':s.state==='failed'?'!':s.state==='skipped'?'—':s.state==='active'?'●':'○'}</span> ${esc(s.label)}${s.state==='skipped'?' (skipped)':''}</li>`).join('')}</ol>`:''}${current?.detail?`<p class="smallnote">${esc(current.detail)}</p>`:''}<div class="smallnote">${r?`Requested ${esc(time(r.started))} · ${Math.floor(elapsed/60)}m ${elapsed%60}s${r.run?.url?` · <a href="${esc(r.run.url)}" target="_blank" rel="noopener">View run</a>`:''}`:''}${reloadMessage?`<br>${esc(reloadMessage)}`:''}${backendHealth?`<br>Latest scanner result: ${esc(backendHealth.status)} · ${esc(time(backendHealth.updated_at))}${backendHealth.error?' · '+esc(backendHealth.error):''}`:''}</div></div>`;
  if($('cleanScanBrief')){$('cleanScanBrief').textContent=title+' · details';if(r?.failed||r?.unverified||dataDownloadFailed||backendHealth?.error)$('cleanScanDetails').open=true;}
 
@@ -284,12 +284,15 @@ async function pollRun(){
    const h=await json(API+'/health?request_id='+encodeURIComponent(id),35000);
    if(!active||active.id!==id)return; // A data download may finish this request while status is in flight.
    const r=h.latestRun;
-   if(r){active.run=r;active.requestStatus='accepted';active.message=r.status==='completed'&&r.conclusion==='success'?'Scan finished; checking that its data has published.':`Your scan is ${r.status.replaceAll('_',' ')}.`;
+   if(r){active.run=r;active.requestStatus='accepted';active.message=r.status==='completed'&&r.conclusion==='success'?'Scan finished; checking that its data has published.':`${active.following?'The existing scan':'Your scan'} is ${r.status.replaceAll('_',' ')}.`;
      if(r.status==='completed'&&r.conclusion!=='success'){
        rememberRefresh({...active,failed:true,finished:Date.now(),message:`Scan ${r.conclusion}. The last validated snapshot is preserved.`});
        active=null;save('0dteActiveScan',null);enableScan(true);renderRefresh();return;
      }
-   }else active.message=active.requestStatus==='unknown'?'Checking whether GitHub received the request after a connection interruption.':'Request accepted; waiting for GitHub to register this run.';
+   }else if(active.following&&Date.now()-active.started>=180000){
+     rememberRefresh({...active,busy:true,finished:Date.now(),message:'GitHub did not register the existing scan. Use Check data or request another scan.'});
+     active=null;save('0dteActiveScan',null);renderRefresh();return;
+   }else if(!active.following)active.message=active.requestStatus==='unknown'?'Checking whether GitHub received the request after a connection interruption.':'Request accepted; waiting for GitHub to register this run.';
    save('0dteActiveScan',active);rememberRefresh(active);renderRefresh();
    if(r?.status==='completed'&&r.conclusion==='success'){
      active.verificationStarted??=Date.now();
@@ -311,8 +314,16 @@ async function startScan(mode){
  let rejected=false;
  try{
    const r=await fetch(API+'/refresh',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scan_mode:mode,request_id:id}),signal:AbortSignal.timeout(20000)});
-   const j=await r.json();if(!r.ok||!j.ok){rejected=true;throw Error(j.error||'Request failed');}
+   const j=await r.json();
    if(!active||active.id!==id)return;
+   if(r.status===409){
+     const existing=followExistingScan(active,j.active_request_id);
+     active=existing.following?existing:null;
+     save('0dteActiveScan',active);rememberRefresh(existing);renderRefresh();
+     if(active)await pollRun();else await load();
+     return;
+   }
+   if(!r.ok||!j.ok){rejected=true;throw Error(j.error||'Request failed');}
    active.requestStatus='accepted';active.message='Accepted. Watching your scan through publication.';save('0dteActiveScan',active);rememberRefresh(active);renderRefresh();await pollRun();
  }catch(e){if(!active||active.id!==id)return;
    if(rejected){rememberRefresh({...active,requestStatus:'failed',failed:true,finished:Date.now(),message:'Scan request failed: '+e.message});active=null;save('0dteActiveScan',null);enableScan(true);}
