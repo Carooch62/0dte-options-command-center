@@ -2,6 +2,8 @@ import {verifyAccess} from './plaid-sync.js';
 import {watchKey} from './contract-watch.js';
 import {pendingWatchEvents} from './watch-monitor.js';
 import {sendDiscordWatchEvent,sendDiscordTestMessage} from './watch-discord.js';
+import {configuredDiscordWebhook,discordWebhookStatus,removeDiscordWebhook,storeDiscordWebhook} from './watch-discord-config.js';
+import {discordSetupPage} from './watch-discord-setup-page.js';
 
 const LEGACY_KEY='contract-watch-monitor-v1';
 const WATCHES_KEY='contract-watch-list-v2';
@@ -20,13 +22,13 @@ async function read(env){
  const legacy=await json(env,LEGACY_KEY)||{};
  return {list:{watches:legacy.watches||[],revision:'legacy'},checkpoint:checkpoint||{...legacy,revision:'legacy'}};
 }
-const enabled=env=>env.WATCH_ALERTS_ENABLED==='true'&&!!env.DISCORD_WATCH_WEBHOOK_URL;
+const enabled=(env,configured)=>env.WATCH_ALERTS_ENABLED==='true'&&configured;
 const sameOrigin=(request,url)=>request.headers.get('Origin')===url.origin&&request.headers.get('X-Requested-With')==='ContractWatch';
 
-export function verifiedAlertReadiness(env) {
+export function verifiedAlertReadiness(env,discordConfigured=!!env.DISCORD_WATCH_WEBHOOK_URL) {
  const requirements={
   scan_scheduler:env.FAST_SCAN_ENABLED==='true'&&!!env.SCAN_COORDINATOR,
-  discord_webhook:!!env.DISCORD_WATCH_WEBHOOK_URL,
+  discord_webhook:discordConfigured,
   private_robinhood_connection:env.ROBINHOOD_CONNECTION_ENABLED==='true',
   hosted_quote_permission:false,
   exact_contract_link:false
@@ -40,13 +42,33 @@ export async function handleWatchService(request,env){
  if(!env.PLAID_STORE||!env.CF_ACCESS_AUD||!env.CF_ACCESS_EMAIL||!env.CF_ACCESS_TEAM_DOMAIN)return reply({ok:false,error:'Private watch service not configured'},503);
  if(!await verifyAccess(request,env))return reply({ok:false,error:'Access sign in required'},401);
  const url=new URL(request.url);
+ if(url.pathname==='/private/watch/setup'){
+  if(request.method!=='GET')return reply({ok:false,error:'GET required'},405);
+  return discordSetupPage();
+ }
+ if(url.pathname==='/private/watch/webhook'){
+  if(request.method==='GET')return reply({ok:true,...await discordWebhookStatus(env)});
+  if(!['PUT','DELETE'].includes(request.method))return reply({ok:false,error:'PUT or DELETE required'},405);
+  if(!sameOrigin(request,url))return reply({ok:false,error:'Invalid request origin'},403);
+  if(env.DISCORD_WATCH_WEBHOOK_URL)return reply({ok:false,error:'Webhook is managed in Cloudflare'},409);
+  if(!env.PLAID_ENCRYPTION_KEY)return reply({ok:false,error:'Private encryption is not configured'},503);
+  if(request.method==='DELETE'){
+   await removeDiscordWebhook(env);return reply({ok:true,configured:false});
+  }
+  if(Number(request.headers.get('Content-Length'))>1000)return reply({ok:false,error:'Webhook request too large'},413);
+  const raw=await request.text();
+  if(raw.length>1000)return reply({ok:false,error:'Webhook request too large'},413);
+  let body;try{body=JSON.parse(raw);}catch{return reply({ok:false,error:'Invalid webhook request'},400);}
+  try{await storeDiscordWebhook(env,body?.webhook_url);}catch{return reply({ok:false,error:'Invalid Discord webhook or encryption configuration'},400);}
+  return reply({ok:true,configured:true});
+ }
  if(url.pathname==='/private/watch/readiness') {
   if(request.method!=='GET')return reply({ok:false,error:'GET required'},405);
-  return reply(verifiedAlertReadiness(env));
+  return reply(verifiedAlertReadiness(env,!!await configuredDiscordWebhook(env)));
  }
  if(url.pathname!=='/private/watch')return reply({ok:false,error:'Not found'},404);
  if(request.method==='GET'){
-  const {list,checkpoint}=await read(env);return reply({ok:true,watches:list.watches,revision:list.revision,enabled:enabled(env),test_available:!!env.DISCORD_WATCH_WEBHOOK_URL,last_scan_at:checkpoint.revision===list.revision?checkpoint.previous?.generated_at||null:null});
+  const {list,checkpoint}=await read(env),configured=!!await configuredDiscordWebhook(env);return reply({ok:true,watches:list.watches,revision:list.revision,enabled:enabled(env,configured),test_available:configured,last_scan_at:checkpoint.revision===list.revision?checkpoint.previous?.generated_at||null:null});
  }
  if(!['PUT','POST'].includes(request.method))return reply({ok:false,error:'PUT or POST required'},405);
  if(!sameOrigin(request,url))return reply({ok:false,error:'Invalid request origin'},403);
@@ -54,7 +76,7 @@ export async function handleWatchService(request,env){
  const body=await request.json().catch(()=>null),watches=body?.watches;
  if(request.method==='POST'){
   if(body?.action!=='test')return reply({ok:false,error:'Invalid test request'},400);
-  if(!env.DISCORD_WATCH_WEBHOOK_URL)return reply({ok:false,error:'Discord webhook not configured'},503);
+  if(!await configuredDiscordWebhook(env))return reply({ok:false,error:'Discord webhook not configured'},503);
   await sendDiscordTestMessage(env);
   return reply({ok:true,test_sent:true});
  }
@@ -64,11 +86,11 @@ export async function handleWatchService(request,env){
  const changed=JSON.stringify(list.watches.map(watchKey).sort())!==JSON.stringify(unique.map(watchKey).sort());
  const revision=changed||list.revision==='legacy'?crypto.randomUUID():list.revision;
  if(changed||list.revision==='legacy')await env.PLAID_STORE.put(WATCHES_KEY,JSON.stringify({watches:unique,revision}));
- return reply({ok:true,count:unique.length,revision,enabled:enabled(env)});
+ return reply({ok:true,count:unique.length,revision,enabled:enabled(env,!!await configuredDiscordWebhook(env))});
 }
 
 export async function scheduledWatchCheck(env,now=Date.now(),fetcher=fetch){
- if(env.APP_ENV==='preview'||env.WATCH_ALERTS_ENABLED!=='true'||!env.PLAID_STORE||!env.DISCORD_WATCH_WEBHOOK_URL)return 'disabled';
+ if(env.APP_ENV==='preview'||env.WATCH_ALERTS_ENABLED!=='true'||!env.PLAID_STORE||!await configuredDiscordWebhook(env))return 'disabled';
  const {list,checkpoint}=await read(env);
  if(list.revision==='legacy')return 'needs-private-sync';
  if(!list.watches.length)return 'no-watches';

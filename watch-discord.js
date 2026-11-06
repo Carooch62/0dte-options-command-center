@@ -1,4 +1,5 @@
-// Research alerts only. The webhook must be supplied as a Worker secret.
+// Research alerts only. A webhook may be a Worker secret or encrypted private KV.
+import {configuredDiscordWebhook} from './watch-discord-config.js';
 export function discordWatchMessage(event) {
   const w=event?.watch||{};
   if(event?.status!=='TRIGGERED_RECHECK_REQUIRED'||!w.ticker||!w.expiry||!['UP','DOWN'].includes(w.direction))throw Error('Invalid watch event');
@@ -30,7 +31,7 @@ export async function sendDiscordTestMessage(env,fetcher=fetch) {
 }
 
 async function sendDiscordPayload(payload,env,fetcher) {
-  const webhook=env?.DISCORD_WATCH_WEBHOOK_URL;
+  const webhook=await configuredDiscordWebhook(env);
   if(!webhook)return {status:'not-configured'};
   let url;try{url=new URL(webhook);}catch{throw Error('Invalid Discord webhook configuration');}
   if(url.protocol!=='https:'||url.hostname!=='discord.com'||!/^\/api\/webhooks\/\d+\/[A-Za-z0-9_-]+$/.test(url.pathname))throw Error('Invalid Discord webhook configuration');
