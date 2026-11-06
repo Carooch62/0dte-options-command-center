@@ -1,6 +1,7 @@
 // Verified alerts stay disconnected from the quote pilot until hosted access
 // and an exact Robinhood contract link are confirmed. Discord is the only channel.
 import {sendDiscordVerifiedOptionAlert} from './watch-discord.js';
+import {configuredDiscordWebhook} from './watch-discord-config.js';
 
 export async function deliverVerifiedOptionAlert(alert,env,{discord=sendDiscordVerifiedOptionAlert}={}) {
  if(env?.WATCH_VERIFIED_ALERTS_ENABLED!=='true'||env?.WATCH_QUOTE_PILOT_ENABLED!=='true')
@@ -9,7 +10,7 @@ export async function deliverVerifiedOptionAlert(alert,env,{discord=sendDiscordV
     !/^[A-Za-z0-9_-]{1,90}:[0-9a-f-]{36}$/i.test(alert.key)||
     !alert.link||typeof alert.text!=='string'||!alert.text.includes(alert.link))
   return {status:'not-ready'};
- if(!env.DISCORD_WATCH_WEBHOOK_URL)return {status:'not-configured'};
+ if(!await configuredDiscordWebhook(env))return {status:'not-configured'};
  const marker='verified-option-alert-v1:discord:'+alert.key;
  if(await env.PLAID_STORE.get(marker))return {status:'already-sent'};
  try {
