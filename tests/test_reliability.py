@@ -150,8 +150,10 @@ class ReliabilityTests(unittest.TestCase):
         import requests
         r=requests.Response();r.status_code=429
         success=unittest.mock.Mock();success.raise_for_status.return_value=None;success.json.return_value={'ok':True}
-        with patch.object(scanner.requests,'get',side_effect=[r,success]) as get,patch.object(scanner.time,'sleep'):
-            self.assertTrue(scanner.request_json('https://example.org')['ok']);self.assertEqual(get.call_count,2)
+        with patch.object(scanner.requests.Session,'get',side_effect=[r,success,success]) as get,patch.object(scanner.time,'sleep'):
+            self.assertTrue(scanner.request_json('https://example.org',timeout=12)['ok'])
+            self.assertTrue(scanner.request_json('https://example.org')['ok'])
+            self.assertEqual([call.kwargs['timeout'] for call in get.call_args_list],[12,12,8])
     def test_pipeline_distinguishes_unverified_empty_chains_from_proven_no_expiry(self):
         with tempfile.TemporaryDirectory() as folder:
             stage=Path(folder);(stage/'data').mkdir()

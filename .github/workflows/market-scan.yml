@@ -93,6 +93,10 @@ jobs:
           git add data/
           if git diff --cached --quiet; then exit 0; fi
           git commit -m 'Update validated scan and health'
-          git pull --rebase origin main
-          git push origin HEAD:main
+          # Push directly when the checked-out main is still current.
+          # A regular push rejects concurrent updates without overwriting them.
+          if ! git push origin HEAD:main; then
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
 
