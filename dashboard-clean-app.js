@@ -85,7 +85,7 @@ function streamlinedCard(html,x){
  article.querySelector('.quick-metrics')?.after(brief);
  const ages=article.querySelector('.source-ages');
  if(ages){const summary=document.createElement('p');summary.className='clean-quote smallnote';const picked=contractShortlist(x,dataDownloadFailed?{...data,generated_at:null}:data,Number($('askMin').value),Number($('askMax').value))[0]?.option;
- summary.textContent=(ages.querySelector('b')?.textContent||'Research only')+' · Stock '+shortAge(x.bar_end)+' · Option '+shortAge(picked?.option_timestamp);
+ summary.textContent=(ages.querySelector('b')?.textContent||'Research only')+' · Stock '+shortAge(x.bar_end)+(picked?' · Option '+shortAge(picked.option_timestamp):'');
  ages.before(summary);drawer.append(ages);}
  for(const node of [...article.querySelectorAll(':scope > .details,:scope > .trend-strip,:scope > .trend-caption,:scope > .entry-plan,:scope > .status-time')])drawer.append(node);
  article.querySelector('.card-footer')?.before(drawer);
