@@ -60,6 +60,7 @@ def pct(a, b):
 
 ERRORS = []
 ERROR_LOCK = threading.Lock()
+HTTP_CLIENT = threading.local()
 
 def record_error(ticker, stage, error):
     # Record categories/status only; never credentials or response bodies.
@@ -73,10 +74,15 @@ def record_error(ticker, stage, error):
 def market_session(now=None):
     return session_info(now)['session']
 
-def request_json(url, **kwargs):
+def request_json(url, *, timeout=8, **kwargs):
+    if not hasattr(HTTP_CLIENT, 'session'):
+        HTTP_CLIENT.session = requests.Session()
+    session = HTTP_CLIENT.session
     for attempt in range(3):
         try:
-            r = requests.get(url, timeout=kwargs.pop('timeout', 8), **kwargs)
+            # Keep sockets warm without carrying provider cookies between requests.
+            session.cookies.clear()
+            r = session.get(url, timeout=timeout, **kwargs)
             r.raise_for_status()
             return r.json()
         except (requests.RequestException, ValueError) as exc:
