@@ -90,13 +90,18 @@ jobs:
         run: |
           git config user.name '0DTE Scanner'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add data/
+          timed_publish() {
+            local TIMEFORMAT="publish $1: %3R seconds"
+            shift
+            time "$@"
+          }
+          timed_publish staging git add data/
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'Update validated scan and health'
+          timed_publish commit git commit -m 'Update validated scan and health'
           # Push directly when the checked-out main is still current.
           # A regular push rejects concurrent updates without overwriting them.
-          if ! git push origin HEAD:main; then
-            git pull --rebase origin main
-            git push origin HEAD:main
+          if ! timed_publish push git push origin HEAD:main; then
+            timed_publish rebase git pull --rebase origin main
+            timed_publish retry_push git push origin HEAD:main
           fi
 
