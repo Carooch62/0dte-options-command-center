@@ -10,9 +10,17 @@ test('clean saved view restores the view saved in the same UI',()=>{
  shortcuts.onclick({target:{dataset:{view:'save'}}});control.value='DOWN';
  shortcuts.onclick({target:{dataset:{view:'restore'}}});assert.equal(control.value,'UP');
 });
-test('clean filter restoration uses its own saved preferences',()=>{
- let key,restored;vm.runInNewContext(source.split('\n').find(l=>l.startsWith('restoreFilters(read(')),{read:k=>{key=k;return {askMax:'0.25'};},restoreFilters:v=>restored=v});
- assert.equal(key,'0dteCleanDashboardFilters');assert.equal(restored.askMax,'0.25');
+test('clean filter restoration migrates the old all-states default once',()=>{
+ const block=source.slice(source.indexOf('const storedFilters='),source.indexOf('const shortcuts=',source.indexOf('const storedFilters=')));
+ let restored;const saved=[];
+ const run=(filters,migrated)=>{
+  vm.runInNewContext(block,{read:(key)=>key==='0dteCleanDashboardFilters'?filters:migrated,save:(key,value)=>saved.push([key,value]),restoreFilters:value=>restored=value});
+ };
+ run({askMax:'0.25',state:'ALL'},false);
+ assert.equal(restored.askMax,'0.25');assert.equal(restored.state,'ACTIVE');
+ assert.equal(saved[0][0],'0dteSkipDefaultMigrated');
+ run({askMax:'0.25',state:'ALL'},true);
+ assert.equal(restored.state,'ALL');
 });
 test('freshness warning updates during a focused entry-plan edit',()=>{
  const prefix=source.slice(source.indexOf('function render(){'),source.indexOf(' const all=',source.indexOf('function render(){')))+'\n}';
