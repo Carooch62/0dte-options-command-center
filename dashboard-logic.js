@@ -17,7 +17,7 @@ export function recordedState(row) {
   return state==='CONFIRMED'?'CONFIRMED DELAYED':['PASS','WATCH','SECOND-WAVE','TRIGGERED','DECAYING'].includes(state)?state:'NO RECORDED STATUS';
 }
 export function matchesState(row,data,selected,now=Date.now()) {
-  return selected==='ALL'||recordedState(row)===selected;
+  return selected==='ALL'||(selected==='ACTIVE'&&recordedState(row)!=='PASS')||recordedState(row)===selected;
 }
 export function robinhoodStockUrl(ticker) {
   const symbol=String(ticker||'').trim().toUpperCase();
