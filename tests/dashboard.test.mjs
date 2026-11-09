@@ -197,3 +197,12 @@ test('contract gaps distinguish unchecked, unavailable and screened chains',()=>
  assert.equal(contractGapLabel({chain_status:'EMPTY_UNVERIFIED'}),'Option coverage unverified');
  assert.equal(contractGapLabel({chain_status:'SUCCESS'}),'No qualifying contract');
 });
+
+
+test('watch states exclude skipped setups by default while preserving audit views',()=>{
+ const skipped={execution_state:'PASS'},watch={execution_state:'WATCH'};
+ assert(!matchesState(skipped,{},'ACTIVE'));
+ assert(matchesState(watch,{},'ACTIVE'));
+ assert(matchesState(skipped,{},'PASS'));
+ assert(matchesState(skipped,{},'ALL'));
+});
