@@ -13,6 +13,16 @@ test('comparison cannot use a later publication or previous session',()=>{
  assert.equal(scannerComparison(t,h).scan_id,'prior');assert.equal(scannerComparison(t,h).direction_aligned,true);assert.equal(scannerComparison({...t,time:'2026-10-07T15:00:00Z'},h).status,'NO_PRIOR_SNAPSHOT');assert.equal(researchDataset(pack([buy,sell]),h).ml_ready,false);
 });
 
+test('comparison returns exact archived contract evidence without treating it as a fill',()=>{
+ const t={ticker:'TEST',side:'call',expiry:'2026-10-06',strike:100,time:'2026-10-06T15:00:00Z'};
+ const contract={contract_id:'TEST261006C00100000',expiry:t.expiry,side:t.side,strike:t.strike,bid:.19,ask:.21,delta:.4,theta:-.08,source:'CBOE delayed (15m)'};
+ const history=[{scan_id:'prior',generated_at:'2026-10-06T14:59:00Z',candidate_state:[{ticker:'TEST',direction:'UP',contract_evidence:{contracts:[contract]}}]}];
+ const comparison=scannerComparison(t,history);
+ assert.deepEqual(comparison.contract_evidence,contract);
+ assert.equal(comparison.contract_delta_at_entry,.4);
+ assert.match(comparison.limitation,/not fills/);
+});
+
 test('conflicting transaction identity across symbols invalidates both affected groups in any order',()=>{
  const otherBuy={...buy,investment_transaction_id:'ob',ticker_symbol:'OTHR261006C00100000'},otherSell={...sell,investment_transaction_id:'os',ticker_symbol:otherBuy.ticker_symbol};
  const conflict={...buy,ticker_symbol:otherBuy.ticker_symbol};
