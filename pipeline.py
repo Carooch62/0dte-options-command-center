@@ -12,7 +12,7 @@ from market_clock import session_info
 from scan_archive import archive_research, archive_receipt
 
 ROOT=Path(__file__).resolve().parent
-FILES=('market.json','market-dashboard.json','scan-history.json','feedback.json','option-observations.json','trend-cache.json')
+FILES=('market.json','market-dashboard.json','scan-history.json','feedback.json','option-observations.json','trend-cache.json','later-expiry-shadow.json')
 
 def validate(stage):
     raw=json.loads((stage/'data/market.json').read_text())
@@ -26,6 +26,9 @@ def validate(stage):
         if 'execution_state' not in x:raise ValueError('Missing execution state')
         for o in x.get('preferred_contracts',[]):
             if not o['quote_valid'] or not o['delta_ok'] or not o['tight_spread']:raise ValueError('Invalid preferred contract')
+    shadow=json.loads((stage/'data/later-expiry-shadow.json').read_text())
+    if shadow.get('mode')!='SHADOW_RESEARCH_ONLY' or any(shadow.get(key)!='NONE' for key in ('ranking_effect','eligibility_effect','scoring_effect','alert_effect')):
+        raise ValueError('Later-expiry research is not isolated')
     return {'status':'DEGRADED' if raw.get('core_missing') or received<configured*.9 or any(raw['coverage']['chain_status_counts'].get(status) for status in ('SOURCE_FAILURE','EMPTY_UNVERIFIED')) else 'SUCCESS',
             'coverage':raw['coverage'],'core_missing':raw.get('core_missing',[]),'scan_id':raw['scan_id']}
 
@@ -75,10 +78,10 @@ def run():
             stage=Path(folder);(stage/'data').mkdir()
             for name in ('scan-history.json','option-observations.json','trend-cache.json'):
                 if (dest/name).exists():shutil.copy2(dest/name,stage/'data'/name)
-            for name in ('scanner.py','trend_context.py','option_expander.py','core_0dte.py','schema_normalizer.py','execution_normalizer.py'):
+            for name in ('scanner.py','trend_context.py','option_expander.py','core_0dte.py','schema_normalizer.py','execution_normalizer.py','later_expiry_shadow.py'):
                 health['stage']=name
                 try:
-                    measure(name, lambda: subprocess.run([sys.executable,str(ROOT/name)],cwd=stage,check=True,timeout=300 if name in ('scanner.py','option_expander.py') else 120))
+                    measure(name, lambda: subprocess.run([sys.executable,str(ROOT/name)],cwd=stage,check=True,timeout=300 if name in ('scanner.py','option_expander.py','later_expiry_shadow.py') else 120))
                 except (subprocess.SubprocessError, OSError):
                     if name != 'trend_context.py':
                         raise

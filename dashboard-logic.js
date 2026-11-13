@@ -16,6 +16,18 @@ export function recordedState(row) {
   const state=row.last_status?.state||row.execution_state;
   return state==='CONFIRMED'?'CONFIRMED DELAYED':['PASS','WATCH','SECOND-WAVE','TRIGGERED','DECAYING'].includes(state)?state:'NO RECORDED STATUS';
 }
+export function stateLabel(row,state=recordedState(row)) {
+  if(state==='PASS')return 'SKIP';
+  if(state==='TRIGGERED'&&row?.setup_qualified===false)return 'LEVEL CROSSED · UNQUALIFIED';
+  return state;
+}
+export function quoteProvenance(option={}) {
+  const source=option.source||'Source unknown';
+  const lower=String(source).toLowerCase();
+  const source_class=lower.includes('robinhood')?'BROKER_SOURCE':lower.includes('delayed')||lower.includes('cboe')?'DELAYED_RESEARCH':'UNKNOWN';
+  return {source,source_class,quote_time:option.option_timestamp||null,collected_at:option.collected_at||null,
+    minimum_delay_minutes:finite(option.minimum_delay_minutes),timestamp_basis:option.timestamp_basis||'UNKNOWN',freshness:option.quote_freshness||'UNKNOWN'};
+}
 export function matchesState(row,data,selected,now=Date.now()) {
   return selected==='ALL'||(selected==='ACTIVE'&&recordedState(row)!=='PASS')||recordedState(row)===selected;
 }
