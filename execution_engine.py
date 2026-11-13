@@ -377,8 +377,15 @@ def contract_evidence(candidate):
         for option in pool:
             ask = f(option.get('ask'), -1)
             dte = option.get('dte')
-            if (not option.get('contract_id') or option.get('quote_valid') is not True
-                    or option.get('near_atm') is not True or not isinstance(dte, int)
+            quote_valid = option.get('quote_valid')
+            quote_valid = quote_valid is True or (quote_valid is None and valid_quote(option))
+            near_atm = option.get('near_atm')
+            if near_atm is None:
+                stock_price = f(candidate.get('price'))
+                strike = f(option.get('strike'))
+                near_atm = bool(stock_price and strike and abs(strike-stock_price)/stock_price <= .03)
+            if (not option.get('contract_id') or not quote_valid
+                    or near_atm is not True or not isinstance(dte, int)
                     or not 0 <= dte <= 14 or not 0 < ask <= .75):
                 continue
             candidates.append(option)

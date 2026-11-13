@@ -157,6 +157,9 @@ class ReliabilityTests(unittest.TestCase):
     def test_pipeline_distinguishes_unverified_empty_chains_from_proven_no_expiry(self):
         with tempfile.TemporaryDirectory() as folder:
             stage=Path(folder);(stage/'data').mkdir()
+            (stage/'data/later-expiry-shadow.json').write_text(json.dumps({
+                'mode':'SHADOW_RESEARCH_ONLY','ranking_effect':'NONE','eligibility_effect':'NONE',
+                'scoring_effect':'NONE','alert_effect':'NONE','candidates':[]}))
             for chain_status,expected in [('EMPTY_UNVERIFIED','DEGRADED'),('SOURCE_FAILURE','DEGRADED'),('NO_EXPIRATION_TODAY','SUCCESS'),('SUCCESS','SUCCESS')]:
                 with self.subTest(chain_status=chain_status):
                     raw={'universe_size':1,'scan_id':'health-qc','candidates':[{'chain_attempted':True}],

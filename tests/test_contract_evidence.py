@@ -44,6 +44,17 @@ class ContractEvidenceTests(unittest.TestCase):
         self.assertFalse({'WIDE', 'FAR', 'LONG', 'INVALID'} &
                          {x['contract_id'] for x in evidence['contracts']})
 
+    def test_unknown_quote_time_is_retained_as_evidence_but_not_made_fresh(self):
+        option = self.option('TEST-UNKNOWN-TIME', 0, .25)
+        option.pop('quote_valid')
+        option.pop('near_atm')
+        option['option_timestamp'] = None
+        evidence = contract_evidence({'price': 38, 'preferred_contracts': [], 'usable_contracts': [],
+                                      'options': [option], 'expiry_groups': {}})
+        self.assertEqual(len(evidence['contracts']), 1)
+        self.assertIsNone(evidence['contracts'][0]['option_timestamp'])
+        self.assertIsNone(evidence['contracts'][0]['quote_freshness'])
+
 
 if __name__ == '__main__':
     unittest.main()
