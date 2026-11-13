@@ -1,9 +1,19 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {displayState,selectableContracts,requestPublished,tradePL,riskSummary,validTrade} from '../dashboard-logic.js';
+import {displayState,selectableContracts,requestPublished,tradePL,riskSummary,validTrade,stateLabel,quoteProvenance} from '../dashboard-logic.js';
 import worker from '../worker.js';
 const now=Date.parse('2026-09-30T14:00:00Z');const data={generated_at:'2026-09-30T13:59:00Z',market_session:'OPEN',session_open_at:'2026-09-30T13:30:00Z',session_close_at:'2026-09-30T20:00:00Z'};
 test('expired cards demote without new scan',()=>{const r={bar_end:data.generated_at,execution_state:'TRIGGERED'};assert.equal(displayState(r,data,now),'TRIGGERED');assert.equal(displayState(r,data,now+10*60000),'STALE PRICE DATA');});
 test('unknown quote time never shows confirmation',()=>{assert.equal(displayState({bar_end:data.generated_at,execution_state:'CONFIRMED',preferred_contracts:[{}]},data,now),'WATCH');});
+test('display labels distinguish a level cross from a qualified setup',()=>{
+ assert.equal(stateLabel({setup_qualified:false},'TRIGGERED'),'LEVEL CROSSED · UNQUALIFIED');
+ assert.equal(stateLabel({setup_qualified:true},'TRIGGERED'),'TRIGGERED');
+ assert.equal(stateLabel({},'PASS'),'SKIP');
+});
+test('quote provenance exposes source timing without inventing freshness',()=>{
+ const p=quoteProvenance({source:'CBOE delayed options',option_timestamp:'2026-09-30T13:45:00Z',collected_at:'2026-09-30T14:00:00Z',minimum_delay_minutes:15,timestamp_basis:'EXCHANGE_REPORTED'});
+ assert.equal(p.source_class,'DELAYED_RESEARCH');assert.equal(p.minimum_delay_minutes,15);assert.equal(p.freshness,'UNKNOWN');
+ assert.equal(quoteProvenance({source:'Robinhood'}).source_class,'BROKER_SOURCE');
+});
 test('matching run required',()=>{assert.equal(requestPublished({scan_id:'other'},'requested'),false);assert.equal(requestPublished({scan_id:'requested'},'requested'),true);});
 test('price filters include retained higher-priced contracts',()=>{const r={eligible_contracts:[{side:'call',delta:.4,delta_verified:true,ask:.4,quote_valid:true,delta_ok:true,tight_spread:true}]};assert.equal(selectableContracts(r).length,0);assert.equal(selectableContracts(r,.1,.5).length,1);});
 test('journal and risk use fees and open positions',()=>{const t={ticker:'TEST',contract:'C',time:'2026-09-30T13:30:00Z',entry:.2,exit:.3,qty:2,fees:1.3};assert(validTrade(t));assert(Math.abs(tradePL(t)-18.7)<1e-8);assert(!validTrade({...t,qty:1.5}));const r=riskSummary({perTrade:20,maxExposure:50},[{...t,exit:null}],.25,1,new Date(now));assert.equal(r.alerts.length,2);});

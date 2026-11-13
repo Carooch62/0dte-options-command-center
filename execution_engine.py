@@ -357,19 +357,58 @@ def enrich(data, previous=None):
 
 
 def contract_evidence(candidate):
-    """Bounded filter-selected sample, including candidates without entry signals."""
+    """Bounded decision-time sample for later private trade reconciliation.
+
+    This does not change ranking or eligibility.  It retains liquid, near-ATM
+    contracts through 14 DTE so a later fill can be compared with the exact
+    contract that was visible before entry, while keeping the public archive
+    small and free of account or order identifiers.
+    """
+    pools = [
+        candidate.get('preferred_contracts', []),
+        candidate.get('usable_contracts', []),
+        candidate.get('options', []),
+    ]
+    for key in ('week', 'two_weeks'):
+        pools.append((candidate.get('expiry_groups') or {}).get(key, {}).get('options', []))
+    preferred = {o.get('contract_id') for o in candidate.get('preferred_contracts', [])}
+    candidates = []
+    for pool in pools:
+        for option in pool:
+            ask = f(option.get('ask'), -1)
+            dte = option.get('dte')
+            quote_valid = option.get('quote_valid')
+            quote_valid = quote_valid is True or (quote_valid is None and valid_quote(option))
+            near_atm = option.get('near_atm')
+            if near_atm is None:
+                stock_price = f(candidate.get('price'))
+                strike = f(option.get('strike'))
+                near_atm = bool(stock_price and strike and abs(strike-stock_price)/stock_price <= .03)
+            if (not option.get('contract_id') or not quote_valid
+                    or near_atm is not True or not isinstance(dte, int)
+                    or not 0 <= dte <= 14 or not 0 < ask <= .75):
+                continue
+            candidates.append(option)
+    candidates.sort(key=lambda o: (
+        o.get('contract_id') in preferred,
+        f(o.get('contract_score'), -999),
+        f(o.get('volume')),
+    ), reverse=True)
     rows = []; seen = set()
-    for option in candidate.get('preferred_contracts', [])[:3] + candidate.get('options', [])[:3]:
+    for option in candidates:
         cid = option.get('contract_id')
-        if not cid or cid in seen:
+        if cid in seen:
             continue
         seen.add(cid)
-        fields = ('contract_id', 'expiry', 'side', 'strike', 'bid', 'ask', 'spread', 'spread_pct',
+        fields = ('contract_id', 'expiry', 'dte', 'side', 'strike', 'bid', 'ask', 'spread', 'spread_pct',
                   'delta', 'theta', 'theta_available', 'volume', 'source', 'option_timestamp',
                   'payload_timestamp', 'received_at', 'last_trade_time', 'timestamp_basis',
-                  'minimum_delay_minutes', 'rejection_reasons')
+                  'minimum_delay_minutes', 'quote_freshness', 'contract_score',
+                  'rejection_reasons')
         rows.append({key: option.get(key) for key in fields})
-    return {'selection': 'Up to three preferred plus first three returned contracts; filter-selected, not full-chain coverage',
+        if len(rows) == 12:
+            break
+    return {'selection': 'Up to 12 filter-selected liquid near-ATM contracts priced at $0.75 or less across 0–14 DTE; decision-time evidence only, not full-chain coverage',
             'contracts': rows}
 
 
