@@ -408,7 +408,7 @@ def contract_evidence(candidate):
         rows.append({key: option.get(key) for key in fields})
         if len(rows) == 12:
             break
-    return {'selection': 'Up to 12 liquid near-ATM contracts priced at $0.75 or less across 0–14 DTE; decision-time evidence only, not full-chain coverage',
+    return {'selection': 'Up to 12 filter-selected liquid near-ATM contracts priced at $0.75 or less across 0–14 DTE; decision-time evidence only, not full-chain coverage',
             'contracts': rows}
 
 
