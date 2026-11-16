@@ -2,7 +2,6 @@
 import gzip
 import hashlib
 import json
-import orjson
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -65,6 +64,7 @@ BROKER_FIELDS = ('ticker', 'rank', 'direction', 'setup_qualified', 'qualificatio
 
 def rebuild_brokerage_index(day_path):
     """Expose decision-time fields only; omit later markouts and outcome labels."""
+    import orjson  # Hydration imports day_of before dependencies are installed.
     day_path = Path(day_path)
     scans, contexts, context_ids = [], [], {}
     for path in sorted((day_path / 'scans').glob('*.json.gz')):
