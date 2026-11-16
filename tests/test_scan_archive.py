@@ -1,11 +1,16 @@
 import gzip
 import json
 import tempfile
+import subprocess
+import sys
 import unittest
 from pathlib import Path
 from scan_archive import archive_research, day_of
 
 class ArchiveTests(unittest.TestCase):
+    def test_calendar_helper_imports_before_dependencies_are_installed(self):
+        subprocess.run([sys.executable, '-S', '-c', 'from scan_archive import day_of; assert day_of("2026-11-16T14:00:00Z") == "2026-11-16"'], check=True)
+
     def test_rollover_retains_scans_and_updates_markouts(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder); dest=root/'archive'
