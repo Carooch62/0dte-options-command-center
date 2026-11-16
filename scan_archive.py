@@ -2,6 +2,7 @@
 import gzip
 import hashlib
 import json
+import orjson
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -67,7 +68,7 @@ def rebuild_brokerage_index(day_path):
     day_path = Path(day_path)
     scans, contexts, context_ids = [], [], {}
     for path in sorted((day_path / 'scans').glob('*.json.gz')):
-        row = json.loads(gzip.decompress(path.read_bytes()))
+        row = orjson.loads(gzip.decompress(path.read_bytes()))
         scan = {k: row[k] for k in ('scan_id', 'generated_at', 'dashboard_generated_at',
                                    'recovered_commit_at', 'recovered_from_commit') if k in row}
         scan['candidate_state'] = [{k: candidate[k] for k in BROKER_FIELDS if k in candidate}
