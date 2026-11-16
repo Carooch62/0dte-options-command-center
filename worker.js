@@ -150,7 +150,14 @@ export default {
             latestRun.runnerAssigned=!!job?.runner_name;
             latestRun.waitingForRunner=run.status!=='completed'&&!job?.runner_name&&!latestRun.steps.length;
             latestRun.ageMinutes=Math.max(0,(Date.now()-Date.parse(run.created_at))/60000);
-            latestRun.publicationNote=latestRun.waitingForRunner?'Waiting for a GitHub runner; scheduled requests are skipped while this run is unfinished.':run.status==='completed'&&!job?.runner_name&&!latestRun.steps.length?'Run ended without an assigned runner or recorded scan steps; no new snapshot was produced.':null;
+            const runnerStart=Date.parse(job?.started_at);
+            latestRun.queueSeconds=Number.isFinite(runnerStart)?Math.max(0,Math.round((runnerStart-Date.parse(run.created_at))/1000)):null;
+            const scanStep=job?.steps?.find(s=>s.name==='Scan, enrich, and validate');
+            const publishStep=job?.steps?.find(s=>s.name==='Publish validated data or failure health');
+            const duration=s=>Number.isFinite(Date.parse(s?.started_at))&&Number.isFinite(Date.parse(s?.completed_at))?Math.max(0,Math.round((Date.parse(s.completed_at)-Date.parse(s.started_at))/1000)):null;
+            latestRun.scanSeconds=duration(scanStep);
+            latestRun.publishSeconds=duration(publishStep);
+            latestRun.publicationNote=latestRun.waitingForRunner?`Waiting for a GitHub runner for ${latestRun.ageMinutes.toFixed(1)} min; scheduled requests are skipped while this run is unfinished.`:run.status==='completed'&&!job?.runner_name&&!latestRun.steps.length?'Run ended without an assigned runner or recorded scan steps; no new snapshot was produced.':null;
           }catch(e){latestRun.stepError=e.message;}
         }
         return response({ok:true,version:VERSION,request_id:id,latestRun},200,request);
