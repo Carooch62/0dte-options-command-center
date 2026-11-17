@@ -34,6 +34,11 @@ class NewsCoverageObservabilityTests(unittest.TestCase):
         self.assertEqual(candidate['news_items'], [])
         self.assertFalse(candidate['catalyst'])
 
+    def test_malformed_provider_payload_is_source_failure(self):
+        with patch.object(scanner, 'request_json', return_value={'news': ['invalid']}):
+            self.assertEqual(scanner.news('TEST'), [])
+        self.assertTrue(any(e['ticker'] == 'TEST' and e['stage'] == 'news' for e in scanner.ERRORS))
+
     def test_other_stage_error_does_not_mark_news_failed(self):
         scanner.record_error('TEST', 'price_scan', RuntimeError('unavailable'))
         candidate = {'ticker': 'TEST'}
