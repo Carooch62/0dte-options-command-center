@@ -1,5 +1,4 @@
-// Bind scanner evidence, exact provider option quotes and an independently
-// verified Robinhood contract URL before handing a message to Discord.
+// Private quote-qualified setup alerts use explicit manual contract navigation.
 import {prepareVerifiedOptionAlert} from './watch-alert.js';
 import {countQualifiedQuotes} from './watch-quote-qualification.js';
 import {deliverVerifiedOptionAlert} from './watch-alert-delivery.js';

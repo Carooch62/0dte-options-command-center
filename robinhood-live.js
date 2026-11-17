@@ -28,11 +28,13 @@ async function ownerRequest(env,path,body){
  if(!response.ok)throw Error('Robinhood authorization unavailable; reconnect or retry later');
  return response.json();
 }
-async function connection(env){
- if(env.ROBINHOOD_COORDINATOR)return (await ownerRequest(env,'/token')).connection;
- // Legacy manual access remains available, but cannot enable unattended renewal.
- return legacyConnection(env);
+async function connectionState(env){
+ if(env.ROBINHOOD_COORDINATOR)return ownerRequest(env,'/token');
+ const saved=await legacyConnection(env);
+ return {connection:saved,authorization_present:!!saved,renewal_supported:false};
 }
+async function connection(env){return (await connectionState(env)).connection;}
+
 async function saveConnection(env,saved){
  if(env.ROBINHOOD_COORDINATOR)return ownerRequest(env,'/save',{sealed:await seal(saved,env)});
  await env.PLAID_STORE.put(storageKey(env),await seal(saved,env));
@@ -83,7 +85,7 @@ export class RobinhoodCoordinator {
   if(saved&&saved.expires_at<=Date.now()+120000&&saved.refresh_token){
    // Persist the rotated token before any caller receives the new access token.
    // On uncertain network outcomes, stop automatic retries: rotation may have occurred.
-   if(stored.refresh_uncertain||stored.retry_after>Date.now())return Response.json({connection:null});
+   if(stored.refresh_uncertain||stored.retry_after>Date.now())return Response.json({connection:null,authorization_present:true,renewal_supported:false});
    await this.state.storage.put('credential',{...stored,refresh_uncertain:true});
    try{
     const renewed=await exchange({grant_type:'refresh_token',refresh_token:saved.refresh_token,client_id:this.env.ROBINHOOD_CLIENT_ID,resource:MCP});
@@ -92,10 +94,10 @@ export class RobinhoodCoordinator {
     await this.state.storage.put('credential',{sealed:await seal(saved,this.env)});
    }catch(error){
     if(error.status===429)await this.state.storage.put('credential',{...stored,retry_after:Date.now()+error.retry_ms});
-    return Response.json({connection:null});
+    return Response.json({connection:null,authorization_present:true,renewal_supported:false});
    }
   }
-  return Response.json({connection:saved&&saved.expires_at>Date.now()+15000?saved:null});
+  return Response.json({connection:saved&&saved.expires_at>Date.now()+15000?saved:null,authorization_present:!!saved,renewal_supported:!!saved?.refresh_token});
  });}
 }
 async function exchange(form){const response=await fetch(TOKEN,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(form),signal:AbortSignal.timeout(15000)});if(!response.ok)throw Object.assign(Error('Robinhood authorization failed; reconnect to retry'),{status:response.status,retry_ms:Math.max(60000,Math.min(3600000,(Number(response.headers.get('Retry-After'))||60)*1000))});const data=await response.json();if(typeof data.access_token!=='string'||!data.access_token||!Number.isFinite(Number(data.expires_in))||Number(data.expires_in)<=0||data.token_type?.toLowerCase()!=='bearer')throw Error('Invalid Robinhood authorization response');return {access_token:data.access_token,refresh_token:typeof data.refresh_token==='string'&&data.refresh_token?data.refresh_token:null,expires_at:Date.now()+Number(data.expires_in)*1000};}
@@ -213,8 +215,8 @@ export async function handleRobinhood(request,env){
   try{const r=await fetch(`https://raw.githubusercontent.com/Carooch62/0dte-options-command-center/main/data/candidate-quote-batch.json?v=${Date.now()}`,{cf:{cacheTtl:0},signal:AbortSignal.timeout(15000)});return reply({ok:true,snapshot:await readSnapshot(r)});}catch{return reply({ok:false,error:'Current scanner snapshot unavailable or too large. Import a JSON snapshot instead.'},502);}
  }
  if(path==='/private/plaid/robinhood/status'&&request.method==='GET'){
-  const saved=await connection(env),connected=!!saved&&saved.expires_at>Date.now();
-  return reply({ok:true,connected,expires_at:saved?new Date(saved.expires_at).toISOString():null,status:connected?'CONNECTED_UNVERIFIED':saved?'RECONNECT_REQUIRED':'READY_TO_CONNECT',scanner_feed:'DELAYED_RESEARCH'});
+  const state=await connectionState(env),saved=state.connection,connected=!!saved&&saved.expires_at>Date.now();
+  return reply({ok:true,connected,automatic_renewal_ready:!!env.ROBINHOOD_COORDINATOR&&state.renewal_supported,expires_at:saved?new Date(saved.expires_at).toISOString():null,status:connected?'CONNECTED_UNVERIFIED':state.authorization_present?'RECONNECT_REQUIRED':'READY_TO_CONNECT',scanner_feed:'DELAYED_RESEARCH'});
  }
  if(path==='/private/plaid/robinhood/callback'&&request.method==='GET'){
   const clear={'Set-Cookie':cookie('',0)};
