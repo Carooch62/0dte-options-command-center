@@ -27,7 +27,7 @@ const sameOrigin=(request,url)=>request.headers.get('Origin')===url.origin&&requ
 
 export function verifiedAlertReadiness(env,discordConfigured=!!env.DISCORD_WATCH_WEBHOOK_URL) {
  const requirements={
-  scan_scheduler:env.FAST_SCAN_ENABLED==='true'&&!!env.SCAN_COORDINATOR,
+  scan_scheduler:!!env.SCAN_COORDINATOR,
   discord_webhook:discordConfigured,
   private_robinhood_connection:env.ROBINHOOD_CONNECTION_ENABLED==='true',
   hosted_quote_permission:env.ROBINHOOD_UNATTENDED_CONFIRMED==='true',
