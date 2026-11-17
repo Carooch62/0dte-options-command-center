@@ -1,3 +1,4 @@
+import {coverageReport} from './coverage-report.js';
 import {loadDashboardSnapshot} from './dashboard-delivery.js';
 import {entryReadiness,trendSummary,matchesTrend,quoteKey,observePremiums,premiumChange,positionEstimate,reentryProblem,positionAlerts,validPlan} from './trade-review.js?v=20261002-trend-filters';
 import {watchKey,watchTransitions} from './contract-watch.js';
@@ -230,7 +231,8 @@ function render(){if(!data)return;
  const all=(data.candidates||[]).map(x=>({...expirationView(x,$('expiration').value),prefer_low_theta:$('thetaMax').value!=='off',theta_limit_pct:['prefer','off'].includes($('thetaMax').value)?null:Number($('thetaMax').value)})),counts={};for(const x of all){const s=recordedState(x);counts[s]=(counts[s]||0)+1;}
  const c=data.coverage||{};
  $('stats').innerHTML=[['STOCK ROWS',c.stocks_received??data.scanned_rows??0],['CHAIN ATTEMPTS',c.chains_attempted??'Unknown'],['WITH SAME-DAY CHAIN',c.chains_with_contracts??'Unknown'],['LAST TRIGGERED',counts.TRIGGERED||0],['LAST SECOND-WAVE',counts['SECOND-WAVE']||0],['LAST CONFIRMED',counts['CONFIRMED DELAYED']||0]].map(([a,b])=>`<div class="panel stat"><b>${esc(b)}</b><span>${a}</span></div>`).join('');
- $('coverage').textContent=`Universe: ${data.universe_size??'unknown'} · ${c.chains_not_attempted??'unknown'} chains not yet attempted · ${Object.entries(c.chain_status_counts||{}).map(([a,b])=>a+': '+b).join(' · ')}. Broader discovery: ${Object.entries(data.discovery||{}).map(([a,b])=>a+' '+b.status).join(', ')}.`;
+ const report=coverageReport(c);
+ $('coverage').textContent=`${report.summary} ${report.incomplete?'Missed-candidate analysis is incomplete because not all chains were checked. ':''}Universe: ${data.universe_size??'unknown'} · ${c.chains_not_attempted??'unknown'} chains not yet attempted · ${Object.entries(c.chain_status_counts||{}).map(([a,b])=>a+': '+b).join(' · ')}. Broader discovery: ${Object.entries(data.discovery||{}).map(([a,b])=>a+' '+b.status).join(', ')}.`;
  const min=Number($('askMin').value),max=Number($('askMax').value);$('filterNotice').textContent=(!Number.isFinite(min)||!Number.isFinite(max)||min<0||max<min)?'Enter a valid minimum and maximum.':'';
  let rows=all.filter(x=>tickerMatches(x.ticker,$('tickerSearch').value)&&matchesState(x,dataDownloadFailed?{...data,generated_at:null}:data,$('state').value)&&($('direction').value==='ALL'||x.direction===$('direction').value)&&matchesTrend(x,$('trendPeriod').value,$('trendDirection').value,$('trendAlignment').value,dataDownloadFailed?{...data,generated_at:null}:data)&&($('catalyst').value==='ALL'||x.catalyst_level===$('catalyst').value)&&($('onlyContracts').value!=='contracts'||selectableContracts(x,min,max).length)&&($('onlyContracts').value!=='starred'||stars.includes(x.ticker)));
  const order={'CONFIRMED DELAYED':7,TRIGGERED:6,'SECOND-WAVE':5,WATCH:4,DECAYING:3,PASS:2,'STALE PRICE DATA':1,'STALE SCAN':1,'MARKET CLOSED':1,'DATA UNAVAILABLE':0};
