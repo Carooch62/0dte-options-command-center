@@ -50,12 +50,15 @@ jobs:
       - name: Capture public shadow evidence after a validated scan
         run: |
           python - <<'PY'
-          import json, subprocess
+          import importlib.util, json, subprocess
           from pathlib import Path
-          from shadow_evidence import capture
           health=json.loads(Path('data/scan-health.json').read_text())
           if health.get('stage') == 'VALIDATED' and health.get('status') in ('SUCCESS','DEGRADED'):
-              print(json.dumps(capture('data', source_commit=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip())))
+              if importlib.util.find_spec('shadow_evidence') is None:
+                  print('SHADOW_EVIDENCE_UNAVAILABLE: current branch has no capture module; no shadow validation claimed.')
+              else:
+                  from shadow_evidence import capture
+                  print(json.dumps(capture('data', source_commit=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip())))
           else:
               print('No new validated scan; retained evidence keeps its original timestamps.')
           PY
