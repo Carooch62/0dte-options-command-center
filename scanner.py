@@ -125,7 +125,10 @@ def news(t):
     try:
         d=request_json('https://query1.finance.yahoo.com/v1/finance/search',
                        params={'q':t,'newsCount':8,'quotesCount':0},headers={'User-Agent':UA})
-        return d.get('news',[])
+        items = d.get('news') if isinstance(d, dict) else None
+        if not isinstance(items, list) or any(not isinstance(item, dict) for item in items):
+            raise ValueError('invalid news response')
+        return items
     except Exception as exc:
         record_error(t,'news',exc)
         return []
@@ -270,6 +273,8 @@ def add_news(items):
             x = next((z for z in items if z["ticker"] == ticker), None)
             if x is None:
                 continue
+            x["news_status"] = "SOURCE_FAILURE" if any(e['ticker'] == ticker and e['stage'] == 'news' for e in ERRORS) else "SUCCESS"
+            x["news_checked_at"] = datetime.now(timezone.utc).isoformat()
             x["news_items"] = fresh
             x["news"] = " | ".join(f"{n['title']} ({n['publisher']})" for n in fresh if n.get("title"))
             x["catalyst"] = any(n.get("explicit_ticker") for n in fresh)
@@ -502,13 +507,17 @@ def main():
     print(json.dumps({'stage':'news_complete'}),flush=True)
     for x in rows:
         x.setdefault('news_items',[]);x.setdefault('catalyst',False)
+        x.setdefault('news_status','NOT_SCANNED')
         x.update(chain_attempted=False,chain_status='NOT_SCANNED',options=[],preferred_contracts=[],usable_contracts=[],zero_dte=False)
     out={'generated_at':datetime.now(timezone.utc).isoformat(), 'market_date':info['market_date'],
          'market_session':info['session'],'session_open_at':info['open_at'],'session_close_at':info['close_at'],
          'scan_mode':scan_mode,'scan_id':os.getenv('SCAN_REQUEST_ID') or os.getenv('GITHUB_RUN_ID') or str(time.time_ns()),
          'workflow_run_id':os.getenv('GITHUB_RUN_ID'),'source':'Yahoo 5m bars + CBOE delayed options; Nasdaq fallback',
          'data_quality':'DELAYED_RESEARCH','universe_size':len(universe),'scanned_rows':len(rows),
-         'news_universe':min(50,len(rows)),'discovery':discovery,'price_errors':list(ERRORS),
+         'news_universe':min(50,len(rows)),
+         'news_coverage':{status:sum(x['news_status']==status for x in rows)
+                          for status in ('SUCCESS','SOURCE_FAILURE','NOT_SCANNED')},
+         'discovery':discovery,'price_errors':list(ERRORS),
          'candidates':rows,'contract_rules':{'preferred_ask_min':.10,'preferred_ask_max':.30,
          'min_delta':.30,'max_delta':.50,'trade_dte_max':14,'swing_dte_min':15,'swing_min_delta':.70,'swing_max_delta':.80,'preferred_delta':.40,'preferred_spread_max':.05,'preferred_spread_pct_max':20}}
     coverage(out);Path('data').mkdir(exist_ok=True)
