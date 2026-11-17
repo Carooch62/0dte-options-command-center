@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {deliverVerifiedOptionAlert} from '../watch-alert-delivery.js';
 import {sendDiscordVerifiedOptionAlert} from '../watch-discord.js';
 
-const alert={key:'scan-one:b6864f13-709c-42ba-a6f9-f3dc2bdcbe83',link:'https://robinhood.com/options/example',text:'REVIEW TEST $10 call https://robinhood.com/options/example'};
+const alert={key:'scan-one:b6864f13-709c-42ba-a6f9-f3dc2bdcbe83',link:'https://robinhood.com/options/example',discord_text:'REVIEW TEST $10 call https://robinhood.com/options/example',text:'REVIEW TEST $10 call https://robinhood.com/options/example'};
 const values=new Map();
 const store={get:async key=>values.get(key),put:async(key,value)=>values.set(key,value)};
 const env={WATCH_VERIFIED_ALERTS_ENABLED:'true',WATCH_QUOTE_PILOT_ENABLED:'true',DISCORD_WATCH_WEBHOOK_URL:'https://discord.com/api/webhooks/123/placeholder',PLAID_STORE:store};
@@ -30,7 +30,9 @@ test('delivery failures retain the alert for retry',async()=>{
 test('Discord message disables mentions and rejects an invalid link',async()=>{
  await sendDiscordVerifiedOptionAlert(alert,env,async(url,options)=>{
   assert.match(url,/^https:\/\/discord.com\/api\/webhooks\//);
+  assert.equal(JSON.parse(options.body).content,alert.discord_text);
   assert.deepEqual(JSON.parse(options.body).allowed_mentions,{parse:[]});return {ok:true};
  });
  await assert.rejects(sendDiscordVerifiedOptionAlert({...alert,link:'https://evil.example/'},env,()=>{throw Error('network called')}),/Invalid verified option alert/);
 });
+

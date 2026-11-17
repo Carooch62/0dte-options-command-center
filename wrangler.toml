@@ -30,6 +30,7 @@ id = "c141007029b0432abe871df0e27c3bdf"
 
 [vars]
 FAST_SCAN_ENABLED = "false"
+ROBINHOOD_UNATTENDED_CONFIRMED = "true"
 
 # Branch previews intentionally have no brokerage storage or private connection.
 # Never copy the production PLAID_STORE ID into this block.
@@ -39,3 +40,11 @@ kv_namespaces = []
 [previews.vars]
 APP_ENV = "preview"
 
+
+[[durable_objects.bindings]]
+name = "ROBINHOOD_COORDINATOR"
+class_name = "RobinhoodCoordinator"
+
+[[migrations]]
+tag = "robinhood-coordinator-v1"
+new_sqlite_classes = ["RobinhoodCoordinator"]

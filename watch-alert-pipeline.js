@@ -8,7 +8,6 @@ export async function processVerifiedOptionAlerts(env,snapshot,candidates,observ
  now=Date.now(),resolveLink=null,deliver=deliverVerifiedOptionAlert
 }={}){
  if(env.WATCH_QUOTE_PILOT_ENABLED!=='true'||env.WATCH_VERIFIED_ALERTS_ENABLED!=='true')return {status:'disabled'};
- if(typeof resolveLink!=='function')return {status:'link-resolver-unavailable',qualified:countQualifiedQuotes(candidates,observations,now)};
  let sent=0,unlinked=0,failed=0;
  for(const candidate of candidates){
   const option=candidate.options?.[0];
@@ -17,7 +16,7 @@ export async function processVerifiedOptionAlerts(env,snapshot,candidates,observ
    Number(x.instrument?.strike_price)===Number(option?.strike));
   if(matches.length!==1||countQualifiedQuotes([candidate],matches,now)!==1)continue;
   const observation=matches[0];
-  const link=await resolveLink(observation.instrument,candidate);
+  const link=typeof resolveLink==='function'?await resolveLink(observation.instrument,candidate):null;
   const alert=prepareVerifiedOptionAlert(candidate,observation,link,{
    scan_id:snapshot.scan_id,generated_at:snapshot.generated_at,
    market_session:snapshot.market_session,execution_state:candidate.execution_state
@@ -29,3 +28,4 @@ export async function processVerifiedOptionAlerts(env,snapshot,candidates,observ
  }
  return {status:failed?'delivery-retry':'checked',sent,unlinked,failed};
 }
+
