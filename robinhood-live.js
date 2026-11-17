@@ -46,9 +46,9 @@ export class RobinhoodCoordinator {
    get:async key=>localKey(key)?await this.state.storage.get('pilot:'+key)||null:this.env.PLAID_STORE.get(key),
    put:async(key,value,options)=>localKey(key)?this.state.storage.put('pilot:'+key,value):this.env.PLAID_STORE.put(key,value,options)
   };
-  try{return await runWatchQuotePilot({...this.env,PLAID_STORE:store});}
+  try{const result=await runWatchQuotePilot({...this.env,PLAID_STORE:store});await this.state.storage.put('pilot_throttles',0);return result;}
   catch(error){
-   if(error.status===429){await this.state.storage.put('pilot_retry_after',Date.now()+error.retry_ms);return {status:'throttled'};}
+   if(error.status===429){const failures=(await this.state.storage.get('pilot_throttles')||0)+1;await this.state.storage.put('pilot_throttles',failures);await this.state.storage.put('pilot_retry_after',Date.now()+Math.max(error.retry_ms,Math.min(3600000,300000*2**Math.min(failures-1,4))));return {status:'throttled'};}
    return {status:'verification-failed'};
   }
  }

@@ -5,8 +5,8 @@ Support case 022550842 confirms unattended MCP use without separate approval or 
 ## Implementation
 
 - `ROBINHOOD_COORDINATOR` stores AES-GCM encrypted authorization in a Durable Object. Credential reads, callback saves, disconnects and refreshes serialize through the owner object. Legacy KV credentials migrate on first use; old authorizations have no saved refresh token and require one reconnect.
-- Renewal starts two minutes before expiry. Replacement refresh tokens persist before new access is returned. Ambiguous renewal failures require reconnect instead of reusing a possibly consumed token; HTTP 429 persists a cooldown.
-- The pilot uses a separate named object. Overlapping ticks share one execution. Scan checkpoints and successful delivery markers use strongly consistent storage. A delivery timeout can still be ambiguous; Discord webhooks offer no application idempotency key.
+- Renewal starts two minutes before expiry. Replacement refresh tokens persist before new access is returned. Ambiguous renewal failures require reconnect instead of reusing a possibly consumed token; HTTP 429 persists a cooldown; repeated pilot throttling increases the delay up to one hour.
+- The scanner publishes a <=64 KiB watch-quote-batch.json with up to three contracts; the Worker never loads the full dashboard for this pilot. The pilot uses a separate named object. Overlapping ticks share one execution. Scan checkpoints and successful delivery markers use strongly consistent storage. A delivery timeout can still be ambiguous; Discord webhooks offer no application idempotency key.
 - Exact identity, current open-session scan, quote age, ask <= $0.30, spread, delta and volume checks remain mandatory. Missing contract links use the Robinhood home page with explicit manual-selection instructions.
 - Discord receives contract identity and derived setup information only. Raw provider prices and Greeks are excluded. This is an implementation choice, not a claim that support approved Discord distribution.
 

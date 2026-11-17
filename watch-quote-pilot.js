@@ -4,7 +4,7 @@ import {quoteWatchContracts} from './robinhood-live.js';
 import {processVerifiedOptionAlerts} from './watch-alert-pipeline.js';
 export {countQualifiedQuotes} from './watch-quote-qualification.js';
 
-const snapshotUrl='https://raw.githubusercontent.com/Carooch62/0dte-options-command-center/main/data/market-dashboard.json';
+const snapshotUrl='https://raw.githubusercontent.com/Carooch62/0dte-options-command-center/main/data/watch-quote-batch.json';
 const checkpointKey='watch-quote-pilot:last-checked-scan';
 
 export function triggeredQuoteCandidates(snapshot, now) {
@@ -20,12 +20,35 @@ export function triggeredQuoteCandidates(snapshot, now) {
  return projectCandidates({...snapshot,candidates}).candidates.slice(0,3).map(candidate=>({...candidate,execution_state:states.get(candidate.ticker)}));
 }
 
+// Generated with the scanner; carries only the evidence used by pilot selection.
+export function makeWatchQuoteSnapshot(snapshot){
+ const candidates=triggeredQuoteCandidates(snapshot,Date.parse(snapshot.generated_at)).map(selected=>{
+  const option=selected.options[0];
+  const sources=snapshot.candidates.filter(c=>c.ticker===selected.ticker&&c.execution_state===selected.execution_state);
+  const original=sources.flatMap(source=>[...(source.options||[]),...Object.values(source.expiry_groups||{}).flatMap(g=>g?.options||[])]).find(o=>o.side===option.side&&o.expiry===option.expiry&&Number(o.strike)===Number(option.strike));
+  const keys=['contract_id','expiry','side','strike','ask','quote_valid','near_atm','delta_ok','usable_spread','volume','dte','contract_score'];
+  return {ticker:selected.ticker,direction:option.side==='call'?'UP':'DOWN',execution_state:selected.execution_state,options:[Object.fromEntries(keys.filter(k=>k in original).map(k=>[k,original[k]]))]};
+ });
+ return {format:'watch-pilot-v1',scan_id:snapshot.scan_id,generated_at:snapshot.generated_at,market_session:snapshot.market_session,candidates};
+}
+export async function readPilotSnapshot(response){
+ const limit=65536;
+ if(!response.ok||Number(response.headers.get('Content-Length'))>limit)throw Error('Pilot batch unavailable or oversized');
+ const reader=response.body.getReader(),decoder=new TextDecoder();let size=0,raw='';
+ try{
+  while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>limit)throw Error('Pilot batch oversized');raw+=decoder.decode(value,{stream:true});}
+  raw+=decoder.decode();const snapshot=JSON.parse(raw);
+  if(snapshot.format!=='watch-pilot-v1'||!Array.isArray(snapshot.candidates)||snapshot.candidates.length>3)throw Error('Invalid pilot batch');
+  return snapshot;
+ }finally{await reader.cancel().catch(()=>{});}
+}
+
 // Run on the existing slower watch tick. Report counts only, with no trade messages or stored quotes.
 export async function runWatchQuotePilot(env,{now=Date.now(),clock=Date.now,fetcher=fetch,verify=quoteWatchContracts,resolveLink=null,deliver}={}) {
  if(env.APP_ENV==='preview'||env.WATCH_QUOTE_PILOT_ENABLED!=='true'||!env.PLAID_STORE)return {status:'disabled'};
  const response=await fetcher(snapshotUrl+'?v='+now,{cf:{cacheTtl:0},signal:AbortSignal.timeout(15000)});
  if(!response.ok)throw Error('Alert pilot scan unavailable');
- const snapshot=await response.json();
+ const snapshot=await readPilotSnapshot(response);
  const candidates=triggeredQuoteCandidates(snapshot,now);
  if(!candidates.length)return {status:'no-recent-triggered-contracts'};
  if(await env.PLAID_STORE.get(checkpointKey)===snapshot.scan_id)return {status:'unchanged'};
@@ -39,3 +62,4 @@ export async function runWatchQuotePilot(env,{now=Date.now(),clock=Date.now,fetc
  await env.PLAID_STORE.put(checkpointKey,snapshot.scan_id,{expirationTtl:3600});
  return {status:'checked',candidates:candidates.length,qualified,alerts};
 }
+

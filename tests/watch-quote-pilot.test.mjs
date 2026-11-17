@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {countQualifiedQuotes, runWatchQuotePilot, triggeredQuoteCandidates} from '../watch-quote-pilot.js';
+import {countQualifiedQuotes, runWatchQuotePilot, triggeredQuoteCandidates,makeWatchQuoteSnapshot,readPilotSnapshot} from '../watch-quote-pilot.js';
 
 const now=Date.parse('2026-11-05T15:31:00Z');
 const expiry='2026-11-05';
 const id='b6864f13-709c-42ba-a6f9-f3dc2bdcbe83';
 const option={expiry,side:'call',strike:10,ask:.25,quote_valid:true,near_atm:true,delta_ok:true,usable_spread:true,volume:50,dte:0};
 const row={ticker:'TEST',direction:'UP',execution_state:'TRIGGERED',options:[option,{...option,side:'put'}]};
-const snapshot={scan_id:'pilot-fixture',generated_at:new Date(now-1000).toISOString(),market_session:'OPEN',candidates:[row,{...row,ticker:'WAIT',execution_state:'WATCH'}]};
+const snapshot={format:'watch-pilot-v1',scan_id:'pilot-fixture',generated_at:new Date(now-1000).toISOString(),market_session:'OPEN',candidates:[row,{...row,ticker:'WAIT',execution_state:'WATCH'}]};
 const observed={
  instrument:{id,chain_symbol:'TEST',type:'call',expiration_date:expiry,strike_price:10,trade_value_multiplier:100,state:'active',tradability:'tradable',sellout_datetime:'2026-11-05T20:30:00Z'},
  quote:{instrument_id:id,updated_at:new Date(now-2000).toISOString(),bid_price:.24,ask_price:.26,delta:.40,volume:50},
@@ -19,6 +19,14 @@ test('pilot selects recent triggered research contracts with the matching direct
  assert.deepEqual(candidates.map(c=>[c.ticker,c.options[0].side]),[['TEST','call']]);
  assert.deepEqual(triggeredQuoteCandidates(snapshot,now+6*60000),[]);
  assert.deepEqual(triggeredQuoteCandidates({...snapshot,market_session:'CLOSED'},now),[]);
+});
+test('compact pilot batch preserves selection and omits large unrelated research data',async()=>{
+ const compact=makeWatchQuoteSnapshot({...snapshot,unused:'x'.repeat(100000),candidates:snapshot.candidates.map(c=>({...c,bars:['x'.repeat(100000)]}))});
+ assert.deepEqual(triggeredQuoteCandidates(compact,now),triggeredQuoteCandidates(snapshot,now));
+ assert.ok(JSON.stringify(compact).length<2000);
+ assert.deepEqual(await readPilotSnapshot(Response.json(compact)),compact);
+ await assert.rejects(readPilotSnapshot(new Response('x'.repeat(65537))),/oversized/);
+ await assert.rejects(readPilotSnapshot(Response.json({...compact,format:'unknown'})),/Invalid/);
 });
 
 test('the exact current contract must pass spread, price, delta and freshness checks',()=>{
@@ -45,3 +53,4 @@ test('pilot is opt-in and leaves a failed authorization check available to retry
  assert.equal(fetches,1);
  assert.equal(checkpoints,0);
 });
+

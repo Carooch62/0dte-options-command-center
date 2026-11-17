@@ -50,3 +50,13 @@ test('simultaneous pilot ticks share one execution',async()=>harness(async({owne
  const a=owner.fetch(new Request('https://internal/pilot')),b=owner.fetch(new Request('https://internal/pilot'));
  release();assert.deepEqual(await (await a).json(),{status:'checked'});await b;assert.equal(runs,1);
 }));
+test('pilot throttling increases persistent cooldown and suppresses provider calls',async()=>harness(async({owner,values,setFetch})=>{
+ owner.env.WATCH_QUOTE_PILOT_ENABLED='true';
+ let calls=0;setFetch(async()=>{calls++;throw Object.assign(Error('throttled'),{status:429,retry_ms:60000});});
+ assert.equal((await owner.runPilot()).status,'throttled');
+ assert.ok(values.get('pilot_retry_after')>=Date.now()+299000);
+ assert.equal((await owner.runPilot()).status,'throttled');assert.equal(calls,1);
+ values.set('pilot_retry_after',0);
+ await owner.runPilot();assert.equal(calls,2);assert.equal(values.get('pilot_throttles'),2);
+ assert.ok(values.get('pilot_retry_after')>=Date.now()+599000);
+}));

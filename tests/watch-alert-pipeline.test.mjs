@@ -5,7 +5,7 @@ import {runWatchQuotePilot,triggeredQuoteCandidates} from '../watch-quote-pilot.
 
 const now=Date.parse('2026-11-05T15:31:00Z');
 const id='b6864f13-709c-42ba-a6f9-f3dc2bdcbe83';
-const snapshot={scan_id:'pipeline-fixture',generated_at:new Date(now-1000).toISOString(),market_session:'OPEN',candidates:[{
+const snapshot={format:'watch-pilot-v1',scan_id:'pipeline-fixture',generated_at:new Date(now-1000).toISOString(),market_session:'OPEN',candidates:[{
  ticker:'TEST',direction:'UP',execution_state:'TRIGGERED',options:[{
   expiry:'2026-11-05',side:'call',strike:10,ask:.25,quote_valid:true,near_atm:true,delta_ok:true,usable_spread:true,volume:50,dte:0
  }]

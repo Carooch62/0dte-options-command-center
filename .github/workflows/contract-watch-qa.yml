@@ -22,6 +22,13 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Historical quote archives are not needed to verify or deploy code.
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !/data/
+            /data/*.json
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -30,3 +37,4 @@ jobs:
       - run: node --check worker.js
       - run: node --check dashboard-clean-app.js
       - run: node scripts/test-contract-watch-ui.mjs
+
