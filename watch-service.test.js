@@ -21,8 +21,8 @@ test('verified-alert readiness reports missing prerequisites without exposing se
  assert.equal(state.requirements.scan_scheduler,true);
  assert.equal(state.requirements.discord_webhook,true);
  assert.equal(state.requirements.hosted_quote_permission,false);
- assert.equal(state.requirements.exact_contract_link,false);
- assert.deepEqual(state.missing,['hosted_quote_permission','exact_contract_link']);
+ assert.equal(state.requirements.manual_contract_navigation,true);
+ assert.deepEqual(state.missing,['hosted_quote_permission','automatic_token_renewal']);
  assert.doesNotMatch(JSON.stringify(state),/placeholder|TWILIO|Bearer/);
 });
 test('protected readiness route still requires an Access assertion',async()=>{
@@ -31,3 +31,4 @@ test('protected readiness route still requires an Access assertion',async()=>{
  const r=await handleWatchService(new Request('https://example.com/private/watch/readiness'),env);
  assert.equal(r.status,401);
 });
+

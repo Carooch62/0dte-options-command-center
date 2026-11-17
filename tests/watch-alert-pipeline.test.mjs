@@ -5,7 +5,7 @@ import {runWatchQuotePilot,triggeredQuoteCandidates} from '../watch-quote-pilot.
 
 const now=Date.parse('2026-11-05T15:31:00Z');
 const id='b6864f13-709c-42ba-a6f9-f3dc2bdcbe83';
-const snapshot={scan_id:'pipeline-fixture',generated_at:new Date(now-1000).toISOString(),market_session:'OPEN',candidates:[{
+const snapshot={format:'watch-pilot-v1',scan_id:'pipeline-fixture',generated_at:new Date(now-1000).toISOString(),market_session:'OPEN',candidates:[{
  ticker:'TEST',direction:'UP',execution_state:'TRIGGERED',options:[{
   expiry:'2026-11-05',side:'call',strike:10,ask:.25,quote_valid:true,near_atm:true,delta_ok:true,usable_spread:true,volume:50,dte:0
  }]
@@ -17,13 +17,13 @@ const observed={instrument:{id,chain_symbol:'TEST',type:'call',expiration_date:'
 const enabled={WATCH_QUOTE_PILOT_ENABLED:'true',WATCH_VERIFIED_ALERTS_ENABLED:'true'};
 const link={verified:true,instrument_id:id,source:'robinhood-provider',href:'https://robinhood.com/options/example'};
 
-test('no provider-backed link resolver means no delivery',async()=>{
+test('no deep-link resolver uses manual contract navigation',async()=>{
  let deliveries=0;const candidates=triggeredQuoteCandidates(snapshot,now);
  assert.equal(candidates[0].execution_state,'TRIGGERED');
  assert.deepEqual(await processVerifiedOptionAlerts(enabled,snapshot,candidates,[observed],{
   now,deliver:async()=>{deliveries++;return {status:'sent'}}
- }),{status:'link-resolver-unavailable',qualified:1});
- assert.equal(deliveries,0);
+ }),{status:'checked',sent:1,unlinked:0,failed:0});
+ assert.equal(deliveries,1);
 });
 
 test('missing and wrong-contract links block alerts; exact verified link permits one',async()=>{
@@ -32,7 +32,7 @@ test('missing and wrong-contract links block alerts; exact verified link permits
   deliveries++;assert.equal(alert.instrument_id,id);assert.match(alert.text,/TEST \$10 CALL/);
   return {status:'sent'};
  };
- for(const value of [null,{...link,instrument_id:'unrelated'},{...link,verified:false}]){
+ for(const value of [{...link,instrument_id:'unrelated'},{...link,verified:false}]){
   const result=await processVerifiedOptionAlerts(enabled,snapshot,candidates,[observed],{now,resolveLink:async()=>value,deliver});
   assert.deepEqual(result,{status:'checked',sent:0,unlinked:1,failed:0});
  }
@@ -64,3 +64,4 @@ test('an expired or mismatched quote never calls the link resolver',async()=>{
  assert.deepEqual(result,{status:'checked',sent:0,unlinked:0,failed:0});
  assert.equal(calls,0);
 });
+

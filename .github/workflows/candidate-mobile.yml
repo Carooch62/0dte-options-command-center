@@ -17,6 +17,13 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Historical quote archives are not needed to verify or deploy code.
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !/data/
+            /data/*.json
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -42,6 +49,7 @@ jobs:
           path: test-results/mobile/
           if-no-files-found: warn
           retention-days: 7
+
 
 
 

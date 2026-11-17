@@ -23,7 +23,9 @@ export async function sendDiscordVerifiedOptionAlert(alert,env,fetcher=fetch) {
     typeof alert.text!=='string'||alert.text.length>1800||
     typeof alert.link!=='string'||!alert.text.includes(alert.link)||
     !/^https:\/\/(?:www\.)?robinhood\.com\//.test(alert.link))throw Error('Invalid verified option alert');
-  return sendDiscordPayload({content:alert.text,allowed_mentions:{parse:[]}},env,fetcher);
+  // Keep provider prices and Greeks on the authenticated dashboard, not Discord.
+  if(typeof alert.discord_text!=='string'||alert.discord_text.length>1800||!alert.discord_text.includes(alert.link))throw Error('Private signal summary required');
+  return sendDiscordPayload({content:alert.discord_text,allowed_mentions:{parse:[]}},env,fetcher);
 }
 
 export async function sendDiscordTestMessage(env,fetcher=fetch) {
@@ -39,3 +41,4 @@ async function sendDiscordPayload(payload,env,fetcher) {
   if(!response.ok)throw Error(`Discord delivery HTTP ${response.status}`);
   return {status:'sent'};
 }
+
