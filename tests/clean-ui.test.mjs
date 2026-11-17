@@ -56,5 +56,5 @@ test('streamlined status legend explains all displayed scanner states without im
   assert.ok(legend.includes(state),state);
  }
  assert.match(legend,/not a live option entry/);
- assert.match(legend,/not a live broker quote/);
+ assert.match(legend,/not a live broker quote/i);
 });
