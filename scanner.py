@@ -125,7 +125,10 @@ def news(t):
     try:
         d=request_json('https://query1.finance.yahoo.com/v1/finance/search',
                        params={'q':t,'newsCount':8,'quotesCount':0},headers={'User-Agent':UA})
-        return d.get('news',[])
+        items = d.get('news') if isinstance(d, dict) else None
+        if not isinstance(items, list):
+            raise ValueError('invalid news response')
+        return items
     except Exception as exc:
         record_error(t,'news',exc)
         return []
