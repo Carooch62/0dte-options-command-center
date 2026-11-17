@@ -1,17 +1,17 @@
 name: Staging Algorithm Scan
 on:
   push:
-    branches: [staging-algorithm]
+    branches: [staging-next-20261117]
     paths: ['*.py', '*.js', '*.toml', 'news_event_reviews.json', 'requirements.txt', 'tests/**', '.github/workflows/staging-scan.yml']
   workflow_dispatch:
 permissions:
   contents: write
 concurrency:
-  group: staging-algorithm-scan
+  group: staging-next-20261117-scan
   cancel-in-progress: false
 jobs:
   scan:
-    if: github.ref == 'refs/heads/staging-algorithm'
+    if: github.ref == 'refs/heads/staging-next-20261117'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -21,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: staging-algorithm
+          ref: staging-next-20261117
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -62,13 +62,13 @@ jobs:
       - name: Publish staging results only
         if: always() && !cancelled()
         run: |
-          test "${GITHUB_REF}" = refs/heads/staging-algorithm
+          test "${GITHUB_REF}" = refs/heads/staging-next-20261117
           test -f data/staging-environment.json
           git config user.name '0DTE Staging Scanner'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add data/
           if git diff --cached --quiet; then exit 0; fi
           git commit -m 'Update isolated staging scan results'
-          git pull --rebase origin staging-algorithm
-          git push origin HEAD:staging-algorithm
+          git pull --rebase origin staging-next-20261117
+          git push origin HEAD:staging-next-20261117
 
