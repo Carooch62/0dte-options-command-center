@@ -5,6 +5,7 @@ import {verifyAccess} from './plaid-sync.js';
 import {quoteRequestTiming} from './quote-timing.js';
 import {runWatchQuotePilot} from './watch-quote-pilot.js';
 import {marketSessions} from './market-session.js';
+import {reviewAccount,projectFillLookup} from './private-fill-lookup.js';
 const MCP='https://agent.robinhood.com/mcp/trading';
 const ISSUER=MCP;
 const TOKEN='https://api.robinhood.com/oauth2/token/';
@@ -119,7 +120,7 @@ export class RobinhoodCoordinator {
 async function exchange(form){const response=await fetch(TOKEN,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(form),signal:AbortSignal.timeout(15000)});if(!response.ok)throw Object.assign(Error('Robinhood authorization failed; reconnect to retry'),{status:response.status,retry_ms:Math.max(60000,Math.min(3600000,(Number(response.headers.get('Retry-After'))||60)*1000))});const data=await response.json();if(typeof data.access_token!=='string'||!data.access_token||!Number.isFinite(Number(data.expires_in))||Number(data.expires_in)<=0||data.token_type?.toLowerCase()!=='bearer')throw Error('Invalid Robinhood authorization response');return {access_token:data.access_token,refresh_token:typeof data.refresh_token==='string'&&data.refresh_token?data.refresh_token:null,expires_at:Date.now()+Number(data.expires_in)*1000};}
 
 // The client cannot accept arbitrary MCP methods or tool names from the browser.
-const ALLOWED=new Set(['get_equity_quotes','get_option_quotes','get_option_chains','get_option_instruments']);
+const ALLOWED=new Set(['get_equity_quotes','get_option_quotes','get_option_chains','get_option_instruments','get_accounts','get_option_orders','get_option_positions']);
 export async function rpc(token,method,params={},session=null){
  if(!['initialize','tools/list','tools/call'].includes(method)||method==='tools/call'&&!ALLOWED.has(params.name))throw Error('Market-data operation required');
  const response=await fetch(MCP,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json',Accept:'application/json, text/event-stream',...(method!=='initialize'?{'MCP-Protocol-Version':'2025-03-26'}:{}),...(session?{'Mcp-Session-Id':session}:{})},body:JSON.stringify({jsonrpc:'2.0',id:crypto.randomUUID(),method,params}),signal:AbortSignal.timeout(15000)});
@@ -272,6 +273,32 @@ export async function handleRobinhood(request,env){
   const saved=await connection(env);if(!saved||saved.expires_at<=Date.now()+15000)return reply({ok:false,error:'Reconnect Robinhood before resolving contracts'},409);
   try{const call=await marketClient(saved.access_token,['get_option_chains','get_option_instruments'],saved.expires_at);return reply({ok:true,source:'Robinhood MCP metadata',resolved_at:new Date().toISOString(),results:await resolveContracts(contracts,call)});}catch{return reply({ok:false,error:'Exact metadata lookup failed or is unavailable. Import a matching research snapshot instead.'},502);}
  }
+ if(path==='/private/plaid/robinhood/fills'){
+  if(env.ROBINHOOD_FILL_LOOKUP_ENABLED!=='true'||!env.ROBINHOOD_REVIEW_ACCOUNT)return reply({ok:false,error:'Private fill lookup is not enabled'},503);
+  let exact;try{const raw=await request.text();if(raw.length>2000)throw Error();exact=contractRequest({contracts:[JSON.parse(raw)]})[0];}catch{return reply({ok:false,error:'Provide one exact contract identity'},400);}
+  const saved=await connection(env);if(!saved||saved.expires_at<=Date.now()+15000)return reply({ok:false,error:'Reconnect the private Robinhood client first'},409);
+  try{
+   const call=await marketClient(saved.access_token,['get_option_chains','get_option_instruments','get_accounts','get_option_orders','get_option_positions'],saved.expires_at);
+   const account=reviewAccount((await call('get_accounts',{})).accounts,env.ROBINHOOD_REVIEW_ACCOUNT);
+   const [match]=await resolveContracts([exact],call);
+   if(match.status!=='EXACT_METADATA_MATCH')return reply({ok:false,error:'Exact contract could not be verified'},409);
+   const instrument=match.instrument,orders=[];let cursor,complete=false;
+   const since=new Date(Date.now()-30*86400000).toISOString();
+   for(let page=0;page<5;page++){
+    const result=await call('get_option_orders',{account_number:account,chain_ids:instrument.chain_id,created_at_gte:since,...(cursor?{cursor}:{})});
+    if(!Array.isArray(result.orders))throw Error('Invalid order coverage');
+    orders.push(...result.orders);
+    cursor=result.next;
+    if(!cursor){complete=true;break;}
+    if(typeof cursor!=='string')throw Error('Invalid pagination');
+   }
+   const positions=await call('get_option_positions',{account_number:account,option_ids:instrument.id,nonzero:true});
+   if(!Array.isArray(positions.positions)||positions.next)throw Error('Position coverage incomplete');
+   if(positions.positions.some(p=>p.option_id!==instrument.id)||positions.positions.length>1)throw Error('Ambiguous position identity');
+   const position=positions.positions[0];
+   return reply({ok:true,source:'Robinhood confirmed executions',retrieved_at:new Date().toISOString(),...projectFillLookup({orders,position,instrument,complete})});
+  }catch{return reply({ok:false,error:'Private fill lookup could not be verified. No journal data was changed.'},502);}
+ }
  if(path==='/private/plaid/robinhood/quotes'){
   let operation;try{if(Number(request.headers.get('Content-Length'))>10000)throw Error();const raw=await request.text();if(raw.length>10000)throw Error();operation=quoteRequest(JSON.parse(raw));}catch{return reply({ok:false,error:'Invalid quote request'},400);}
   const saved=await connection(env);if(!saved||saved.expires_at<=Date.now()+15000)return reply({ok:false,error:'Reconnect Robinhood before collecting quotes'},409);
@@ -299,3 +326,4 @@ export async function persistQuoteEvidence(env,observations,context){
  if(!env.ROBINHOOD_COORDINATOR)throw Error('Private evidence coordinator required');
  return ownerRequest(env,'/evidence-write',{observations,context});
 }
+

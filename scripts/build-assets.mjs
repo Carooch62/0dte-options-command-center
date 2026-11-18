@@ -12,6 +12,7 @@ const assets = [
   "dashboard_clean.html",
   "dashboard_liquid.html",
   "dashboard-clean-app.js",
+  "trade-exit-assistant.js",
   "coverage-report.js",
   "contract-watch.js",
   "dashboard_glass_previous.html",
@@ -61,6 +62,7 @@ rmSync(output, { recursive: true, force: true });
 mkdirSync(output);
 for (const file of assets) copyFileSync(join(root, file), join(output, file));
 console.log('Prepared ' + assets.length + ' browser assets in public/');
+
 
 
 

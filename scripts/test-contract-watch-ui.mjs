@@ -3,7 +3,7 @@ import {readFile} from 'node:fs/promises';
 import {createRequire} from 'node:module';
 import assert from 'node:assert/strict';
 const {chromium}=createRequire(import.meta.url)('playwright');
-const files=new Set(['dashboard_clean.html','dashboard-clean-app.js','coverage-report.js','dashboard-logic.js','dashboard-delivery.js','dashboard-mobile.css','connection-ui.css','trade-review.js','signal-checklist.js','refresh-progress.js','contract-watch.js']);
+const files=new Set(['dashboard_clean.html','dashboard-clean-app.js','coverage-report.js','dashboard-logic.js','dashboard-delivery.js','dashboard-mobile.css','connection-ui.css','trade-review.js','signal-checklist.js','refresh-progress.js','contract-watch.js','trade-exit-assistant.js']);
 const server=createServer(async(req,res)=>{try{const path=new URL(req.url,'http://localhost').pathname.slice(1);if(!files.has(path)){res.writeHead(404);res.end();return;}res.setHeader('Content-Type',path.endsWith('.js')?'text/javascript':path.endsWith('.css')?'text/css':'text/html');res.end(await readFile(new URL('../'+path,import.meta.url)));}catch{res.writeHead(500);res.end();}});
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 let browser;
@@ -44,6 +44,28 @@ try{
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
  await page.locator('[data-remove-watch]').click();
  assert.match(await page.locator('#contractWatchList').innerText(),/No contracts saved/);
+ // Exercise the purchase helper without any brokerage or trading connection.
+ await page.locator('#board').evaluate(board=>{
+  const box=document.createElement('div');box.className='contract-pick';const button=document.createElement('button');
+  button.dataset.watch=encodeURIComponent(JSON.stringify({ticker:'TEST',direction:'UP',contract_id:'TEST261106C00011000',expiry:'2026-11-06',side:'call',strike:11}));box.append(button);board.append(box);
+ });
+ const record=page.getByRole('button',{name:'I bought this contract · record fill',exact:true});await record.waitFor();await record.click();
+ assert.equal(await page.locator('#je').inputValue(),'');assert.equal(await page.locator('#jtime').inputValue(),'');
+ assert.equal(await page.locator('#jf').inputValue(),'');assert.equal(await page.locator('#jc').inputValue(),'TEST261106C00011000');
+ await page.locator('#addTrade').click();assert.match(await page.locator('#journalNotice').innerText(),/actual execution time and known total fees/);
+ assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('0dteJournal')).length),0);
+ await page.locator('#je').fill('0.50');await page.locator('#jf').fill('0');await page.locator('#jtime').fill('2026-11-02T09:49');await page.locator('#addTrade').click();
+ assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('0dteJournal')).length),1);
+ await page.locator('#exitReviewPanel').getByText(/exceeds the scanner/).waitFor();
+ // A confirmed provider execution retains seconds and cannot be journalled twice.
+ await page.locator('#addTrade').evaluate(button=>{button.dataset.executionId='11111111-1111-4111-8111-111111111111';button.dataset.executedAt='2026-11-02T14:49:30Z';});
+ await page.locator('#addTrade').click();
+ const captured=await page.evaluate(()=>JSON.parse(localStorage.getItem('0dteJournal')));
+ assert.equal(captured.length,2);assert.equal(captured[0].time,'2026-11-02T14:49:30Z');
+ await page.locator('#addTrade').click();assert.match(await page.locator('#journalNotice').innerText(),/already recorded/);
+ assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('0dteJournal')).length),2);
+ assert.deepEqual(errors,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
  console.log('Contract watch render, transition, removal and mobile width passed');
  await page.close();
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}
+

@@ -29,6 +29,7 @@ binding = "PLAID_STORE"
 id = "c141007029b0432abe871df0e27c3bdf"
 
 [vars]
+ROBINHOOD_FILL_LOOKUP_ENABLED = "false"
 FAST_SCAN_ENABLED = "false"
 ROBINHOOD_UNATTENDED_CONFIRMED = "true"
 WATCH_QUOTE_PILOT_ENABLED = "true"
@@ -50,3 +51,4 @@ class_name = "RobinhoodCoordinator"
 [[migrations]]
 tag = "robinhood-coordinator-v1"
 new_sqlite_classes = ["RobinhoodCoordinator"]
+
