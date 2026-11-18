@@ -61,6 +61,7 @@ export function attachTradeExitAssistant({board, journal, getSnapshot}) {
       if (!response.headers.get('Content-Type')?.includes('application/json')) throw Error('Private sign-in is required');
       const result = await response.json();
       if (version !== lookupVersion) return;
+      if(response.status===503){status.textContent='Automatic fill lookup is disabled or not configured. Enter your confirmed execution manually; reconnecting alone does not enable lookup.';return;}
       if (!response.ok || !result.ok) throw Error(result.error || 'Private lookup unavailable');
       status.textContent = `${result.fills.length} confirmed opening execution(s) in the 30-day order window. Current open contracts: ${result.open_quantity}. Fees: unknown; verify them separately. Nothing has been saved.`;
       for (const fill of result.fills) {
