@@ -21,5 +21,7 @@ export function mergeEvidence(previous,records){
   if(existing){if(JSON.stringify(existing)!==JSON.stringify(record))throw Error('Conflicting duplicate quote evidence');continue;}
   rows.push(record);
  }
- return {records:rows.slice(-2000),omitted:(Math.max(0,rows.length-2000))};
+ const kept=rows.slice(-2000);
+ while(kept.length&&new TextEncoder().encode(JSON.stringify(kept)).length>65536)kept.shift();
+ return {records:kept,omitted:rows.length-kept.length};
 }

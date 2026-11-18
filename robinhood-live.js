@@ -66,7 +66,7 @@ export class RobinhoodCoordinator {
   if(path==='/evidence-read'){
    const {day}=await request.json();if(!/^\d{4}-\d\d-\d\d$/.test(day||''))return new Response(null,{status:400});
    const raw=await this.state.storage.get('evidence:'+day);
-   return Response.json({format:'private-quote-evidence-export-v1',day,...(raw?await unseal(raw,this.env):{records:[],omitted:0}),limitations:['Server-collected quotes, not executions or proven exchange latency. At most 2000 records per UTC day; 30-day rolling retention. Export for longer retention.']});
+   return Response.json({format:'private-quote-evidence-export-v1',day,...(raw?await unseal(raw,this.env):{records:[],omitted:0}),limitations:['Server-collected quotes, not executions or proven exchange latency. At most 2000 records and 64 KiB of records per UTC day; 30-day rolling retention. Export for longer retention.']});
   }
   if(path==='/evidence-write'){
    const body=await request.json(),records=evidenceRecords(body.observations,body.context),day=body.context.received_at.slice(0,10);

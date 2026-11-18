@@ -20,3 +20,7 @@ test('private coordinator encrypts quotes, exports original clocks, and survives
  assert.equal(result.records.length,1);assert.equal(result.records[0].quote.updated_at,observations[0].quote.updated_at);
  assert.equal((await handleRobinhood(new Request('https://test/private/plaid/robinhood/evidence'),{})).status,401);
 });
+test('daily evidence stays within storage limits with visible omission counts',()=>{
+ const record=evidenceRecords(observations,context)[0];const many=Array.from({length:2100},(_,n)=>({...record,received_at:new Date(1794927600000+n).toISOString()}));
+ const result=mergeEvidence([],many);assert.ok(new TextEncoder().encode(JSON.stringify(result.records)).length<=65536);assert.ok(result.omitted>0);assert.equal(result.records.length+result.omitted,2100);
+});
