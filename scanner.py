@@ -260,6 +260,9 @@ def add_news(items):
                 "publisher": n.get("publisher", ""),
                 "url": n.get("link", ""),
                 "age_hours": round((time.time() - ts) / 3600, 1),
+                "published_at": datetime.fromtimestamp(ts, timezone.utc).isoformat(),
+                "retrieved_at": datetime.now(timezone.utc).isoformat(),
+                "source": "Yahoo Finance search",
                 "explicit_ticker": relevant,
                 "related_tickers": related[:8],
             })
@@ -525,3 +528,4 @@ def main():
     print(json.dumps(out['coverage']))
 
 if __name__=='__main__': main()
+
