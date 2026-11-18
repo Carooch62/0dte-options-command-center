@@ -21,7 +21,7 @@ export function attachTradeExitAssistant({board, journal, getSnapshot}) {
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const heading = journal.closest('section') || journal.parentElement;
   const plan = document.createElement('div');
-  let awaitingFill = false;
+  let awaitingFill = false, lookupVersion = 0;
   plan.id = 'exitReviewPanel';
   plan.setAttribute('aria-live', 'polite');
   journal.before(plan);
@@ -45,6 +45,42 @@ export function attachTradeExitAssistant({board, journal, getSnapshot}) {
       button.textContent = 'I bought this contract · record fill';
       watch.after(button);
     }
+  }
+  async function lookupAndOffer(contract, notice) {
+    const version = ++lookupVersion;
+    if (!location.hostname.endsWith('.workers.dev')) {
+      notice.append(document.createTextNode(' Private lookup requires the Access-protected Cloudflare dashboard; manual entry remains available here.'));
+      return;
+    }
+    const status = document.createElement('p');
+    status.textContent = 'Checking confirmed Robinhood executions for this exact contract…';
+    notice.append(status);
+    try {
+      const response = await fetch('/private/plaid/robinhood/fills', {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-Requested-With':'RobinhoodQuotes'},body:JSON.stringify({ticker:contract.ticker,expiry:contract.expiry,side:contract.side,strike:contract.strike}),signal:AbortSignal.timeout(60000)});
+      if (!response.headers.get('Content-Type')?.includes('application/json')) throw Error('Private sign-in is required');
+      const result = await response.json();
+      if (version !== lookupVersion) return;
+      if (!response.ok || !result.ok) throw Error(result.error || 'Private lookup unavailable');
+      status.textContent = `${result.fills.length} confirmed opening execution(s) in the 30-day order window. Current open contracts: ${result.open_quantity}. Fees: unknown; verify them separately. Nothing has been saved.`;
+      for (const fill of result.fills) {
+        const choose = document.createElement('button');
+        choose.type = 'button';
+        choose.textContent = `Use fill ${fill.executed_at} · ${fill.quantity} contract(s) at $${fill.price.toFixed(2)} · order ${fill.order_state}`;
+        choose.disabled = result.open_quantity < fill.quantity;
+        choose.onclick = () => {
+          $('je').value = fill.price;
+          $('jq').value = fill.quantity;
+          const date = new Date(fill.executed_at);
+          $('jtime').value = new Date(+date-date.getTimezoneOffset()*60000).toISOString().slice(0,16);
+          $('jf').value = '';
+          status.textContent = 'Confirmed execution prefilled. Verify this fill and enter known total fees; then save the journal entry yourself. Separate partial fills must be reviewed separately.';
+          $('je').focus();
+        };
+        notice.append(choose);
+      }
+      if (!result.fills.length) status.textContent += ' No purchase is inferred from an unfilled order.';
+      if (result.fills.some(fill => result.open_quantity < fill.quantity)) status.textContent += ' Some fills exceed the current open quantity and need sale/re-entry reconciliation; they were not prefilled.';
+    } catch (error) { if (version === lookupVersion) status.textContent = `Automatic lookup unavailable: ${error.message}. Enter a confirmed fill manually or reconnect privately.`; }
   }
   board.addEventListener('click', event => {
     const button = event.target.closest('[data-record-fill]');
@@ -72,6 +108,7 @@ export function attachTradeExitAssistant({board, journal, getSnapshot}) {
     $('je').focus();
     const notice = $('journalNotice');
     notice.textContent = (candidate?.setup_qualified === false ? 'Shadow review: the latest displayed ticker setup is unqualified in delayed research. Verify the actual pre-entry snapshot and live quote. ' : '') + 'Enter the actual Robinhood fill premium, quantity, execution time, and total known fees. Scanner ask is not your fill. Saving is a separate confirmation.';
+    void lookupAndOffer(contract, notice);
   }, true);
   $('addTrade').addEventListener('click', event => {
     if (!awaitingFill) return;
