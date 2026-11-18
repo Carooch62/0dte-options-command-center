@@ -28,6 +28,10 @@ test('activation gate prevents provider calls and credential access',async()=>ha
  assert.equal((await handleRobinhood(request('status','GET',auth),{...env,ROBINHOOD_CONNECTION_ENABLED:'false'})).status,503);
  assert.equal(calls.length,0);
 }));
+test('fill lookup is separately disabled without provider calls',async()=>harness(async({env,auth,calls})=>{
+ const r=await handleRobinhood(request('fills','POST',auth,{ticker:'SPY',expiry:'2026-11-20',side:'call',strike:7}),env);
+ assert.equal(r.status,503);assert.equal(calls.length,0);
+}));
 test('cross-origin mutation and non-fixed callback configuration are rejected',async()=>harness(async({env,auth,calls})=>{
  assert.equal((await handleRobinhood(request('connect','POST',{...auth,Origin:'https://evil.test'}),env)).status,403);
  assert.equal((await handleRobinhood(request('status','GET',auth),{...env,ROBINHOOD_REDIRECT_URI:'https://evil.test/callback'})).status,503);
@@ -167,5 +171,26 @@ test('authenticated metadata path discovers only read-only tools and sanitizes e
   return Response.json({result:{structuredContent:{data}}});
  });
  const r=await handleRobinhood(request('resolve','POST',auth,{contracts:[{ticker:'SPY',strike:772,side:'put',expiry:'2026-10-16'}]}),env),text=await r.text();assert.equal(r.status,200);assert.ok(!text.includes('PRIVATE'));assert.ok(!text.includes('secret'));assert.equal(JSON.parse(text).results[0].status,'EXACT_METADATA_MATCH');assert.deepEqual(operations,['get_option_chains','get_option_instruments']);
+}));
+test('private fill lookup matches configured account and one exact execution without leaking account data',async()=>harness(async({env,auth,setUpstream})=>{
+ const started=await handleRobinhood(request('connect','POST',auth,{}),env),target=new URL((await started.json()).authorization_url);
+ const cb=new URL(env.ROBINHOOD_REDIRECT_URI);cb.search=new URLSearchParams({code:'code',state:target.searchParams.get('state'),iss:'https://agent.robinhood.com/mcp/trading'});
+ setUpstream(async()=>Response.json({access_token:'secret',token_type:'Bearer',expires_in:3600}));
+ await handleRobinhood(new Request(cb,{headers:{...auth,Cookie:started.headers.get('Set-Cookie').split(';')[0]}}),env);
+ const chain='11111111-1111-4111-8111-111111111111',id='22222222-2222-4222-8222-222222222222',exec='33333333-3333-4333-8333-333333333333',names=[];
+ setUpstream(async(url,options)=>{
+  const b=JSON.parse(options.body);
+  if(b.method==='initialize')return Response.json({result:{protocolVersion:'2025-03-26'}});
+  if(b.method==='notifications/initialized')return new Response(null,{status:202});
+  if(b.method==='tools/list')return Response.json({result:{tools:['get_accounts','get_option_chains','get_option_instruments','get_option_orders','get_option_positions','place_option_order'].map(name=>({name}))}});
+  names.push(b.params.name);
+  const identity={id,chain_id:chain,chain_symbol:'SPY',expiration_date:'2026-11-20',strike_price:'7',type:'call',trade_value_multiplier:'100'};
+  const data={get_accounts:{accounts:[{account_number:'private-target',brokerage_account_type:'individual'},{account_number:'private-other',brokerage_account_type:'individual'}]},get_option_chains:{chains:[{id:chain,expiration_dates:['2026-11-20']}]},get_option_instruments:{instruments:[identity]},get_option_orders:{orders:[{state:'partially_filled',processed_quantity:'1',legs:[{option_id:id,expiration_date:'2026-11-20',strike_price:'7',option_type:'call',side:'buy',position_effect:'open',executions:[{id:exec,price:'.33',quantity:'1',timestamp:'2026-11-18T15:22:00Z'}]}]}],next:null},get_option_positions:{positions:[{option_id:id,quantity:'1'}],next:null}}[b.params.name];
+  return Response.json({result:{structuredContent:{data}}});
+ });
+ const live={...env,ROBINHOOD_FILL_LOOKUP_ENABLED:'true',ROBINHOOD_REVIEW_ACCOUNT:'private-target'};
+ const r=await handleRobinhood(request('fills','POST',auth,{ticker:'SPY',expiry:'2026-11-20',side:'call',strike:7}),live),body=await r.json();
+ assert.equal(r.status,200);assert.equal(body.fills.length,1);assert.equal(body.fills[0].fees,null);assert.equal(body.open_quantity,1);
+ assert.ok(!JSON.stringify(body).includes('private-target'));assert.ok(!JSON.stringify(body).includes('private-other'));assert.ok(!names.includes('place_option_order'));
 }));
 
