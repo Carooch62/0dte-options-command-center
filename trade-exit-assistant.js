@@ -33,7 +33,7 @@ export function attachTradeExitAssistant({board, journal, getSnapshot}) {
     const open = Array.isArray(trades) ? trades.filter(t => t.exit == null) : [];
     plan.innerHTML = `<h3>Open positions · exit review</h3><p class="smallnote">Manual fills and plans saved only in this browser. Scanner status and option quotes are delayed research, not current executable prices. Nothing here places an order.</p>` + (open.length ? open.map(t => {
       const notes = exitReview(t, candidates.get(t.ticker), snapshot);
-      return `<div class="contract-pick"><b>${escape(t.ticker)} ${escape(t.contract)}</b><p class="smallnote">Recorded fill $${Number(t.entry).toFixed(2)} × ${Number(t.qty)}; verify this entry against Robinhood. Maximum premium at risk before fees: $${(Number(t.entry) * Number(t.qty) * 100).toFixed(2)}.</p><ul>${notes.map(n => `<li>${escape(n)}</li>`).join('')}</ul><p class="smallnote">Use Edit fill / plan below to set checkpoints. No net P/L is calculated here.</p></div>`;
+      return `<div class="contract-pick"><b>${escape(t.ticker)} ${escape(t.contract)}</b><p class="smallnote">Recorded fill $${Number(t.entry).toFixed(2)} × ${Number(t.qty)}; verify this entry and the contract multiplier against Robinhood. Premium paid for a standard 100-share contract, before fees: $${(Number(t.entry) * Number(t.qty) * 100).toFixed(2)}.</p><ul>${notes.map(n => `<li>${escape(n)}</li>`).join('')}</ul><p class="smallnote">Use Edit fill / plan below to set checkpoints. No net P/L is calculated here.</p></div>`;
     }).join('') : '<p class="smallnote">No open fills recorded here.</p>');
   }
   function addButtons() {
