@@ -20,3 +20,10 @@ test('later unqualified ticker observation produces a shadow-only review', () =>
   assert.doesNotMatch(exitReview(trade,{...candidate,last_status:{observed_at:'2026-11-18T14:00:00Z'}},{generated_at:'2026-11-18T16:01:00Z'}).join(' '),/Shadow review/);
   assert.equal(exitReview({...trade,exit:.4},candidate,{generated_at:'2026-11-18T16:01:00Z'}),null);
 });
+
+
+test('outside-budget personal fills are labelled without changing scanner qualification',()=>{
+ const candidate={setup_qualified:true};
+ assert.match(exitReview({...trade,entry:.50},candidate,null).join(' '),/exceeds the scanner/);
+ assert.equal(candidate.setup_qualified,true);
+});

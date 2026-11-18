@@ -294,7 +294,8 @@ export async function handleRobinhood(request,env){
    }
    const positions=await call('get_option_positions',{account_number:account,option_ids:instrument.id,nonzero:true});
    if(!Array.isArray(positions.positions)||positions.next)throw Error('Position coverage incomplete');
-   const position=positions.positions.find(p=>p.option_id===instrument.id);
+   if(positions.positions.some(p=>p.option_id!==instrument.id)||positions.positions.length>1)throw Error('Ambiguous position identity');
+   const position=positions.positions[0];
    return reply({ok:true,source:'Robinhood confirmed executions',retrieved_at:new Date().toISOString(),...projectFillLookup({orders,position,instrument,complete})});
   }catch{return reply({ok:false,error:'Private fill lookup could not be verified. No journal data was changed.'},502);}
  }
@@ -325,3 +326,4 @@ export async function persistQuoteEvidence(env,observations,context){
  if(!env.ROBINHOOD_COORDINATOR)throw Error('Private evidence coordinator required');
  return ownerRequest(env,'/evidence-write',{observations,context});
 }
+

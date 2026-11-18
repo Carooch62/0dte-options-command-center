@@ -21,3 +21,15 @@ test('only exact confirmed opening executions are projected; fees remain unknown
   assert.throws(()=>projectFillLookup({orders,position:null,instrument,complete:false}));
   assert.throws(()=>projectFillLookup({orders:[{...orders[0],legs:[{...leg,expiration_date:'2026-11-21'}]}],position:null,instrument,complete:true}),/Contract mismatch/);
 });
+
+
+test('prefill requires opening executions to match current position with no sales',()=>{
+ const order={state:'filled',processed_quantity:'1',legs:[leg]};
+ assert.equal(projectFillLookup({orders:[order],position:{quantity:'1'},instrument,complete:true}).fills[0].prefill_eligible,true);
+ for(const orders of [[order,{...order,legs:[{...leg,side:'sell',position_effect:'close'}]}],[order,{...order,legs:[{...leg,side:'sell',position_effect:'close',executions:null}]}]]){
+  assert.equal(projectFillLookup({orders,position:{quantity:'1'},instrument,complete:true}).fills[0].prefill_eligible,false);
+ }
+ assert.equal(projectFillLookup({orders:[order],position:{quantity:2},instrument,complete:true}).fills[0].prefill_eligible,false);
+ assert.throws(()=>projectFillLookup({orders:[{...order,legs:[leg,{...leg,side:'sell'}]}],position:{quantity:1},instrument,complete:true}),/Multi-leg/);
+ assert.throws(()=>projectFillLookup({orders:[order],position:{quantity:1},instrument:{...instrument,trade_value_multiplier:10},complete:true}),/Incomplete/);
+});

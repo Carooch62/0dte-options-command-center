@@ -2,6 +2,7 @@
 export function exitReview(trade, candidate, snapshot) {
   if (!trade || trade.exit !== null) return null;
   const notes = [];
+  if(Number(trade.entry)>.30)notes.push('Recorded entry exceeds the scanner’s $0.30 premium limit. This personal trade remains separate from scanner-qualified entries.');
   if (trade.lossReview == null || trade.target == null) notes.push('Set your own loss-review and profit-review bids before relying on a price checkpoint.');
   else notes.push(`Review a sale if a current executable bid reaches your loss checkpoint ($${Number(trade.lossReview).toFixed(2)}) or profit checkpoint ($${Number(trade.target).toFixed(2)}). These are reminders, not orders or guaranteed fills.`);
   if (trade.exitConditions) notes.push(`Reassess if your stated setup ends: ${trade.exitConditions}`);
@@ -66,8 +67,10 @@ export function attachTradeExitAssistant({board, journal, getSnapshot}) {
         const choose = document.createElement('button');
         choose.type = 'button';
         choose.textContent = `Use fill ${fill.executed_at} · ${fill.quantity} contract(s) at $${fill.price.toFixed(2)} · order ${fill.order_state}`;
-        choose.disabled = result.open_quantity < fill.quantity;
+        choose.disabled = fill.prefill_eligible!==true||result.open_quantity < fill.quantity;
         choose.onclick = () => {
+          $('addTrade').dataset.executionId=fill.execution_id;
+          $('addTrade').dataset.executedAt=fill.executed_at;
           $('je').value = fill.price;
           $('jq').value = fill.quantity;
           const date = new Date(fill.executed_at);
@@ -78,6 +81,7 @@ export function attachTradeExitAssistant({board, journal, getSnapshot}) {
         };
         notice.append(choose);
       }
+      if(result.reconciliation_status==='MANUAL_RECONCILIATION_REQUIRED')status.textContent+=' Earlier sales, missing fills or a position mismatch prevent automatic prefill. Reconcile manually.';
       if (!result.fills.length) status.textContent += ' No purchase is inferred from an unfilled order.';
       if (result.fills.some(fill => result.open_quantity < fill.quantity)) status.textContent += ' Some fills exceed the current open quantity and need sale/re-entry reconciliation; they were not prefilled.';
     } catch (error) { if (version === lookupVersion) status.textContent = `Automatic lookup unavailable: ${error.message}. Enter a confirmed fill manually or reconnect privately.`; }
@@ -89,6 +93,7 @@ export function attachTradeExitAssistant({board, journal, getSnapshot}) {
     try { contract = JSON.parse(decodeURIComponent(button.dataset.recordFill)); } catch { return; }
     const snapshot = getSnapshot();
     const candidate = snapshot?.candidates?.find(x => x.ticker === contract.ticker);
+    delete $('addTrade').dataset.executionId;delete $('addTrade').dataset.executedAt;
     document.dispatchEvent(new Event('recordNewFill'));
     $('jt').value = contract.ticker;
     $('jc').value = contract.contract_id;
@@ -113,6 +118,7 @@ export function attachTradeExitAssistant({board, journal, getSnapshot}) {
     notice.textContent = (candidate?.setup_qualified === false ? 'Shadow review: the latest displayed ticker setup is unqualified in delayed research. Verify the actual pre-entry snapshot and live quote. ' : '') + 'Enter the actual Robinhood fill premium, quantity, execution time, and total known fees. Scanner ask is not your fill. Saving is a separate confirmation.';
     void lookupAndOffer(contract, notice);
   }, true);
+  for(const id of ['jt','jc','je','jq','jtime'])$(id).addEventListener('input',()=>{delete $('addTrade').dataset.executionId;delete $('addTrade').dataset.executedAt;});
   $('addTrade').addEventListener('click', event => {
     if (!awaitingFill) return;
     if (!$('jtime').value || !$('jf').value.trim()) {
@@ -121,7 +127,7 @@ export function attachTradeExitAssistant({board, journal, getSnapshot}) {
       $('journalNotice').textContent = 'Enter the actual execution time and known total fees (enter 0 only if confirmed zero) before saving this fill.';
       return;
     }
-    awaitingFill = false;
+    // Keep the guard active if journal validation rejects the save.
   }, true);
   journal.addEventListener('click', event => { if (event.target.closest('[data-edit]')) awaitingFill = false; }, true);
   new MutationObserver(addButtons).observe(board, {childList:true,subtree:true});
@@ -130,3 +136,4 @@ export function attachTradeExitAssistant({board, journal, getSnapshot}) {
   renderPlan();
   return {renderPlan};
 }
+
