@@ -22,6 +22,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: staging-next-20261117
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !/data/archive/
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -54,11 +58,13 @@ jobs:
           from pathlib import Path
           health=json.loads(Path('data/scan-health.json').read_text())
           if health.get('stage') == 'VALIDATED' and health.get('status') in ('SUCCESS','DEGRADED'):
-              if importlib.util.find_spec('shadow_evidence') is None:
-                  print('SHADOW_EVIDENCE_UNAVAILABLE: current branch has no capture module; no shadow validation claimed.')
-              else:
-                  from shadow_evidence import capture
-                  print(json.dumps(capture('data', source_commit=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip())))
+              from shadow_evidence import capture,compare_news,atomic_json
+              from scanner import add_news
+              print(json.dumps(capture('data', source_commit=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip())))
+              snapshot=json.loads(Path('data/market-dashboard.json').read_text())
+              probe=compare_news(snapshot,add_news)
+              atomic_json(Path('data/news-coverage-probe-latest.json'),probe)
+              atomic_json(Path('data/news-coverage-probes')/(snapshot['scan_id']+'.json'),probe)
           else:
               print('No new validated scan; retained evidence keeps its original timestamps.')
           PY
