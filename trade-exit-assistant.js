@@ -71,7 +71,7 @@ export function attachTradeExitAssistant({board, journal, getSnapshot}) {
     $('jt').scrollIntoView({block:'center'});
     $('je').focus();
     const notice = $('journalNotice');
-    notice.textContent = 'Enter the actual Robinhood fill premium, quantity, execution time, and total known fees. Scanner ask is not your fill. Saving is a separate confirmation.';
+    notice.textContent = (candidate?.setup_qualified === false ? 'Shadow review: the latest displayed ticker setup is unqualified in delayed research. Verify the actual pre-entry snapshot and live quote. ' : '') + 'Enter the actual Robinhood fill premium, quantity, execution time, and total known fees. Scanner ask is not your fill. Saving is a separate confirmation.';
   }, true);
   $('addTrade').addEventListener('click', event => {
     if (!awaitingFill) return;
