@@ -5,6 +5,23 @@ from pathlib import Path
 from datetime import datetime, timezone
 from quality import parse_time, valid_quote, ET
 
+def observation_reason(candidate):
+    """Return why a candidate belongs in prospective reporting.
+
+    This is deliberately reporting-only: it does not alter setup qualification,
+    execution state, ranking, eligibility, or alerts.  Qualified WATCH and
+    restored SECOND-WAVE rows must be retained even when a transition event was
+    not emitted in the current scan.
+    """
+    state = candidate.get('execution_state')
+    if state in ('TRIGGERED', 'CONFIRMED'):
+        return 'PRICE_TRIGGER'
+    if candidate.get('second_wave_event'):
+        return 'SECOND_WAVE_EVENT'
+    if candidate.get('setup_qualified') is True and state in ('WATCH', 'SECOND-WAVE'):
+        return 'QUALIFIED_' + state.replace('-', '_')
+    return None
+
 def update(data, path='data/option-observations.json'):
     p=Path(path)
     try: events=json.loads(p.read_text())
@@ -38,7 +55,8 @@ def update(data, path='data/option-observations.json'):
     seen={(e['scan_id'],e['contract_id']) for e in events}
     active={e['contract_id'] for e in events if e['market_date']==today and (now-parse_time(e['observed_at'])).total_seconds()<1800}
     for x in data['candidates']:
-        if x.get('execution_state') not in ('TRIGGERED','CONFIRMED') and not x.get('second_wave_event'):continue
+        reason=observation_reason(x)
+        if not reason:continue
         for o in x.get('preferred_contracts',[])[:3]:
             cid=o['contract_id']
             if cid in active or (data['scan_id'],cid) in seen:continue
@@ -62,6 +80,7 @@ def update(data, path='data/option-observations.json'):
                                  'recent_move':x.get('recent_move'),'volume_ratio':x.get('volume_ratio'),
                                  'invalidation_price':x.get('invalidation_price'),
                                  'second_wave_event':x.get('second_wave_event'),
+                                 'observation_reason':reason,
                                  'trend_context':deepcopy(x.get('trend_context'))},'markouts':{}})
             active.add(cid)
     events=events[-2000:]
