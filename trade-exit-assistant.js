@@ -89,14 +89,17 @@ export function attachTradeExitAssistant({board, journal, getSnapshot}) {
     try { contract = JSON.parse(decodeURIComponent(button.dataset.recordFill)); } catch { return; }
     const snapshot = getSnapshot();
     const candidate = snapshot?.candidates?.find(x => x.ticker === contract.ticker);
+    document.dispatchEvent(new Event('recordNewFill'));
     $('jt').value = contract.ticker;
     $('jc').value = contract.contract_id;
     $('jexpiry').value = contract.expiry || '';
     $('je').value = '';
     $('jx').value = '';
+    $('jq').value = '1';
     $('jf').value = '';
     $('jloss').value = '';
     $('jtarget').value = '';
+    $('jmax').value = '';
     $('jconditions').value = candidate?.invalidation_price != null ? `Review if underlying breaks ${candidate.invalidation_price} (scanner observation; verify live)` : '';
     $('jreason').value = '';
     $('jtime').value = '';
@@ -120,6 +123,7 @@ export function attachTradeExitAssistant({board, journal, getSnapshot}) {
     }
     awaitingFill = false;
   }, true);
+  journal.addEventListener('click', event => { if (event.target.closest('[data-edit]')) awaitingFill = false; }, true);
   new MutationObserver(addButtons).observe(board, {childList:true,subtree:true});
   new MutationObserver(renderPlan).observe(journal, {childList:true});
   addButtons();
