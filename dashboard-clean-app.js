@@ -17,6 +17,7 @@ const oldTrades=read('0dteJournal',[]);
 let trades=(Array.isArray(oldTrades)?oldTrades:[]).map(t=>({...t,id:t.id||crypto.randomUUID(),exit:t.exit??null,fees:t.fees||0})).filter(t=>validTrade(t)&&validPlan(t));
 save('0dteJournal',trades);
 let editingTrade=null;
+document.addEventListener('recordNewFill',()=>{editingTrade=null;$('addTrade').textContent='Save trade';});
 let premiumHistory=read('0dtePremiumHistory',{});
 if(!premiumHistory||Array.isArray(premiumHistory)||typeof premiumHistory!=='object')premiumHistory={};
 let settings=read('0dteRisk',{}),stars=read('0dteStars',[]);
