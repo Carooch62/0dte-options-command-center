@@ -46,7 +46,13 @@ class ProspectiveOutcomeTests(unittest.TestCase):
         reasons = {event['ticker']: event['signal_inputs']['observation_reason'] for event in events}
         self.assertEqual(reasons, {'RIOT': 'QUALIFIED_WATCH', 'CROSS': 'PRICE_TRIGGER'})
         self.assertEqual(result['option_feedback']['today_count'], 2)
+        self.assertEqual(events[0]['observation_policy']['horizons_minutes'], [5,15,30])
+        self.assertEqual(data['candidates'][0]['execution_state'], 'WATCH')
+        self.assertTrue(data['candidates'][0]['setup_qualified'])
+        self.assertEqual(observation_reason({'execution_state':'SECOND-WAVE','setup_qualified':True}), 'QUALIFIED_SECOND_WAVE')
+        self.assertIsNone(observation_reason({'execution_state':'SECOND-WAVE','setup_qualified':False}))
 
 
 if __name__ == '__main__':
     unittest.main()
+

@@ -5,6 +5,8 @@ from pathlib import Path
 from datetime import datetime, timezone
 from quality import parse_time, valid_quote, ET
 
+PUBLIC_OBSERVATION_POLICY={'profile':'public-delayed-5-15-30-v1','horizons_minutes':[5,15,30],'window_tolerance_minutes':10,'entry':'ask','exit':'bid','interpretation':'QUOTED_OBSERVATIONS_NOT_FILLS'}
+
 def observation_reason(candidate):
     """Return why a candidate belongs in prospective reporting.
 
@@ -62,7 +64,7 @@ def update(data, path='data/option-observations.json'):
             if cid in active or (data['scan_id'],cid) in seen:continue
             events.append({'scan_id':data['scan_id'],'market_date':today,'observed_at':now.isoformat(),
                 'ticker':x['ticker'],'contract_id':cid,'expiry':o.get('expiry'),'side':o['side'],'strike':o['strike'],
-                'entry_ask':o['ask'],'entry_bid':o['bid'],'volume':o.get('volume'),'delta':o.get('delta'),'theta':o.get('theta'),
+                'observation_policy':deepcopy(PUBLIC_OBSERVATION_POLICY),'entry_ask':o['ask'],'entry_bid':o['bid'],'volume':o.get('volume'),'delta':o.get('delta'),'theta':o.get('theta'),
                 'theta_available':o.get('theta_available'),'spread':o.get('spread'),'spread_pct':o.get('spread_pct'),
                 'quote_freshness':o.get('quote_freshness'),'minimum_delay_minutes':o.get('minimum_delay_minutes'),
                 'received_at':o.get('received_at'),'timestamp_basis':o.get('timestamp_basis'),
@@ -85,6 +87,7 @@ def update(data, path='data/option-observations.json'):
             active.add(cid)
     events=events[-2000:]
     p.write_text(json.dumps(events,separators=(',',':'),allow_nan=False))
-    data['option_feedback']={'observation_count':len(events),'today_count':sum(e['market_date']==today for e in events),
+    data['option_feedback']={'observation_policy':deepcopy(PUBLIC_OBSERVATION_POLICY),'observation_count':len(events),'today_count':sum(e['market_date']==today for e in events),
                             'recent':events[-10:],'interpretation':'Prospective quoted observations, not executed returns; fees excluded.'}
     return data
+
