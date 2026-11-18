@@ -1,4 +1,5 @@
 // Separate, private OAuth client. Never inherits the ChatGPT connection.
+import {evidenceRecords,mergeEvidence} from './private-evidence.js';
 import {contractRequest,resolveContracts,readSnapshot} from './private-candidates.js';
 import {verifyAccess} from './plaid-sync.js';
 import {quoteRequestTiming} from './quote-timing.js';
@@ -10,7 +11,7 @@ const TOKEN='https://api.robinhood.com/oauth2/token/';
 const encoder=new TextEncoder(),decoder=new TextDecoder();
 const COOKIE='__Secure-rh-connect';
 const COOKIE_PATH='/private/plaid/robinhood/';
-const b64=bytes=>btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const b64=bytes=>{let raw='';for(let n=0;n<bytes.length;n+=32768)raw+=String.fromCharCode(...bytes.subarray(n,n+32768));return btoa(raw).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');};
 const bytes=s=>Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
 const headers={'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'};
 const reply=(data,status=200,extra={})=>new Response(JSON.stringify(data),{status,headers:{...headers,...extra}});
@@ -62,6 +63,21 @@ export class RobinhoodCoordinator {
   }
   return this.state.blockConcurrencyWhile(async()=>{
   const path=new URL(request.url).pathname;
+  if(path==='/evidence-read'){
+   const {day}=await request.json();if(!/^\d{4}-\d\d-\d\d$/.test(day||''))return new Response(null,{status:400});
+   const raw=await this.state.storage.get('evidence:'+day);
+   return Response.json({format:'private-quote-evidence-export-v1',day,...(raw?await unseal(raw,this.env):{records:[],omitted:0}),limitations:['Server-collected quotes, not executions or proven exchange latency. At most 2000 records and 64 KiB of records per UTC day; 30-day rolling retention. Export for longer retention.']});
+  }
+  if(path==='/evidence-write'){
+   const body=await request.json(),records=evidenceRecords(body.observations,body.context),day=body.context.received_at.slice(0,10);
+   const raw=await this.state.storage.get('evidence:'+day),old=raw?await unseal(raw,this.env):{records:[],omitted:0};
+   const merged=mergeEvidence(old.records,records);merged.omitted+=old.omitted;
+   await this.state.storage.put('evidence:'+day,await seal(merged,this.env));
+   const days=[...new Set([...(await this.state.storage.get('evidence-days')||[]),day])].sort();
+   for(const expired of days.slice(0,-30))await this.state.storage.delete('evidence:'+expired);
+   await this.state.storage.put('evidence-days',days.slice(-30));
+   return Response.json({stored:records.length});
+  }
   if(path==='/save'){
    const {sealed}=await request.json();await unseal(sealed,this.env);
    await this.state.storage.put('credential',{sealed});
@@ -211,6 +227,10 @@ export async function handleRobinhood(request,env){
  const redirect=new URL(env.ROBINHOOD_REDIRECT_URI);
  if(redirect.protocol!=='https:'||redirect.origin!==url.origin||redirect.pathname!=='/private/plaid/robinhood/callback'||redirect.search||redirect.hash)return reply({ok:false,error:'Invalid Robinhood callback configuration'},503);
  await key(env);
+ if(path==='/private/plaid/robinhood/evidence'&&request.method==='GET'){
+  if(!env.ROBINHOOD_COORDINATOR)return reply({ok:false,error:'Evidence store unavailable'},503);
+  return reply({ok:true,evidence:await ownerRequest(env,'/evidence-read',{day:url.searchParams.get('day')||new Date().toISOString().slice(0,10)})});
+ }
  if(path==='/private/plaid/robinhood/candidates'&&request.method==='GET'){
   try{const r=await fetch(`https://raw.githubusercontent.com/Carooch62/0dte-options-command-center/main/data/candidate-quote-batch.json?v=${Date.now()}`,{cf:{cacheTtl:0},signal:AbortSignal.timeout(15000)});return reply({ok:true,snapshot:await readSnapshot(r)});}catch{return reply({ok:false,error:'Current scanner snapshot unavailable or too large. Import a JSON snapshot instead.'},502);}
  }
@@ -263,6 +283,7 @@ export async function handleRobinhood(request,env){
    const quoteFinished=performance.now();
    // Extract only quote pairs; never expose arbitrary tool content or account data.
    const normalized=normalizeQuotes(data,operation,receivedAt);
+   if(env.ROBINHOOD_COORDINATOR)await persistQuoteEvidence(env,normalized.observations,{kind:operation.name==='get_option_quotes'?'option':'equity',received_at:new Date(receivedAt).toISOString()});
    const request_timing=quoteRequestTiming({setup_ms:setupFinished-setupStarted,quote_ms:quoteFinished-setupFinished,worker_ms:performance.now()-requestStarted,setup_reused:call.setup_reused,setup_mode:call.setup_mode,setup_cache_status:call.setup_cache_status});
    return reply({ok:true,source:'Robinhood MCP',received_at:new Date(receivedAt).toISOString(),...normalized,request_timing,latency_verified:false,greek_calculation_time:null,scanner_feed:'DELAYED_RESEARCH'});
   }catch{return reply({ok:false,error:'Robinhood quote verification failed; reconnect or check client setup'},502);}
@@ -272,3 +293,9 @@ export async function handleRobinhood(request,env){
 
 
 
+
+
+export async function persistQuoteEvidence(env,observations,context){
+ if(!env.ROBINHOOD_COORDINATOR)throw Error('Private evidence coordinator required');
+ return ownerRequest(env,'/evidence-write',{observations,context});
+}

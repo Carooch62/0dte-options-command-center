@@ -1,6 +1,6 @@
 import {countQualifiedQuotes} from './watch-quote-qualification.js';
 import {projectCandidates} from './private-candidates.js';
-import {quoteWatchContracts} from './robinhood-live.js';
+import {quoteWatchContracts,persistQuoteEvidence} from './robinhood-live.js';
 import {processVerifiedOptionAlerts} from './watch-alert-pipeline.js';
 export {countQualifiedQuotes} from './watch-quote-qualification.js';
 
@@ -55,6 +55,7 @@ export async function runWatchQuotePilot(env,{now=Date.now(),clock=Date.now,fetc
  const {status,observations}=await verify(env,candidates.map(candidate=>candidate.options[0]));
  if(status!=='checked')return {status};
  const verifiedAt=clock();
+ if(env.ROBINHOOD_COORDINATOR&&observations.length)await persistQuoteEvidence(env,observations,{kind:'option',received_at:new Date(verifiedAt).toISOString(),scan_id:snapshot.scan_id,generated_at:snapshot.generated_at});
  const qualified=countQualifiedQuotes(candidates,observations,verifiedAt);
  const alerts=await processVerifiedOptionAlerts(env,snapshot,candidates,observations,
   {now:verifiedAt,resolveLink,...(deliver?{deliver}:{})});
@@ -62,4 +63,5 @@ export async function runWatchQuotePilot(env,{now=Date.now(),clock=Date.now,fetc
  await env.PLAID_STORE.put(checkpointKey,snapshot.scan_id,{expirationTtl:3600});
  return {status:'checked',candidates:candidates.length,qualified,alerts};
 }
+
 
