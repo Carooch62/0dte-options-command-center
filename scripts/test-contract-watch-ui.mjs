@@ -57,6 +57,13 @@ try{
  await page.locator('#je').fill('0.50');await page.locator('#jf').fill('0');await page.locator('#jtime').fill('2026-11-02T09:49');await page.locator('#addTrade').click();
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('0dteJournal')).length),1);
  await page.locator('#exitReviewPanel').getByText(/exceeds the scanner/).waitFor();
+ // A confirmed provider execution retains seconds and cannot be journalled twice.
+ await page.locator('#addTrade').evaluate(button=>{button.dataset.executionId='11111111-1111-4111-8111-111111111111';button.dataset.executedAt='2026-11-02T14:49:30Z';});
+ await page.locator('#addTrade').click();
+ const captured=await page.evaluate(()=>JSON.parse(localStorage.getItem('0dteJournal')));
+ assert.equal(captured.length,2);assert.equal(captured[0].time,'2026-11-02T14:49:30Z');
+ await page.locator('#addTrade').click();assert.match(await page.locator('#journalNotice').innerText(),/already recorded/);
+ assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('0dteJournal')).length),2);
  assert.deepEqual(errors,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
  console.log('Contract watch render, transition, removal and mobile width passed');
  await page.close();
