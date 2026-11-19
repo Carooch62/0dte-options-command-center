@@ -87,7 +87,7 @@ test('connection check immediately shows progress and retains its retry after a 
  assert.equal(h.get('check-connection').disabled,false);
  assert.match(h.get('retry-request').textContent,/connection check/);
  const html=await readFile(new URL('../candidate-quotes.html',import.meta.url),'utf8');
- assert.match(html,/<a id="private-sign-in" href="\.\/brokerage.html#robinhood-live" target="_blank" rel="noopener">/);
+ assert.match(html,/<a id="private-sign-in" href="\/private\/plaid\/robinhood\/sign-in\?return_to=%2Fcandidate-quotes.html" target="_blank" rel="noopener">/);
  assert.ok(html.indexOf('id="private-sign-in"')>html.indexOf('</p>\n<section aria-label="Connection health">'));
 });
 test('staging denial clears old prices and permits a later retry',async()=>{

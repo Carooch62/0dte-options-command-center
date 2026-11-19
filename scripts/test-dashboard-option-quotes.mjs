@@ -38,6 +38,9 @@ try{for(const width of [390,1280]){
  await page.clock.fastForward(61000);await page.locator('#privateOptionQuote [role=status]').filter({hasText:'STALE QUOTE'}).waitFor();assert.deepEqual(calls,['resolve','quotes']);
  failure=true;await page.getByRole('button',{name:'Refresh Robinhood quote',exact:true}).click();
  await page.locator('#privateOptionQuote [role=status]').filter({hasText:'sign-in required'}).waitFor();assert.equal(await page.locator('#privateOptionQuote tbody').count(),0);
+ const signIn=page.locator('#privateOptionQuote').getByRole('link',{name:'Sign in to private quotes',exact:true});
+ assert.equal(await signIn.getAttribute('target'),'_blank');const destination=new URL(await signIn.getAttribute('href'),origin);assert.equal(destination.pathname,'/private/plaid/robinhood/sign-in');assert.match(destination.searchParams.get('return_to'),/rh-quote=/);
+ assert.equal(await page.locator('#privateOptionQuote details').evaluate(el=>el.open),false);
  failure=false;wrong=true;const before=calls.filter(x=>x==='quotes').length;
  await page.getByRole('button',{name:'Refresh Robinhood quote',exact:true}).click();
  await page.locator('#privateOptionQuote [role=status]').filter({hasText:'Exact Robinhood contract match unavailable'}).waitFor();assert.equal(calls.filter(x=>x==='quotes').length,before);

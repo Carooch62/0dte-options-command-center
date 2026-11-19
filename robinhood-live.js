@@ -224,6 +224,15 @@ export async function handleRobinhood(request,env){
  const requestStarted=performance.now();
  const url=new URL(request.url),path=url.pathname;
  if(!await verifyAccess(request,env))return reply({ok:false,error:'Private sign in required'},401);
+ // Top-level navigation lets Access establish the website session before returning
+ // to the selected quote. It neither inspects nor changes Robinhood credentials.
+ if(path==='/private/plaid/robinhood/sign-in'){
+  if(request.method!=='GET')return reply({ok:false,error:'Use GET for private sign-in'},405,{Allow:'GET'});
+  const raw=url.searchParams.get('return_to')||'/dashboard_liquid.html?v=20261119-quote-signin';
+  let target;try{target=new URL(raw,url.origin);}catch{return reply({ok:false,error:'Invalid sign-in destination'},400);}
+  if(raw.length>3000||target.origin!==url.origin||!['/dashboard_liquid.html','/dashboard_clean.html','/candidate-quotes.html','/brokerage.html'].includes(target.pathname))return reply({ok:false,error:'Invalid sign-in destination'},400);
+  return new Response(null,{status:303,headers:{'Cache-Control':'no-store','Referrer-Policy':'no-referrer',Location:target.pathname+target.search+target.hash}});
+ }
  if(!configured(env))return reply({ok:false,status:'SETUP_REQUIRED',error:'Robinhood hosted sign-in is paused after authorization failed. Callback compatibility must be verified before reconnecting.'},503);
  const redirect=new URL(env.ROBINHOOD_REDIRECT_URI);
  if(redirect.protocol!=='https:'||redirect.origin!==url.origin||redirect.pathname!=='/private/plaid/robinhood/callback'||redirect.search||redirect.hash)return reply({ok:false,error:'Invalid Robinhood callback configuration'},503);
