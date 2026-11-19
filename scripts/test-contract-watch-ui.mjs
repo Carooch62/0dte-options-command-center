@@ -38,6 +38,8 @@ try{
  assert.equal(await page.locator('#board .clean-drawer').evaluate(el=>el.open),false);
  await manual.click();assert.equal(await page.locator('#jt').inputValue(),'TEST');assert.equal(await page.locator('#jc').inputValue(),'');
  assert.equal(await page.locator('#jtime').inputValue(),'');assert.equal(await page.locator('#je').inputValue(),'');
+ await page.locator('#jc').fill('MANUAL-CONTRACT');await page.locator('#jexpiry').fill('2026-11-06');await page.locator('#je').fill('0.20');
+ assert.equal(await page.locator('#jloss').inputValue(),'0.14');assert.match(await page.locator('#purchaseExitDraft').innerText(),/MANUAL-CONTRACT/);
  assert.match(await page.locator('#contractWatchList').innerText(),/WATCH/);
  scan={...base,scan_id:'new',generated_at:'2026-11-02T14:49:00Z',candidates:[row('TRIGGERED')]};
  await page.locator('#check').click();

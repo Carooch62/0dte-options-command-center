@@ -61,7 +61,7 @@ export function attachTradeExitAssistant({board, journal, getSnapshot}) {
   }
   for(const id of ['je','jq'])$(id).addEventListener('input',renderDraft);
   for(const id of ['jloss','jtarget'])$(id).addEventListener('input',()=>{draft.dataset.manualCheckpoints='true';renderDraft();});
-  for(const id of ['jt','jc','jexpiry'])$(id).addEventListener('input',()=>{draftContract=null;draft.replaceChildren();});
+  for(const id of ['jt','jc','jexpiry'])$(id).addEventListener('input',()=>{draftContract={ticker:$('jt').value.trim().toUpperCase(),contract_id:$('jc').value.trim(),expiry:$('jexpiry').value};draftCandidate=null;draftSnapshot=null;delete draft.dataset.manualCheckpoints;for(const field of ['je','jtime','jf','jconditions','jreason'])$(field).value='';renderDraft();});
   function renderPlan() {
     let trades = [];
     try { trades = JSON.parse(localStorage.getItem('0dteJournal') || '[]'); } catch { /* unavailable */ }
@@ -161,7 +161,7 @@ export function attachTradeExitAssistant({board, journal, getSnapshot}) {
     notice.textContent = (candidate?.setup_qualified === false ? 'Shadow review: the latest displayed ticker setup is unqualified in delayed research. Verify the actual pre-entry snapshot and live quote. ' : '') + 'Enter the actual Robinhood fill premium, quantity, execution time, and total known fees. Scanner ask is not your fill. Saving is a separate confirmation.';
     void lookupAndOffer(contract, notice);
   }, true);
-  for(const id of ['jt','jc','je','jq','jtime'])$(id).addEventListener('input',()=>{delete $('addTrade').dataset.executionId;delete $('addTrade').dataset.executedAt;});
+  for(const id of ['jt','jc','jexpiry','je','jq','jtime'])$(id).addEventListener('input',()=>{delete $('addTrade').dataset.executionId;delete $('addTrade').dataset.executedAt;});
   $('addTrade').addEventListener('click', event => {
     if (!awaitingFill) return;
     if (!$('jtime').value || !$('jf').value.trim()) {
