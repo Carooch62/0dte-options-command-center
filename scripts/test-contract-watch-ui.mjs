@@ -33,6 +33,11 @@ try{
  await page.goto(`http://127.0.0.1:${server.address().port}/index.html`);
  await page.waitForURL('**/dashboard_liquid.html');
  await page.locator('#contractWatchList').filter({hasText:'TEST'}).waitFor();
+ const manual=page.locator('#board > article .purchase-action button');
+ await manual.waitFor({state:'visible'});assert.equal(await manual.innerText(),'Record an option purchase');
+ assert.equal(await page.locator('#board .clean-drawer').evaluate(el=>el.open),false);
+ await manual.click();assert.equal(await page.locator('#jt').inputValue(),'TEST');assert.equal(await page.locator('#jc').inputValue(),'');
+ assert.equal(await page.locator('#jtime').inputValue(),'');assert.equal(await page.locator('#je').inputValue(),'');
  assert.match(await page.locator('#contractWatchList').innerText(),/WATCH/);
  scan={...base,scan_id:'new',generated_at:'2026-11-02T14:49:00Z',candidates:[row('TRIGGERED')]};
  await page.locator('#check').click();
@@ -45,12 +50,12 @@ try{
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
  await page.locator('[data-remove-watch]').click();
  assert.match(await page.locator('#contractWatchList').innerText(),/No contracts saved/);
- // Exercise the purchase helper without any brokerage or trading connection.
- await page.locator('#board').evaluate(board=>{
-  const box=document.createElement('div');box.className='contract-pick';const button=document.createElement('button');
-  button.dataset.watch=encodeURIComponent(JSON.stringify({ticker:'TEST',direction:'UP',contract_id:'TEST261106C00011000',expiry:'2026-11-06',side:'call',strike:11}));box.append(button);board.append(box);
- });
- const record=page.getByRole('button',{name:'I bought this contract · record fill',exact:true});await record.waitFor();await record.click();
+ // Exercise a real rendered shortlist, with all contract drawers still collapsed.
+ await page.locator('#expiration').evaluate(select=>{select.value='today';select.dispatchEvent(new Event('input',{bubbles:true}));});
+ const option={contract_id:'TEST261106C00011000',expiry:'2026-11-06',side:'call',strike:11,bid:.19,ask:.20,delta:.4,delta_verified:true,quote_valid:true,delta_ok:true,tight_spread:true,near_atm:true,expiry_verified:true,volume:100,spread:.01,spread_pct:5,distance_pct:1};
+ scan={...base,scan_id:'with-contract',generated_at:'2026-11-02T14:50:00Z',candidates:[{...row('WATCH'),options:[option],eligible_contracts:[option]}]};
+ await page.locator('#check').click();
+ const record=page.locator('#board .purchase-action').getByRole('button',{name:'I bought this contract · record fill',exact:true});await record.waitFor({state:'visible'});assert.equal(await page.locator('#board .clean-drawer').evaluate(el=>el.open),false);await record.click();
  assert.equal(await page.locator('#je').inputValue(),'');assert.equal(await page.locator('#jtime').inputValue(),'');
  assert.equal(await page.locator('#jf').inputValue(),'');assert.equal(await page.locator('#jc').inputValue(),'TEST261106C00011000');
  await page.locator('#addTrade').click();assert.match(await page.locator('#journalNotice').innerText(),/actual execution time and known total fees/);
