@@ -9,6 +9,8 @@ on:
       - 'watch-*.js'
       - 'worker.js'
       - 'dashboard-clean-app.js'
+      - 'dashboard-option-quotes.js'
+      - 'scripts/test-dashboard-option-quotes.mjs'
       - 'dashboard_clean.html'
       - 'dashboard_liquid.html'
       - 'index.html'
@@ -43,3 +45,4 @@ jobs:
       - run: node --check dashboard-clean-app.js
       - run: node scripts/test-contract-watch-ui.mjs
 
+      - run: node scripts/test-dashboard-option-quotes.mjs
