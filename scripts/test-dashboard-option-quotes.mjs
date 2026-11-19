@@ -18,7 +18,7 @@ try{for(const width of [390,1280]){
   if(path==='private/plaid/robinhood/quotes'){
    calls.push('quotes');assert.deepEqual(route.request().postDataJSON(),{kind:'option',instrument_ids:[id]});return route.fulfill(failure?{status:401,json:{error:'synthetic sign in'}}:{json:{received_at:await page.evaluate(()=>new Date().toISOString()),observations:[{quote:{instrument_id:id,bid_price:'.19',ask_price:'.20',updated_at:quoteTime}}]}});
   }
-  if(path.startsWith('data/')||path.includes('/data/'))return route.fulfill({headers:{'Access-Control-Allow-Origin':'*'},json:path.endsWith('market-dashboard-today.json')||path.endsWith('market-dashboard.json')?fixture:{status:'SUCCESS'}});
+  if(path.startsWith('data/')||path.includes('/data/'))return route.fulfill({headers:{'Access-Control-Allow-Origin':'*'},json:path.endsWith('market-dashboard-today.json')?{...fixture,delivery_window:'today'}:path.endsWith('market-dashboard.json')?fixture:{status:'SUCCESS'}});
   if(path==='health')return route.fulfill({json:{ok:true,latestRun:null}});
   if(!files.has(path))return route.abort();
   return route.fulfill({contentType:path.endsWith('.js')?'text/javascript':path.endsWith('.css')?'text/css':'text/html',body:await readFile(new URL('../'+path,import.meta.url))});
