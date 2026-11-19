@@ -1,5 +1,5 @@
 // Public staging research reader. Fixed paths only; no private data or scan dispatch.
-const base='https://raw.githubusercontent.com/Carooch62/0dte-options-command-center/staging-algorithm/data/';
+const base='https://raw.githubusercontent.com/Carooch62/0dte-options-command-center/staging-next-20261117/data/';
 const headers={'Content-Type':'application/json','Cache-Control':'no-store'};
 export async function handleShadowResearch(request,fetcher=fetch){
  const match=/^\/data\/staging-shadow-(evidence-latest|review-queue|outcomes)\.json$/.exec(new URL(request.url).pathname);

@@ -3,7 +3,7 @@ from pathlib import Path
 from shadow_evidence import capture,packet
 class CaptureTests(unittest.TestCase):
  def test_marker_clocks_and_repeat_are_safe(self):
-  snapshot={'scan_id':'sample','generated_at':'2026-11-17T15:00:00Z','candidates':[{'ticker':'X','news_status':'NOT_SCANNED','secret':'excluded','options':[]}]}
+  snapshot={'scan_id':'sample','market_session':'OPEN','generated_at':'2026-11-17T15:00:00Z','candidates':[{'ticker':'X','news_status':'NOT_SCANNED','secret':'excluded','options':[]}]}
   self.assertRaises(ValueError,packet,snapshot,'2026-11-17T14:00:00Z')
   with tempfile.TemporaryDirectory() as folder:
    p=Path(folder);(p/'market-dashboard.json').write_text(json.dumps(snapshot));(p/'staging-environment.json').write_text('{"environment":"staging"}')

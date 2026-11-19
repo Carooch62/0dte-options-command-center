@@ -1,15 +1,18 @@
 // Separate, private OAuth client. Never inherits the ChatGPT connection.
+import {evidenceRecords,mergeEvidence} from './private-evidence.js';
 import {contractRequest,resolveContracts,readSnapshot} from './private-candidates.js';
 import {verifyAccess} from './plaid-sync.js';
 import {quoteRequestTiming} from './quote-timing.js';
+import {runWatchQuotePilot} from './watch-quote-pilot.js';
 import {marketSessions} from './market-session.js';
+import {reviewAccount,projectFillLookup} from './private-fill-lookup.js';
 const MCP='https://agent.robinhood.com/mcp/trading';
 const ISSUER=MCP;
 const TOKEN='https://api.robinhood.com/oauth2/token/';
 const encoder=new TextEncoder(),decoder=new TextDecoder();
 const COOKIE='__Secure-rh-connect';
 const COOKIE_PATH='/private/plaid/robinhood/';
-const b64=bytes=>btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const b64=bytes=>{let raw='';for(let n=0;n<bytes.length;n+=32768)raw+=String.fromCharCode(...bytes.subarray(n,n+32768));return btoa(raw).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');};
 const bytes=s=>Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
 const headers={'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'};
 const reply=(data,status=200,extra={})=>new Response(JSON.stringify(data),{status,headers:{...headers,...extra}});
@@ -19,15 +22,109 @@ async function key(env){const raw=bytes(env.PLAID_ENCRYPTION_KEY);if(raw.length!
 async function seal(data,env){const iv=crypto.getRandomValues(new Uint8Array(12));const dataBytes=await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:encoder.encode('robinhood-live-v1')},await key(env),encoder.encode(JSON.stringify(data)));return `${b64(iv)}.${b64(new Uint8Array(dataBytes))}`;}
 async function unseal(raw,env){const [iv,value]=raw.split('.');return JSON.parse(decoder.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:bytes(iv),additionalData:encoder.encode('robinhood-live-v1')},await key(env),bytes(value))));}
 const storageKey=env=>`robinhood-live:connection:${env.CF_ACCESS_EMAIL.toLowerCase()}`;
-async function connection(env){const raw=await env.PLAID_STORE.get(storageKey(env));return raw?unseal(raw,env):null;}
-async function exchange(form){const response=await fetch(TOKEN,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(form),signal:AbortSignal.timeout(15000)});if(!response.ok)throw Error('Robinhood authorization failed; reconnect to retry');const data=await response.json();if(typeof data.access_token!=='string'||!data.access_token||!Number.isFinite(Number(data.expires_in))||Number(data.expires_in)<=0||data.token_type?.toLowerCase()!=='bearer')throw Error('Invalid Robinhood authorization response');return {access_token:data.access_token,expires_at:Date.now()+Number(data.expires_in)*1000};}
+async function legacyConnection(env){const raw=await env.PLAID_STORE.get(storageKey(env));return raw?unseal(raw,env):null;}
+// All credential mutation and refreshes share one strongly consistent owner object.
+const credentialOwner=env=>env.ROBINHOOD_COORDINATOR.get(env.ROBINHOOD_COORDINATOR.idFromName('private-robinhood-owner'));
+async function ownerRequest(env,path,body){
+ const response=await credentialOwner(env).fetch('https://credentials'+path,{method:'POST',body:JSON.stringify(body||{})});
+ if(!response.ok)throw Error('Robinhood authorization unavailable; reconnect or retry later');
+ return response.json();
+}
+async function connectionState(env){
+ if(env.ROBINHOOD_COORDINATOR)return ownerRequest(env,'/token');
+ const saved=await legacyConnection(env);
+ return {connection:saved,authorization_present:!!saved,renewal_supported:false};
+}
+async function connection(env){return (await connectionState(env)).connection;}
+
+async function saveConnection(env,saved){
+ if(env.ROBINHOOD_COORDINATOR)return ownerRequest(env,'/save',{sealed:await seal(saved,env)});
+ await env.PLAID_STORE.put(storageKey(env),await seal(saved,env));
+}
+export class RobinhoodCoordinator {
+ constructor(state,env){this.state=state;this.env=env;}
+ async runPilot(){
+  if((await this.state.storage.get('pilot_retry_after')||0)>Date.now())return {status:'throttled'};
+  const localKey=key=>key.startsWith('watch-quote-pilot:')||key.startsWith('verified-option-alert-v1:');
+  const store={
+   get:async key=>localKey(key)?await this.state.storage.get('pilot:'+key)||null:this.env.PLAID_STORE.get(key),
+   put:async(key,value,options)=>localKey(key)?this.state.storage.put('pilot:'+key,value):this.env.PLAID_STORE.put(key,value,options)
+  };
+  try{const result=await runWatchQuotePilot({...this.env,PLAID_STORE:store});await this.state.storage.put('pilot_throttles',0);return result;}
+  catch(error){
+   if(error.status===429){const failures=(await this.state.storage.get('pilot_throttles')||0)+1;await this.state.storage.put('pilot_throttles',failures);await this.state.storage.put('pilot_retry_after',Date.now()+Math.max(error.retry_ms,Math.min(3600000,300000*2**Math.min(failures-1,4))));return {status:'throttled'};}
+   return {status:'verification-failed'};
+  }
+ }
+ async fetch(request){
+  // Coalesce pilot ticks without the 30-second blockConcurrencyWhile deadline.
+  if(new URL(request.url).pathname==='/pilot'){
+   if(!this.pilotInFlight)this.pilotInFlight=this.runPilot().finally(()=>{this.pilotInFlight=null;});
+   return Response.json(await this.pilotInFlight);
+  }
+  return this.state.blockConcurrencyWhile(async()=>{
+  const path=new URL(request.url).pathname;
+  if(path==='/evidence-read'){
+   const {day}=await request.json();if(!/^\d{4}-\d\d-\d\d$/.test(day||''))return new Response(null,{status:400});
+   const raw=await this.state.storage.get('evidence:'+day);
+   return Response.json({format:'private-quote-evidence-export-v1',day,...(raw?await unseal(raw,this.env):{records:[],omitted:0}),limitations:['Server-collected quotes, not executions or proven exchange latency. At most 2000 records and 64 KiB of records per UTC day; 30-day rolling retention. Export for longer retention.']});
+  }
+  if(path==='/evidence-write'){
+   const body=await request.json(),records=evidenceRecords(body.observations,body.context),day=body.context.received_at.slice(0,10);
+   const raw=await this.state.storage.get('evidence:'+day),old=raw?await unseal(raw,this.env):{records:[],omitted:0};
+   const merged=mergeEvidence(old.records,records);merged.omitted+=old.omitted;
+   await this.state.storage.put('evidence:'+day,await seal(merged,this.env));
+   const days=[...new Set([...(await this.state.storage.get('evidence-days')||[]),day])].sort();
+   for(const expired of days.slice(0,-30))await this.state.storage.delete('evidence:'+expired);
+   await this.state.storage.put('evidence-days',days.slice(-30));
+   return Response.json({stored:records.length});
+  }
+  if(path==='/save'){
+   const {sealed}=await request.json();await unseal(sealed,this.env);
+   await this.state.storage.put('credential',{sealed});
+   await this.env.PLAID_STORE.delete(storageKey(this.env));
+   return Response.json({ok:true});
+  }
+  if(path==='/disconnect'){
+   // Tombstone prevents an eventually consistent legacy KV read resurrecting access.
+   await this.state.storage.put('credential',{sealed:null});
+   await this.env.PLAID_STORE.delete(storageKey(this.env));
+   return Response.json({ok:true});
+  }
+  if(path!=='/token')return new Response(null,{status:404});
+  let stored=await this.state.storage.get('credential');
+  if(stored===undefined){
+   const saved=await legacyConnection(this.env);
+   stored={sealed:saved?await seal(saved,this.env):null};
+   await this.state.storage.put('credential',stored);
+  }
+  let saved=stored.sealed?await unseal(stored.sealed,this.env):null;
+  if(saved&&saved.expires_at<=Date.now()+120000&&saved.refresh_token){
+   // Persist the rotated token before any caller receives the new access token.
+   // On uncertain network outcomes, stop automatic retries: rotation may have occurred.
+   if(stored.refresh_uncertain||stored.retry_after>Date.now())return Response.json({connection:null,authorization_present:true,renewal_supported:false});
+   await this.state.storage.put('credential',{...stored,refresh_uncertain:true});
+   try{
+    const renewed=await exchange({grant_type:'refresh_token',refresh_token:saved.refresh_token,client_id:this.env.ROBINHOOD_CLIENT_ID,resource:MCP});
+    if(!renewed.refresh_token)throw Error('Refresh rotation missing');
+    saved=renewed;
+    await this.state.storage.put('credential',{sealed:await seal(saved,this.env)});
+   }catch(error){
+    if(error.status===429)await this.state.storage.put('credential',{...stored,retry_after:Date.now()+error.retry_ms});
+    return Response.json({connection:null,authorization_present:true,renewal_supported:false});
+   }
+  }
+  return Response.json({connection:saved&&saved.expires_at>Date.now()+15000?saved:null,authorization_present:!!saved,renewal_supported:!!saved?.refresh_token});
+ });}
+}
+async function exchange(form){const response=await fetch(TOKEN,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(form),signal:AbortSignal.timeout(15000)});if(!response.ok)throw Object.assign(Error('Robinhood authorization failed; reconnect to retry'),{status:response.status,retry_ms:Math.max(60000,Math.min(3600000,(Number(response.headers.get('Retry-After'))||60)*1000))});const data=await response.json();if(typeof data.access_token!=='string'||!data.access_token||!Number.isFinite(Number(data.expires_in))||Number(data.expires_in)<=0||data.token_type?.toLowerCase()!=='bearer')throw Error('Invalid Robinhood authorization response');return {access_token:data.access_token,refresh_token:typeof data.refresh_token==='string'&&data.refresh_token?data.refresh_token:null,expires_at:Date.now()+Number(data.expires_in)*1000};}
 
 // The client cannot accept arbitrary MCP methods or tool names from the browser.
-const ALLOWED=new Set(['get_equity_quotes','get_option_quotes','get_option_chains','get_option_instruments']);
+const ALLOWED=new Set(['get_equity_quotes','get_option_quotes','get_option_chains','get_option_instruments','get_accounts','get_option_orders','get_option_positions']);
 export async function rpc(token,method,params={},session=null){
  if(!['initialize','tools/list','tools/call'].includes(method)||method==='tools/call'&&!ALLOWED.has(params.name))throw Error('Market-data operation required');
  const response=await fetch(MCP,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json',Accept:'application/json, text/event-stream',...(method!=='initialize'?{'MCP-Protocol-Version':'2025-03-26'}:{}),...(session?{'Mcp-Session-Id':session}:{})},body:JSON.stringify({jsonrpc:'2.0',id:crypto.randomUUID(),method,params}),signal:AbortSignal.timeout(15000)});
- if(!response.ok)throw Error(response.status===401?'Robinhood connection expired; reconnect':'Robinhood quote service unavailable');
+ if(!response.ok)throw Object.assign(Error(response.status===401?'Robinhood connection expired; reconnect':'Robinhood quote service unavailable'),{status:response.status,retry_ms:Math.max(60000,Math.min(3600000,(Number(response.headers.get('Retry-After'))||60)*1000))});
  const raw=await response.text();if(raw.length>2000000)throw Error('Robinhood response too large');
  let message;
  if(response.headers.get('Content-Type')?.includes('text/event-stream')){
@@ -131,12 +228,16 @@ export async function handleRobinhood(request,env){
  const redirect=new URL(env.ROBINHOOD_REDIRECT_URI);
  if(redirect.protocol!=='https:'||redirect.origin!==url.origin||redirect.pathname!=='/private/plaid/robinhood/callback'||redirect.search||redirect.hash)return reply({ok:false,error:'Invalid Robinhood callback configuration'},503);
  await key(env);
+ if(path==='/private/plaid/robinhood/evidence'&&request.method==='GET'){
+  if(!env.ROBINHOOD_COORDINATOR)return reply({ok:false,error:'Evidence store unavailable'},503);
+  return reply({ok:true,evidence:await ownerRequest(env,'/evidence-read',{day:url.searchParams.get('day')||new Date().toISOString().slice(0,10)})});
+ }
  if(path==='/private/plaid/robinhood/candidates'&&request.method==='GET'){
   try{const r=await fetch(`https://raw.githubusercontent.com/Carooch62/0dte-options-command-center/main/data/candidate-quote-batch.json?v=${Date.now()}`,{cf:{cacheTtl:0},signal:AbortSignal.timeout(15000)});return reply({ok:true,snapshot:await readSnapshot(r)});}catch{return reply({ok:false,error:'Current scanner snapshot unavailable or too large. Import a JSON snapshot instead.'},502);}
  }
  if(path==='/private/plaid/robinhood/status'&&request.method==='GET'){
-  const saved=await connection(env),connected=!!saved&&saved.expires_at>Date.now();
-  return reply({ok:true,connected,expires_at:saved?new Date(saved.expires_at).toISOString():null,status:connected?'CONNECTED_UNVERIFIED':saved?'RECONNECT_REQUIRED':'READY_TO_CONNECT',scanner_feed:'DELAYED_RESEARCH'});
+  const state=await connectionState(env),saved=state.connection,connected=!!saved&&saved.expires_at>Date.now();
+  return reply({ok:true,connected,automatic_renewal_ready:!!env.ROBINHOOD_COORDINATOR&&state.renewal_supported,expires_at:saved?new Date(saved.expires_at).toISOString():null,status:connected?'CONNECTED_UNVERIFIED':state.authorization_present?'RECONNECT_REQUIRED':'READY_TO_CONNECT',scanner_feed:'DELAYED_RESEARCH'});
  }
  if(path==='/private/plaid/robinhood/callback'&&request.method==='GET'){
   const clear={'Set-Cookie':cookie('',0)};
@@ -147,7 +248,7 @@ export async function handleRobinhood(request,env){
    if(pending.expires_at<Date.now()||pending.email!==env.CF_ACCESS_EMAIL.toLowerCase()||pending.state!==url.searchParams.get('state')||url.searchParams.get('iss')!==ISSUER||url.searchParams.has('error'))throw Error();
    const code=url.searchParams.get('code');if(!code||code.length>2000)throw Error();
    const saved=await exchange({grant_type:'authorization_code',code,client_id:env.ROBINHOOD_CLIENT_ID,redirect_uri:redirect.href,code_verifier:pending.verifier,resource:MCP});
-   await env.PLAID_STORE.put(storageKey(env),await seal(saved,env));
+   await saveConnection(env,saved);
    return new Response(null,{status:303,headers:{...headers,...clear,Location:'/brokerage.html#robinhood-live'}});
   }catch{return reply({ok:false,error:'Connection could not be completed. Return to brokerage review and reconnect.'},400,clear);}
  }
@@ -163,13 +264,40 @@ export async function handleRobinhood(request,env){
  if(path==='/private/plaid/robinhood/disconnect'){
   const saved=await connection(env);
   if(saved)marketSessions.dropPrefix((await tokenFingerprint(saved.access_token))+':');
-  await env.PLAID_STORE.delete(storageKey(env));
+  if(env.ROBINHOOD_COORDINATOR)await ownerRequest(env,'/disconnect');
+  else await env.PLAID_STORE.delete(storageKey(env));
   return reply({ok:true,connected:false,revocation_note:'Stored authorization erased. Remove this client in Robinhood to revoke its provider authorization.'},200,{'Set-Cookie':cookie('',0)});
  }
  if(path==='/private/plaid/robinhood/resolve'){
   let contracts;try{const raw=await request.text();if(raw.length>10000)throw Error();contracts=contractRequest(JSON.parse(raw));}catch{return reply({ok:false,error:'Invalid exact contract request'},400);}
   const saved=await connection(env);if(!saved||saved.expires_at<=Date.now()+15000)return reply({ok:false,error:'Reconnect Robinhood before resolving contracts'},409);
   try{const call=await marketClient(saved.access_token,['get_option_chains','get_option_instruments'],saved.expires_at);return reply({ok:true,source:'Robinhood MCP metadata',resolved_at:new Date().toISOString(),results:await resolveContracts(contracts,call)});}catch{return reply({ok:false,error:'Exact metadata lookup failed or is unavailable. Import a matching research snapshot instead.'},502);}
+ }
+ if(path==='/private/plaid/robinhood/fills'){
+  if(env.ROBINHOOD_FILL_LOOKUP_ENABLED!=='true'||!env.ROBINHOOD_REVIEW_ACCOUNT)return reply({ok:false,error:'Private fill lookup is not enabled'},503);
+  let exact;try{const raw=await request.text();if(raw.length>2000)throw Error();exact=contractRequest({contracts:[JSON.parse(raw)]})[0];}catch{return reply({ok:false,error:'Provide one exact contract identity'},400);}
+  const saved=await connection(env);if(!saved||saved.expires_at<=Date.now()+15000)return reply({ok:false,error:'Reconnect the private Robinhood client first'},409);
+  try{
+   const call=await marketClient(saved.access_token,['get_option_chains','get_option_instruments','get_accounts','get_option_orders','get_option_positions'],saved.expires_at);
+   const account=reviewAccount((await call('get_accounts',{})).accounts,env.ROBINHOOD_REVIEW_ACCOUNT);
+   const [match]=await resolveContracts([exact],call);
+   if(match.status!=='EXACT_METADATA_MATCH')return reply({ok:false,error:'Exact contract could not be verified'},409);
+   const instrument=match.instrument,orders=[];let cursor,complete=false;
+   const since=new Date(Date.now()-30*86400000).toISOString();
+   for(let page=0;page<5;page++){
+    const result=await call('get_option_orders',{account_number:account,chain_ids:instrument.chain_id,created_at_gte:since,...(cursor?{cursor}:{})});
+    if(!Array.isArray(result.orders))throw Error('Invalid order coverage');
+    orders.push(...result.orders);
+    cursor=result.next;
+    if(!cursor){complete=true;break;}
+    if(typeof cursor!=='string')throw Error('Invalid pagination');
+   }
+   const positions=await call('get_option_positions',{account_number:account,option_ids:instrument.id,nonzero:true});
+   if(!Array.isArray(positions.positions)||positions.next)throw Error('Position coverage incomplete');
+   if(positions.positions.some(p=>p.option_id!==instrument.id)||positions.positions.length>1)throw Error('Ambiguous position identity');
+   const position=positions.positions[0];
+   return reply({ok:true,source:'Robinhood confirmed executions',retrieved_at:new Date().toISOString(),...projectFillLookup({orders,position,instrument,complete})});
+  }catch{return reply({ok:false,error:'Private fill lookup could not be verified. No journal data was changed.'},502);}
  }
  if(path==='/private/plaid/robinhood/quotes'){
   let operation;try{if(Number(request.headers.get('Content-Length'))>10000)throw Error();const raw=await request.text();if(raw.length>10000)throw Error();operation=quoteRequest(JSON.parse(raw));}catch{return reply({ok:false,error:'Invalid quote request'},400);}
@@ -182,6 +310,7 @@ export async function handleRobinhood(request,env){
    const quoteFinished=performance.now();
    // Extract only quote pairs; never expose arbitrary tool content or account data.
    const normalized=normalizeQuotes(data,operation,receivedAt);
+   if(env.ROBINHOOD_COORDINATOR)await persistQuoteEvidence(env,normalized.observations,{kind:operation.name==='get_option_quotes'?'option':'equity',received_at:new Date(receivedAt).toISOString()});
    const request_timing=quoteRequestTiming({setup_ms:setupFinished-setupStarted,quote_ms:quoteFinished-setupFinished,worker_ms:performance.now()-requestStarted,setup_reused:call.setup_reused,setup_mode:call.setup_mode,setup_cache_status:call.setup_cache_status});
    return reply({ok:true,source:'Robinhood MCP',received_at:new Date(receivedAt).toISOString(),...normalized,request_timing,latency_verified:false,greek_calculation_time:null,scanner_feed:'DELAYED_RESEARCH'});
   }catch{return reply({ok:false,error:'Robinhood quote verification failed; reconnect or check client setup'},502);}
@@ -189,4 +318,12 @@ export async function handleRobinhood(request,env){
  return reply({ok:false,error:'Not found'},404);
 }
 
+
+
+
+
+export async function persistQuoteEvidence(env,observations,context){
+ if(!env.ROBINHOOD_COORDINATOR)throw Error('Private evidence coordinator required');
+ return ownerRequest(env,'/evidence-write',{observations,context});
+}
 

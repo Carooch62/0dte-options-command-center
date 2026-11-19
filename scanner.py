@@ -15,6 +15,8 @@ from datetime import datetime, timezone, time as dtime
 from zoneinfo import ZoneInfo
 from pattern_research import pattern_snapshot
 from relative_volume import same_time_rvol
+from news_research import select_news
+from session_research import session_context
 
 import requests
 
@@ -225,6 +227,7 @@ def scan_one(t, now=None, payload=None):
         end = current[-1]['time']+timedelta(minutes=5)
         return {'ticker':t, 'price':round(price,4), 'day_move':round(day,2) if day is not None else None,
                 'pattern_research':pattern_snapshot(current,direction),
+                'research_context':session_context(current[-1]['time'].isoformat(),info['open_at']),
                 'relative_volume_research':same_time_rvol(bars,now,d.get('_source','Yahoo 5m bars')),
                 'open_move':round(pct(price,first),2), 'previous_close':previous_close,
                 'previous_close_source':previous_close_source,
@@ -506,7 +509,8 @@ def main():
             if x: rows.append(x)
     print(json.dumps({'stage':'prices_complete','rows':len(rows)}),flush=True)
     rows.sort(key=lambda x:num(x['score']),reverse=True)
-    add_news(rows[:50])
+    news_rows,news_selection=select_news(rows)
+    add_news(news_rows)
     print(json.dumps({'stage':'news_complete'}),flush=True)
     for x in rows:
         x.setdefault('news_items',[]);x.setdefault('catalyst',False)
@@ -517,7 +521,7 @@ def main():
          'scan_mode':scan_mode,'scan_id':os.getenv('SCAN_REQUEST_ID') or os.getenv('GITHUB_RUN_ID') or str(time.time_ns()),
          'workflow_run_id':os.getenv('GITHUB_RUN_ID'),'source':'Yahoo 5m bars + CBOE delayed options; Nasdaq fallback',
          'data_quality':'DELAYED_RESEARCH','universe_size':len(universe),'scanned_rows':len(rows),
-         'news_universe':min(50,len(rows)),
+         'news_universe':len(news_rows),'news_selection':news_selection,
          'news_coverage':{status:sum(x['news_status']==status for x in rows)
                           for status in ('SUCCESS','SOURCE_FAILURE','NOT_SCANNED')},
          'discovery':discovery,'price_errors':list(ERRORS),
@@ -528,3 +532,4 @@ def main():
     print(json.dumps(out['coverage']))
 
 if __name__=='__main__': main()
+

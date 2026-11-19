@@ -2,7 +2,7 @@ name: Deploy Cloudflare Worker
 on:
   push:
     branches: [main]
-    paths: ['market-session.js', 'private-request.js', 'tests/private-request.test.mjs', 'worker.js', 'shadow-research.js', 'plaid-sync.js', 'robinhood-live.js', 'private-candidates.js', 'candidate-quotes*.js', 'quote-evidence.js', 'quote-session.js', 'quote-timing.js', 'robinhood-connect.js', 'watch-service.js', 'watch-monitor.js', 'watch-discord*.js', 'watch-quote-*.js', 'watch-alert*.js', 'wrangler.toml', 'scripts/build-assets.mjs', 'scripts/setup-robinhood-client.mjs', 'scripts/worker-setup-readiness.mjs', '*.html', 'dashboard-*.js', 'signal-checklist.js', 'dashboard-mobile.css', 'connection-ui.css', 'refresh-progress.js', 'trade-review.js', '.github/workflows/deploy-worker.yml']
+    paths: ['market-session.js', 'private-request.js', 'tests/private-request.test.mjs', 'worker.js', 'shadow-research.js', 'plaid-sync.js', 'robinhood-live.js', 'private-fill-lookup.js', 'tests/private-fill-lookup.test.mjs', 'private-evidence.js', 'private-candidates.js', 'candidate-quotes*.js', 'quote-evidence.js', 'quote-session.js', 'quote-timing.js', 'robinhood-connect.js', 'server-evidence-link.js', 'watch-service.js', 'watch-monitor.js', 'watch-discord*.js', 'watch-quote-*.js', 'watch-alert*.js', 'wrangler.toml', 'scripts/build-assets.mjs', 'scripts/setup-robinhood-client.mjs', 'scripts/worker-setup-readiness.mjs', '*.html', 'dashboard-*.js', 'trade-exit-assistant.js', 'signal-checklist.js', 'dashboard-mobile.css', 'connection-ui.css', 'refresh-progress.js', 'trade-review.js', '.github/workflows/deploy-worker.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -12,6 +12,13 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Historical quote archives are not needed to verify or deploy code.
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !/data/
+            /data/*.json
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -28,6 +35,9 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+
+
 
 
 
