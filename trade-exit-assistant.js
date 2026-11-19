@@ -1,4 +1,12 @@
 // Browser-local journal helper. Scanner observations are never brokerage fills.
+export function purchaseRecordAction(candidate, option) {
+  const exact = option && option.contract_id && option.expiry && ['call','put'].includes(option.side) && Number(option.strike) > 0;
+  return exact ? {
+    label: 'I bought this contract · record fill',
+    contract: {ticker:candidate.ticker,contract_id:option.contract_id,expiry:option.expiry,side:option.side,strike:Number(option.strike)}
+  } : {label:'Record an option purchase',contract:{ticker:candidate.ticker}};
+}
+
 export function exitReview(trade, candidate, snapshot) {
   if (!trade || trade.exit !== null) return null;
   const notes = [];
@@ -49,6 +57,10 @@ export function attachTradeExitAssistant({board, journal, getSnapshot}) {
   }
   async function lookupAndOffer(contract, notice) {
     const version = ++lookupVersion;
+    if (!contract.contract_id || !contract.expiry || !['call','put'].includes(contract.side) || !(Number(contract.strike)>0)) {
+      notice.append(document.createTextNode(' Enter the exact option contract and expiration manually. No contract was selected by the scanner for this record.'));
+      return;
+    }
     if (!location.hostname.endsWith('.workers.dev')) {
       notice.append(document.createTextNode(' Private lookup requires the Access-protected Cloudflare dashboard; manual entry remains available here.'));
       return;
@@ -97,7 +109,7 @@ export function attachTradeExitAssistant({board, journal, getSnapshot}) {
     delete $('addTrade').dataset.executionId;delete $('addTrade').dataset.executedAt;
     document.dispatchEvent(new Event('recordNewFill'));
     $('jt').value = contract.ticker;
-    $('jc').value = contract.contract_id;
+    $('jc').value = contract.contract_id || '';
     $('jexpiry').value = contract.expiry || '';
     $('je').value = '';
     $('jx').value = '';

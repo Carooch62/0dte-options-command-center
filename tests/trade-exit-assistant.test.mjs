@@ -1,8 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {exitReview} from '../trade-exit-assistant.js';
+import {exitReview,purchaseRecordAction} from '../trade-exit-assistant.js';
 
 const trade = {ticker:'TEST',contract:'TEST261120C00005000',entry:.33,qty:1,time:'2026-11-18T15:00:00Z',exit:null,expiry:'2026-11-20',lossReview:null,target:null};
+
+test('purchase actions bind exact selected identity or leave unknown contract fields empty',()=>{
+  const candidate={ticker:'TEST'},option={contract_id:'TEST261120C00005000',expiry:'2026-11-20',side:'call',strike:5};
+  assert.deepEqual(purchaseRecordAction(candidate,option),{label:'I bought this contract · record fill',contract:{ticker:'TEST',...option}});
+  assert.deepEqual(purchaseRecordAction(candidate,null),{label:'Record an option purchase',contract:{ticker:'TEST'}});
+  assert.deepEqual(purchaseRecordAction(candidate,{...option,contract_id:null}),purchaseRecordAction(candidate,null));
+  assert.equal(candidate.setup_qualified,undefined);
+});
 
 test('open position gets conditional checkpoints without assuming a quote or fill', () => {
   const notes = exitReview(trade, null, null).join(' ');
