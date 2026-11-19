@@ -58,6 +58,8 @@ try{
  const record=page.locator('#board .purchase-action').getByRole('button',{name:'I bought this contract · record fill',exact:true});await record.waitFor({state:'visible'});assert.equal(await page.locator('#board .clean-drawer').evaluate(el=>el.open),false);await record.click();
  assert.equal(await page.locator('#je').inputValue(),'');assert.equal(await page.locator('#jtime').inputValue(),'');
  assert.equal(await page.locator('#jf').inputValue(),'');assert.equal(await page.locator('#jc').inputValue(),'TEST261106C00011000');
+ assert.match(await page.locator('#purchaseExitDraft').innerText(),/Your option exit-plan draft/);
+ assert.equal(await page.locator('#jloss').inputValue(),'0.14');assert.equal(await page.locator('#jtarget').inputValue(),'0.3');
  await page.locator('#addTrade').click();assert.match(await page.locator('#journalNotice').innerText(),/actual execution time and known total fees/);
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('0dteJournal')).length),0);
  await page.locator('#je').fill('0.50');await page.locator('#jf').fill('0');await page.locator('#jtime').fill('2026-11-02T09:49');await page.locator('#addTrade').click();
