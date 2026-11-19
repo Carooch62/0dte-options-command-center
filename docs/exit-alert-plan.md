@@ -1,70 +1,73 @@
-# Position exit notifications — implementation boundary
+# Private option quotes and position checkpoint alerts
 
-Price-first purchase recording is implemented. The entered actual premium drives
-the editable plan; source asks no longer substitute when that field is blank.
-The default percentage checkpoints remain examples until the user chooses a plan.
+## Implemented behavior
 
-Exit notifications are NOT live. Existing setup alerts and their qualification
-gates are not a position exit monitor. The current quote pilot has a five-minute
-tick; it cannot establish instantaneous or streaming notifications.
+The private Liquid dashboard supports optional foreground quote polling. It starts
+off, requires a fresh first quote and a current OPEN-session snapshot, and waits
+60 seconds after request completion. Only one quote refresh runs at a time. Hidden
+tabs pause requests; reopening does not cause a catch-up burst. Transient failures
+back off to at most 16 minutes; sign-in/setup/authorization failures and expired
+contracts stop the loop. Closing/changing the selected contract stops its loop.
+Displayed counts distinguish successful responses from passing fresh quote checks.
+Browser request time does not establish exchange latency. This is not streaming.
 
-Required implementation and activation sequence:
+Matching browser-local fills and saved exit levels remain separate from quoted
+prices. Public Pages and the private Worker have different browser storage; use
+journal export/import deliberately. Existing price-reference ladders remain
+illustrative, editable examples rather than calibrated strategy recommendations.
 
-1. Confirm the actual premium, quantity, exact option identity, chosen loss/profit
-   checkpoints and expiration. Save an explicitly approved, versioned position
-   plan to owner-protected encrypted storage; closing/editing/removing a position
-   must cancel/supersede its old monitor. Browser-local storage cannot monitor a
-   closed Safari tab on its own.
-2. Verify hosted authorization and real rotating-token renewal, then exact option
-   metadata and current two-sided quote clocks in actual open market sessions.
-3. Poll saved open positions independently of scanner eligibility. Do not apply
-   entry ask <= $0.30, delta, news, candidate caps or unchanged-scan checkpoints to
-   exits. Check current executable BID for long-option review checkpoints, not ask,
-   mark or last-trade price. Missing/stale/ambiguous quotes mean unknown, not a hit.
-4. Use an independently verified exchange session and standard multiplier/identity;
-   reject expired, halted, nontradable or mismatched contracts. Process bounded
-   batches fairly with throttling/backoff; measure request latency and quote age
-   before choosing a faster cadence. Preserve the $0 cost constraint. State the
-   actual polling interval and delivery delay; never call five-minute polling real
-   time. An underlying invalidation alert requires its own fresh underlying quote.
-5. Send a private Discord checkpoint summary naming the exact option and reason:
-   review a sale / sell to close in Robinhood. Keep raw provider prices and Greeks
-   out of Discord under the existing personal-use decision. An alert is not a
-   filled sale, guarantee or submitted broker order.
-6. Deduplicate per position/plan revision/checkpoint; handle retries and ambiguous
-   webhook timeouts explicitly. Test actual delivery, close cancellation, plan
-   replacement, missing quotes, expired sessions, failed renewal and no duplicates.
-   Keep delivery disabled until these checks pass. Ask for explicit plan activation
-   rather than turning illustrative default levels into automatic sell advice.
+The private position service stores owner-reviewed exact-contract plans encrypted
+with AES-GCM in a dedicated SQLite Durable Object. Plans include actual premium,
+quantity/time, explicitly reviewed loss/profit bids, source-fill fingerprint, revision
+and enable state. No plan is created or enabled automatically from a scanner result.
+Owner Access JWTs and same-origin mutation checks protect the API. Revisions reject
+stale overwrites from another device. A saved paused plan makes no quote requests.
 
-Next release must include private plan sync and a separately gated position monitor;
-this document does not claim those components are implemented or activated.
+Before enabling a plan, the owner must send a labeled TEST ONLY message, confirm
+receiving it in the private Discord channel, and confirm the actual fill/exit levels.
+The server verifies the same tested webhook, a current exchange-calendar session,
+and fresh exact-contract bid/ask evidence. Missing authorization or prerequisites
+block activation. After hours, save paused and enable during a verified session.
+No real position or notification is activated by deployment alone.
 
-## Detailed benchmark display
+Background checks run on the existing five-minute Worker tick, independent of
+Safari and entry scanner eligibility. The initial limit is three active plans and
+50 saved plans; existing records are never silently overwritten at the storage
+limit. Exact contracts shared by multiple fills reuse one quote lookup. A current-day
+calendar snapshot provides actual open/close boundaries; missing/invalid calendar
+proof prevents quote checks. Expired plans pause. Unchanged scanner results, entry
+ask <= $0.30, delta, news and entry spread limits do not gate exits. Missing, stale,
+ambiguous, crossed, inactive/nonstandard or mismatched quote evidence is unknown;
+a reported zero bid size suppresses notification. Missing size does not establish
+liquidity. Quote observations never guarantee an executable fill or identify every
+halt instantaneously. Quote-check counts/reasons are available privately.
 
-The purchase draft and saved open-position review now show three loss and three
-profit premiums per share, with a compact tier-2 profit reference and expandable
-input/source-clock reasoning. Changing actual entry/time recomputes the draft;
-manually edited checkpoints remain intact. Saved checkpoints are not overwritten
-by subsequent reference tables. Exact contract ID and expiry are required to
-retrieve option-specific context for saved positions; missing contracts stay unknown.
+Fresh BID crossings of the user's saved levels generate review reminders. Messages
+name the exact option, position/revision and loss/profit reason without raw provider
+prices or Greeks. Mentions are disabled. No broker orders or automatic sales occur.
+Five-minute polling plus request/delivery time can miss brief crossings.
 
-The reference ladder is explicitly illustrative: loss -10/-20/-30%, profit
-+25/+50/+75%, rounded to cents. It is not a calibrated recommended strategy. With
-aligned entry/underlying/option clocks, an OPEN session, valid expiration, usable
-signed delta/gamma/daily theta, two-sided spread and directional stock targets,
-the module can instead show provisional local Greek sensitivity scenarios. The
-15/30/60-minute horizons start at the fill, stay within the current session and
-limit stock displacements to 3%. These bounds are engineering guardrails, not
-empirical accuracy claims. An incomplete ladder uses reference mode throughout.
+Persisted per-position/revision/checkpoint markers prevent blind duplicate sends.
+A delivery is claimed before the external request; uncertain timeouts remain pending
+or DELIVERY_UNKNOWN, with no automatic resend. Explicit failures remain recorded for
+owner review. A new revision can rearm after the owner checks Discord. Provider or
+authorization failures back off, capped at 15 minutes. Destination changes pause old
+plans until a new delivery test and explicit review.
 
-The scenario proxy is paid premium + delta*dS + gamma*dS^2/2 + theta*minutes/1440
-minus the observed spread. Constant IV/Greeks and unverified Greek calculation
-clocks prevent an executable-price or forecast claim. Theta diagnostics remain
-observations and are not measured decay since entry. Expiration is displayed in
-calendar days; broker deadlines remain separate. Catalyst/headline timing, setup,
-trend, pattern and volume context explain thesis review, without an arbitrary
-numeric catalyst uplift. A resolved catalyst never cancels a loss review.
+When a monitored local fill is edited, closed or deleted, the private dashboard
+attempts to pause its saved monitor. Cached opaque owned IDs let cancellation survive
+reloads. Missing records on an unrelated/new device do not erase other plans. Network
+failure or conflicting revisions leave a visible unconfirmed-pause warning; the
+server may still monitor until the pause succeeds. Remote plans can be loaded and
+paused explicitly. An already in-flight Discord message can still arrive. Actual
+broker exits remain manual: the journal cannot infer a sale from a quote.
 
-This is a display/planning release. It does not implement or activate exit alerts,
-private position sync, streaming monitoring, broker orders or automatic sales.
+## Validation boundary
+
+Synthetic unit and real-browser tests cover scheduling, source freshness, authorization,
+encryption, revision conflicts, activation/test receipts, stale/missing/crossed books,
+calendar gating, expiry, cancellation during quote lookup, provider backoff, uncertain
+webhook outcomes and exact fill matching. Mock messages do not prove actual phone
+notification delivery. Each owner must complete the actual TEST ONLY receipt step.
+Live repeated quote timing and real rotating-token renewal remain operational
+observations, not guarantees established by this code release.
