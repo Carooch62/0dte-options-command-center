@@ -1,4 +1,9 @@
 // Browser-local journal helper. Scanner observations are never brokerage fills.
+export function purchasePremium(value) {
+  const text=String(value??'').trim().replace(/^\$/, '');
+  if(!/^(?:\d+(?:\.\d+)?|\.\d+)$/.test(text)||!Number.isFinite(Number(text))||Number(text)<=0)throw Error('Enter a positive premium per share, such as 0.20—not the total contract cost.');
+  return Number(text);
+}
 export function purchaseRecordAction(candidate, option) {
   const exact = option && option.contract_id && option.expiry && ['call','put'].includes(option.side) && Number(option.strike) > 0;
   return exact ? {
@@ -53,6 +58,11 @@ export function attachTradeExitAssistant({board, journal, getSnapshot}) {
   let draftContract=null,draftCandidate=null,draftSnapshot=null;
   function renderDraft() {
     if(!draftContract)return;
+    if(!$('je').value.trim()||!(Number($('je').value)>0)){
+      draft.innerHTML='<h3>Your exit plan needs your purchase price</h3><p>Enter the actual premium paid per share below. Scanner quotes will not substitute for your fill.</p>';
+      if(!draft.dataset.manualCheckpoints){$('jloss').value='';$('jtarget').value='';}
+      return;
+    }
     const result=exitPlanDraft(draftContract,draftCandidate,draftSnapshot,$('je').value,$('jq').value);
     if(draft.dataset.manualCheckpoints){for(const [key,id] of [['loss','jloss'],['target','jtarget']])result[key]=$(id).value.trim()&&Number.isFinite(Number($(id).value))?Number($(id).value):null;}
     const money=n=>n===null?'Unknown':'$'+Number(n).toFixed(2);
@@ -133,6 +143,12 @@ export function attachTradeExitAssistant({board, journal, getSnapshot}) {
     if (!button) return;
     let contract;
     try { contract = JSON.parse(decodeURIComponent(button.dataset.recordFill)); } catch { return; }
+    let paid;
+    while(paid===undefined){
+      const value=window.prompt(`What did you pay for ${contract.ticker} ${contract.contract_id||'this option'}? Enter the premium PER SHARE (for example 0.20 = $20 per standard contract), not total cost.`,'');
+      if(value===null)return;
+      try{paid=purchasePremium(value);}catch(error){window.alert(error.message);}
+    }
     const snapshot = getSnapshot();
     const candidate = snapshot?.candidates?.find(x => x.ticker === contract.ticker);
     delete $('addTrade').dataset.executionId;delete $('addTrade').dataset.executedAt;
@@ -140,7 +156,7 @@ export function attachTradeExitAssistant({board, journal, getSnapshot}) {
     $('jt').value = contract.ticker;
     $('jc').value = contract.contract_id || '';
     $('jexpiry').value = contract.expiry || '';
-    $('je').value = '';
+    $('je').value = String(paid);
     $('jx').value = '';
     $('jq').value = '1';
     $('jf').value = '';
