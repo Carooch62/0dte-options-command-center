@@ -1,4 +1,4 @@
-import {attachDashboardOptionQuotes} from './dashboard-option-quotes.js?v=20261119-private-quotes';
+import {attachDashboardOptionQuotes} from './dashboard-option-quotes.js?v=20261119-quote-signin';
 import {coverageReport} from './coverage-report.js';
 import {attachTradeExitAssistant,purchaseRecordAction} from './trade-exit-assistant.js?v=20261119-qc';
 import {loadDashboardSnapshot} from './dashboard-delivery.js';

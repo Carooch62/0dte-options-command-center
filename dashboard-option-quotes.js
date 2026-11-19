@@ -7,6 +7,7 @@ export function optionIdentity(raw){
  const date=new Date(raw.expiry+'T00:00:00Z');if(!Number.isFinite(+date)||date.toISOString().slice(0,10)!==raw.expiry)throw Error('Invalid option expiration.');
  return {ticker:raw.ticker,contract_id:raw.contract_id,side:raw.side,strike:Number(raw.strike),expiry:raw.expiry};
 }
+export function quoteSignInUrl(contract){const back='/dashboard_liquid.html?v=20261119-quote-signin#rh-quote='+encodeURIComponent(JSON.stringify(optionIdentity(contract)));return '/private/plaid/robinhood/sign-in?'+new URLSearchParams({return_to:back});}
 export function privateQuoteUrl(raw){return PRIVATE_DASHBOARD+'#rh-quote='+encodeURIComponent(JSON.stringify(optionIdentity(raw)));}
 function exactInstrument(c,i){return i&&uuid.test(i.id)&&i.chain_symbol===c.ticker&&i.type===c.side&&i.expiration_date===c.expiry&&Number(i.strike_price)===c.strike;}
 export async function fetchOptionQuote(raw,read=requestJSON){
@@ -34,7 +35,7 @@ export function matchingQuoteFills(contract,trades){return (Array.isArray(trades
 export function attachDashboardOptionQuotes({board,getTrades=()=>[],privateOrigin=location.origin==='https://0dte-options-command-center.h69htk56cq.workers.dev',read=requestJSON}){
  const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const panel=document.createElement('section');panel.id='privateOptionQuote';panel.className='panel';panel.style.overflowWrap='anywhere';panel.hidden=true;board.before(panel);
- let selected=null,record=null,busy=false,inFlight=false,generation=0,error='',refreshButton;
+ let selected=null,record=null,busy=false,inFlight=false,generation=0,error='',errorCode='',refreshButton;
  const money=x=>typeof x!=='number'||!Number.isFinite(x)?'Unknown':'$'+x.toFixed(3);
  function fillHtml(){const fills=matchingQuoteFills(selected,getTrades());return fills.length?'<h4>Matching local open fills</h4>'+fills.map(t=>`<p>Recorded entry ${money(t.entry)} · quantity ${escape(t.qty)} · opened ${escape(t.time)}<br>Saved loss-review ${money(t.lossReview)} · profit-review ${money(t.target)}. Compare with the observed bid above; quotes do not change your saved plan.</p>`).join(''):'<p class="smallnote">No matching open fills in this private site’s journal.</p>';}
 
@@ -42,19 +43,20 @@ export function attachDashboardOptionQuotes({board,getTrades=()=>[],privateOrigi
   if(!selected)return;
   const view=optionQuoteView(record),label=[selected.ticker,selected.expiry,selected.strike,selected.side.toUpperCase()].join(' · ');
   panel.hidden=false;
-  panel.innerHTML=`<h3>Private Robinhood option quote</h3><p><b>${escape(label)}</b><br><small>${escape(selected.contract_id)}</small></p><p role="status" data-quote-status>${escape(busy?'Checking exact contract and fetching quote…':error||view?.status||'Ready to request a quote.')}</p>${view?`<table><caption>Premium per share · provider observation</caption><thead><tr><th>Bid</th><th>Ask</th><th>Midpoint</th></tr></thead><tbody><tr><td>${money(view.bid)}</td><td>${money(view.ask)}</td><td>${money(view.midpoint)}</td></tr></tbody></table><p class="smallnote">Provider time ${escape(view.observed_at||'unknown')} · age <span data-quote-age>${view.age_seconds===null?'unknown':Math.floor(view.age_seconds)+'s'}</span><br>Received ${escape(view.received_at||'unknown')}. ${escape(view.reasons.join(' · '))}</p>`:''}<div data-quote-fills>${fillHtml()}</div><p class="smallnote">Quotes stay in this private tab. Journal entries saved on GitHub Pages remain there; they are not automatically copied here. Manual refresh only. Fresh means a provider timestamp within 60 seconds and passing quote checks; it does not establish streaming prices, exchange latency, market-open status, scanner eligibility, or a guaranteed fill. Midpoint is arithmetic, not an executable price. Research prices and your recorded fill remain separate.</p>`;
-  refreshButton=document.createElement('button');refreshButton.type='button';refreshButton.textContent='Refresh Robinhood quote';refreshButton.disabled=busy;refreshButton.onclick=refresh;panel.append(refreshButton);
-  const close=document.createElement('button');close.type='button';close.textContent='Close quote';close.onclick=()=>{generation++;selected=null;record=null;busy=false;error='';panel.hidden=true;};panel.append(close);
+  panel.innerHTML=`<h3>Private Robinhood option quote</h3><p><b>${escape(label)}</b><br><small>${escape(selected.contract_id)}</small></p><p role="status" data-quote-status>${escape(busy?'Checking exact contract and fetching quote…':error||view?.status||'Ready to request a quote.')}</p>${view?`<table><caption>Premium per share · provider observation</caption><thead><tr><th>Bid</th><th>Ask</th><th>Midpoint</th></tr></thead><tbody><tr><td>${money(view.bid)}</td><td>${money(view.ask)}</td><td>${money(view.midpoint)}</td></tr></tbody></table><p class="smallnote">Provider time ${escape(view.observed_at||'unknown')} · age <span data-quote-age>${view.age_seconds===null?'unknown':Math.floor(view.age_seconds)+'s'}</span><br>Received ${escape(view.received_at||'unknown')}. ${escape(view.reasons.join(' · '))}</p>`:''}<div data-quote-fills>${fillHtml()}</div><details><summary>Quote privacy and limitations</summary><p class="smallnote">Quotes stay in this private tab. Journal entries saved on GitHub Pages remain there; they are not automatically copied here. Manual refresh only. Fresh means a provider timestamp within 60 seconds and passing quote checks; it does not establish streaming prices, exchange latency, market-open status, scanner eligibility, or a guaranteed fill. Midpoint is arithmetic, not an executable price. Research prices and your recorded fill remain separate.</p></details>`;
+  refreshButton=document.createElement('button');refreshButton.type='button';refreshButton.textContent='Refresh Robinhood quote';refreshButton.disabled=busy;refreshButton.onclick=refresh;panel.insertBefore(refreshButton,panel.querySelector('[data-quote-fills]'));
+  if(['SIGN_IN','ACCESS_DENIED'].includes(errorCode)){const signIn=document.createElement('a');signIn.href=quoteSignInUrl(selected);signIn.target='_blank';signIn.rel='noopener';signIn.className='broker-link';signIn.textContent='Sign in to private quotes';panel.insertBefore(signIn,refreshButton);const help=document.createElement('p');help.className='smallnote';help.textContent='Complete private website sign-in in the new tab, then return here and refresh. This does not disconnect Robinhood or replace its authorization.';panel.insertBefore(help,refreshButton);}
+  const close=document.createElement('button');close.type='button';close.textContent='Close quote';close.onclick=()=>{generation++;selected=null;record=null;busy=false;error='';errorCode='';panel.hidden=true;};panel.insertBefore(close,panel.querySelector('[data-quote-fills]'));
   const connection=document.createElement('a');connection.href='candidate-quotes.html';connection.textContent='Robinhood connection and quote diagnostics';panel.append(connection);
  }
  async function refresh(){
   if(inFlight||!selected||!privateOrigin)return;
-  inFlight=true;busy=true;error='';record=null;const version=++generation,contract=selected;render();
+  inFlight=true;busy=true;error='';errorCode='';record=null;const version=++generation,contract=selected;render();
   try{const result=await fetchOptionQuote(contract,(...args)=>{if(version!==generation)throw Error('Quote selection changed.');return read(...args);});if(version===generation)record=result;}
-  catch(e){if(version===generation)error=e.message||'Private quote unavailable. Retry when ready.';}
+  catch(e){if(version===generation){errorCode=e.code||'';error=errorCode==='SIGN_IN'?'Private website sign-in required. Sign in below, then refresh this quote. Robinhood authorization has not been checked.':e.message||'Private quote unavailable. Retry when ready.';}}
   finally{inFlight=false;if(version===generation){busy=false;render();}}
  }
- function select(raw){if(inFlight)return;selected=optionIdentity(raw);generation++;busy=false;record=null;error='';render();panel.scrollIntoView({block:'center'});}
+ function select(raw){if(inFlight)return;selected=optionIdentity(raw);generation++;busy=false;record=null;error='';errorCode='';render();panel.scrollIntoView({block:'center'});}
  function addControls(){
   for(const source of board.querySelectorAll('.purchase-action [data-record-fill],button[data-watch]')){
    if(source.parentElement.querySelector('[data-rh-quote]'))continue;

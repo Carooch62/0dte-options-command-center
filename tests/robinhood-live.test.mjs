@@ -195,3 +195,17 @@ test('private fill lookup matches configured account and one exact execution wit
 }));
 
 
+
+test('private sign-in return requires verified Access and never reads Robinhood credentials',async()=>{
+ const anonymous=await handleRobinhood(request('sign-in'),base);assert.equal(anonymous.status,401);assert.equal(anonymous.headers.get('Location'),null);
+ await harness(async({env,auth,calls})=>{
+  const back='/dashboard_liquid.html?v=signin#rh-quote=selected';
+  const noCredentials={...env,ROBINHOOD_CONNECTION_ENABLED:'false',PLAID_STORE:{get(){throw Error('Credential read forbidden');}}};
+  const result=await handleRobinhood(request('sign-in?'+new URLSearchParams({return_to:back}),'GET',auth),noCredentials);
+  assert.equal(result.status,303);assert.equal(result.headers.get('Location'),back);assert.equal(result.headers.get('Cache-Control'),'no-store');assert.equal(calls.length,0);
+  for(const bad of ['https://evil.test/dashboard_liquid.html','//evil.test/dashboard_liquid.html','/private/plaid/robinhood/connect','javascript:alert(1)']){
+   const denied=await handleRobinhood(request('sign-in?'+new URLSearchParams({return_to:bad}),'GET',auth),env);assert.equal(denied.status,400);assert.equal(denied.headers.get('Location'),null);
+  }
+  assert.equal((await handleRobinhood(request('sign-in','POST',auth,{}),env)).status,405);
+ });
+});

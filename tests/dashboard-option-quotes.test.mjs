@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {optionIdentity,privateQuoteUrl,fetchOptionQuote,optionQuoteView,matchingQuoteFills} from '../dashboard-option-quotes.js';
+import {optionIdentity,privateQuoteUrl,quoteSignInUrl,fetchOptionQuote,optionQuoteView,matchingQuoteFills} from '../dashboard-option-quotes.js';
 const c={ticker:'TEST',contract_id:'TEST261120C00100000',side:'call',expiry:'2026-11-20',strike:100};
 const id='22222222-2222-4222-8222-222222222222',at='2026-11-19T18:00:00Z',now=Date.parse(at);
 const i={id,chain_symbol:'TEST',type:'call',expiration_date:c.expiry,strike_price:'100',state:'active',tradability:'tradable',trade_value_multiplier:100,sellout_datetime:'2026-11-20T20:45:00Z'};
@@ -28,4 +28,10 @@ test('unknown/future source clocks and invalid books never pass freshness checks
 test('fill comparison uses only exact open local positions without modifying them',()=>{
  const t={ticker:c.ticker,contract:c.contract_id,expiry:c.expiry,entry:.2,exit:null},trades=[t,{...t,contract:'OTHER'},{...t,expiry:'2026-12-01'},{...t,exit:.3},{...t,entry:null}],before=JSON.stringify(trades);
  assert.deepEqual(matchingQuoteFills(c,trades),[t]);assert.equal(JSON.stringify(trades),before);
+});
+
+test('private sign-in link preserves only selected option identity and returns to dashboard',()=>{
+ const u=new URL(quoteSignInUrl({...c,access_token:'NEVER'}),'https://example.test');
+ assert.equal(u.pathname,'/private/plaid/robinhood/sign-in');const back=new URL(u.searchParams.get('return_to'),u.origin);
+ assert.equal(back.pathname,'/dashboard_liquid.html');assert.deepEqual(JSON.parse(decodeURIComponent(back.hash.slice(10))),c);assert.ok(!u.href.includes('NEVER'));
 });
