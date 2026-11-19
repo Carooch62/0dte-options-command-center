@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {exitReview,purchaseRecordAction} from '../trade-exit-assistant.js';
+import {exitReview,purchaseRecordAction,exitPlanDraft} from '../trade-exit-assistant.js';
 
 const trade = {ticker:'TEST',contract:'TEST261120C00005000',entry:.33,qty:1,time:'2026-11-18T15:00:00Z',exit:null,expiry:'2026-11-20',lossReview:null,target:null};
 
@@ -34,4 +34,13 @@ test('outside-budget personal fills are labelled without changing scanner qualif
  const candidate={setup_qualified:true};
  assert.match(exitReview({...trade,entry:.50},candidate,null).join(' '),/exceeds the scanner/);
  assert.equal(candidate.setup_qualified,true);
+});
+
+test('exit draft uses exact contract research reference without manufacturing a fill',()=>{
+ const c={contract_id:'TEST',expiry:'2026-11-20',side:'call',strike:5};
+ const row={options:[{...c,ask:.20}],invalidation_price:4.9};
+ const p=exitPlanDraft(c,row,{generated_at:'2026-11-18T15:00:00Z'},null,2);
+ assert.equal(p.source,'OBSERVED_RESEARCH_ASK');assert.equal(p.loss,.14);assert.equal(p.target,.30);assert.equal(p.premium_at_risk,40);
+ assert.equal(exitPlanDraft({...c,contract_id:'OTHER'},row,null,null).basis,null);
+ const actual=exitPlanDraft(c,row,null,.24,1);assert.equal(actual.source,'ACTUAL_FILL');assert.equal(actual.loss,.17);assert.equal(actual.target,.36);
 });
