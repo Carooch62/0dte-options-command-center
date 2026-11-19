@@ -197,13 +197,13 @@ export function attachTradeExitAssistant({board, journal, getSnapshot}) {
   journal.addEventListener('click', event => {
     if(!event.target.closest('[data-edit]'))return;
     awaitingFill=false;
-    // The journal's bubble handler populates fields before this draft is rebuilt.
-    queueMicrotask(()=>{
+    // Registered after the journal handler, so its fields now contain this trade.
+    {
       draftSnapshot=getSnapshot();draftCandidate=draftSnapshot?.candidates?.find(c=>c.ticker===$('jt').value);
       draftContract=savedExitContract({ticker:$('jt').value,contract:$('jc').value,expiry:$('jexpiry').value},draftCandidate);
       draft.dataset.manualCheckpoints='true';renderDraft();
-    });
-  }, true);
+    }
+  });
   new MutationObserver(addButtons).observe(board, {childList:true,subtree:true});
   new MutationObserver(renderPlan).observe(journal, {childList:true});
   addButtons();
