@@ -77,10 +77,10 @@ try{
  assert.equal(await page.locator('#exitReviewPanel tbody tr').count(),3);
  assert.equal(await page.locator('#jloss').inputValue(),'0.33');
  // A confirmed provider execution retains seconds and cannot be journalled twice.
- await page.locator('#addTrade').evaluate(button=>{button.dataset.executionId='11111111-1111-4111-8111-111111111111';button.dataset.executedAt='2026-11-02T14:49:30Z';});
+ await page.locator('#addTrade').evaluate(button=>{button.dataset.executionId='11111111-1111-4111-8111-111111111111';button.dataset.executedAt='2026-11-02T14:49:30.123Z';});
  await page.locator('#addTrade').click();
  const captured=await page.evaluate(()=>JSON.parse(localStorage.getItem('0dteJournal')));
- assert.equal(captured.length,2);assert.equal(captured[0].time,'2026-11-02T14:49:30Z');
+ assert.equal(captured.length,2);assert.equal(captured[0].time,'2026-11-02T14:49:30.123Z');
  await page.locator('#addTrade').click();assert.match(await page.locator('#journalNotice').innerText(),/already recorded/);
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('0dteJournal')).length),2);
  await record.click();
@@ -90,7 +90,7 @@ try{
  await page.locator('#purchaseExitDraft').getByText(/your edited checkpoint/).first().waitFor();
  assert.match(await page.locator('#purchaseExitDraft').innerText(),/\$0.50/);
  await page.locator('#addTrade').click();
- assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('0dteJournal'))[0].time),'2026-11-02T14:49:30Z');
+ assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('0dteJournal'))[0].time),'2026-11-02T14:49:30.123Z');
  await page.locator('#journal [data-edit]').last().click();
  await page.locator('#purchaseExitDraft').getByText(/your edited checkpoint/).first().waitFor();
  assert.equal(await page.locator('#jloss').inputValue(),'0.33');
