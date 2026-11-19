@@ -1,5 +1,5 @@
 import {coverageReport} from './coverage-report.js';
-import {attachTradeExitAssistant} from './trade-exit-assistant.js';
+import {attachTradeExitAssistant,purchaseRecordAction} from './trade-exit-assistant.js?v=20261118-visible-fill';
 import {loadDashboardSnapshot} from './dashboard-delivery.js';
 import {entryReadiness,trendSummary,matchesTrend,quoteKey,observePremiums,premiumChange,positionEstimate,reentryProblem,positionAlerts,validPlan} from './trade-review.js?v=20261002-trend-filters';
 import {watchKey,watchTransitions} from './contract-watch.js';
@@ -85,6 +85,12 @@ function streamlinedCard(html,x){
  const preview=article.querySelector('.contract-preview');
  if(preview){const box=document.createElement('div');box.className='clean-contract';box.append(preview);article.querySelector('.price-row')?.after(box);}
  const brief=document.createElement('div');brief.className='clean-levels';
+ const pick=contractShortlist(x,dataDownloadFailed?{...data,generated_at:null}:data,Number($('askMin').value),Number($('askMax').value))[0]?.option;
+ const action=purchaseRecordAction(x,pick),record=document.createElement('button');
+ record.type='button';record.className='record-purchase';record.dataset.recordFill=encodeURIComponent(JSON.stringify(action.contract));record.textContent=action.label;
+ const purchase=document.createElement('div');purchase.className='purchase-action';purchase.append(record);
+ const hint=document.createElement('p');hint.className='smallnote';hint.textContent=pick?'Records a purchase you already made. Enter your actual fill; nothing is bought here.':'Already bought an option? Enter its exact contract and actual fill. This does not make it scanner-qualified.';purchase.append(hint);
+ (article.querySelector('.clean-contract')||article.querySelector('.price-row')||article.querySelector('.row'))?.after(purchase);
  brief.innerHTML='<span>Trigger <b>'+money(x.trigger_price)+'</b></span><span>Invalidation <b>'+money(x.invalidation_price)+'</b></span>';
  article.querySelector('.quick-metrics')?.after(brief);
  const ages=article.querySelector('.source-ages');
