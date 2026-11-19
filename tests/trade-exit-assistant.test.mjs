@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {exitReview,purchaseRecordAction,exitPlanDraft} from '../trade-exit-assistant.js';
+import {exitReview,purchaseRecordAction,exitPlanDraft,purchasePremium} from '../trade-exit-assistant.js';
 
 const trade = {ticker:'TEST',contract:'TEST261120C00005000',entry:.33,qty:1,time:'2026-11-18T15:00:00Z',exit:null,expiry:'2026-11-20',lossReview:null,target:null};
 
@@ -43,4 +43,9 @@ test('exit draft uses exact contract research reference without manufacturing a 
  assert.equal(p.source,'OBSERVED_RESEARCH_ASK');assert.equal(p.loss,.14);assert.equal(p.target,.30);assert.equal(p.premium_at_risk,40);
  assert.equal(exitPlanDraft({...c,contract_id:'OTHER'},row,null,null).basis,null);
  const actual=exitPlanDraft(c,row,null,.24,1);assert.equal(actual.source,'ACTUAL_FILL');assert.equal(actual.loss,.17);assert.equal(actual.target,.36);
+});
+
+test('purchase premium requires an explicit positive decimal rather than a guessed quote',()=>{
+ for(const value of ['0.20','.20','$0.20'])assert.equal(purchasePremium(value),.20);
+ for(const value of [null,'','0','-1','NaN','1e2','20 dollars'])assert.throws(()=>purchasePremium(value));
 });
