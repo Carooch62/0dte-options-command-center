@@ -147,8 +147,8 @@ export function attachTradeExitAssistant({board, journal, getSnapshot}) {
     $('jloss').value = '';
     $('jtarget').value = '';
     $('jmax').value = '';
-    $('jconditions').value = candidate?.invalidation_price != null ? `Review if underlying breaks ${candidate.invalidation_price} (scanner observation; verify live)` : '';
-    $('jreason').value = '';
+    $('jconditions').value = candidate?.invalidation_price != null ? `Review if underlying moves ${contract.side==='put'?'above':contract.side==='call'?'below':'through'} ${candidate.invalidation_price} (scanner observation; verify live)` : '';
+    $('jreason').value = candidate ? `Scanner observation: ${candidate.direction||'unknown direction'} / ${candidate.execution_state||'unknown state'}; setup qualified ${candidate.setup_qualified===true?'yes':candidate.setup_qualified===false?'no':'unknown'}. Verify the pre-entry evidence separately.` : '';
     $('jtime').value = '';
     $('jconfirm').value = '';
     draftContract=contract;draftCandidate=candidate;draftSnapshot=snapshot;delete draft.dataset.manualCheckpoints;
