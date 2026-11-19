@@ -49,3 +49,5 @@ test('purchase premium requires an explicit positive decimal rather than a guess
  for(const value of ['0.20','.20','$0.20'])assert.equal(purchasePremium(value),.20);
  for(const value of [null,'','0','-1','NaN','1e2','20 dollars'])assert.throws(()=>purchasePremium(value));
 });
+
+test('legacy open trade with omitted exit still has an exit review',()=>{const t={...trade};delete t.exit;assert.ok(Array.isArray(exitReview(t,null,null)));});
