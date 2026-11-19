@@ -1,3 +1,5 @@
+import {handlePositionExits,scheduledPositionExits} from './position-exits.js';
+export {PositionExitMonitor} from './position-exits.js';
 import {handleRobinhood} from './robinhood-live.js';
 export {RobinhoodCoordinator} from './robinhood-live.js';
 import {handleShadowResearch} from './shadow-research.js';
@@ -14,7 +16,7 @@ export async function runCoordinatedQuotePilot(env){
 }
 const REPO = 'Carooch62/0dte-options-command-center';
 const WORKFLOW = 'market-scan.yml';
-const VERSION = '2026-11-06.scan-handoff';
+const VERSION = '2026-11-19.position-exit-pilot';
 const ORIGINS = new Set(['https://carooch62.github.io','https://0dte-options-command-center.h69htk56cq.workers.dev']);
 function response(body, status=200, request) {
   const origin=request?.headers.get('Origin');
@@ -112,6 +114,7 @@ export default {
       catch(e){console.log(JSON.stringify({scheduler:'failed',error:e.message}));}
     }
     if(!legacyTick)return;
+    try{console.log(JSON.stringify({position_exits:await scheduledPositionExits(env)}));}catch{console.log(JSON.stringify({position_exits:{status:'request-failed'}}));}
     if(regularWeekday(now)&&env.WATCH_QUOTE_PILOT_ENABLED==='true'){
       try{console.log(JSON.stringify({watch_quote_pilot:await runCoordinatedQuotePilot(env)}));}
       catch{console.log(JSON.stringify({watch_quote_pilot:{status:'verification-failed'}}));}
@@ -131,6 +134,7 @@ export default {
       if(url.pathname.startsWith('/private/')||url.pathname==='/refresh')return response({ok:false,error:'Private connections and scan requests are disabled in branch previews.'},403,request);
       if(url.pathname==='/health')return response({ok:true,environment:'preview',private_connections:false,scan_requests:false},200,request);
     }
+    if(url.pathname.startsWith('/private/plaid/robinhood/position-plans')){try{return await handlePositionExits(request,env);}catch{return response({ok:false,error:'Private position service unavailable'},502,request);}}
     if(url.pathname.startsWith('/private/plaid/robinhood/')) {
       try{return await handleRobinhood(request,env)}catch{return response({ok:false,error:'Private Robinhood service unavailable'},502,request)}
     }

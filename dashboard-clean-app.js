@@ -1,4 +1,4 @@
-import {attachDashboardOptionQuotes} from './dashboard-option-quotes.js?v=20261119-quote-signin';
+import {attachDashboardOptionQuotes} from './dashboard-option-quotes.js?v=20261119-auto-exits';
 import {coverageReport} from './coverage-report.js';
 import {attachTradeExitAssistant,purchaseRecordAction} from './trade-exit-assistant.js?v=20261119-qc';
 import {loadDashboardSnapshot} from './dashboard-delivery.js';
@@ -413,7 +413,7 @@ function setupCleanLayout(){
 }
 setupCleanLayout();
 attachTradeExitAssistant({board:$('board'),journal:$('journal'),getSnapshot:()=>data});
-attachDashboardOptionQuotes({board:$('board'),getTrades:()=>trades});
+attachDashboardOptionQuotes({board:$('board'),getTrades:()=>trades,getSnapshot:()=>data});
 
 active=read('0dteActiveScan',null);lastRefresh=read('0dteLastRefresh',null);enableScan(!refreshBlocksNewRequest(active));renderRefresh();renderJournal();await load();startTimer();if(active)pollRun();
 setInterval(()=>{if(!document.hidden){$('clock').textContent=new Date().toLocaleString('en-US',{timeZone:'America/New_York'})+' ET';render();renderJournal();}},15000);
