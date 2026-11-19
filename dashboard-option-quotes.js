@@ -1,13 +1,15 @@
+import {attachPositionPlanControls} from './dashboard-position-plans.js';
+import {QuotePoller,quoteSessionOpen} from './quote-poller.js';
 import {requestJSON} from './private-request.js';
 import {candidateQuotes} from './candidate-quotes.js';
-export const PRIVATE_DASHBOARD='https://0dte-options-command-center.h69htk56cq.workers.dev/dashboard_liquid.html?v=20261119-private-quotes';
+export const PRIVATE_DASHBOARD='https://0dte-options-command-center.h69htk56cq.workers.dev/dashboard_liquid.html?v=20261119-auto-exits';
 const uuid=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 export function optionIdentity(raw){
  if(!raw||typeof raw.ticker!=='string'||! /^[A-Z][A-Z0-9.-]{0,9}$/.test(raw.ticker)||typeof raw.contract_id!=='string'||!raw.contract_id||raw.contract_id.length>100||!['call','put'].includes(raw.side)||!Number.isFinite(Number(raw.strike))||Number(raw.strike)<=0||typeof raw.expiry!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(raw.expiry))throw Error('Select an exact option contract first.');
  const date=new Date(raw.expiry+'T00:00:00Z');if(!Number.isFinite(+date)||date.toISOString().slice(0,10)!==raw.expiry)throw Error('Invalid option expiration.');
  return {ticker:raw.ticker,contract_id:raw.contract_id,side:raw.side,strike:Number(raw.strike),expiry:raw.expiry};
 }
-export function quoteSignInUrl(contract){const back='/dashboard_liquid.html?v=20261119-quote-signin#rh-quote='+encodeURIComponent(JSON.stringify(optionIdentity(contract)));return '/private/plaid/robinhood/sign-in?'+new URLSearchParams({return_to:back});}
+export function quoteSignInUrl(contract){const back='/dashboard_liquid.html?v=20261119-auto-exits#rh-quote='+encodeURIComponent(JSON.stringify(optionIdentity(contract)));return '/private/plaid/robinhood/sign-in?'+new URLSearchParams({return_to:back});}
 export function privateQuoteUrl(raw){return PRIVATE_DASHBOARD+'#rh-quote='+encodeURIComponent(JSON.stringify(optionIdentity(raw)));}
 function exactInstrument(c,i){return i&&uuid.test(i.id)&&i.chain_symbol===c.ticker&&i.type===c.side&&i.expiration_date===c.expiry&&Number(i.strike_price)===c.strike;}
 export async function fetchOptionQuote(raw,read=requestJSON){
@@ -32,10 +34,13 @@ export function optionQuoteView(record,now=Date.now()){
   status:!clockValid?'UNKNOWN QUOTE TIME':age>60?'STALE QUOTE':row.status==='QUOTE_CHECK_PASSED'?'FRESH QUOTE · CHECKS PASSED':'QUOTE REQUIRES REVIEW',reasons:row.reasons};
 }
 export function matchingQuoteFills(contract,trades){return (Array.isArray(trades)?trades:[]).filter(t=>t&&t.exit==null&&t.ticker===contract.ticker&&t.contract===contract.contract_id&&t.expiry===contract.expiry&&typeof t.entry==='number'&&Number.isFinite(t.entry)&&t.entry>0).slice(0,20);}
-export function attachDashboardOptionQuotes({board,getTrades=()=>[],privateOrigin=location.origin==='https://0dte-options-command-center.h69htk56cq.workers.dev',read=requestJSON}){
+export function attachDashboardOptionQuotes({board,getTrades=()=>[],getSnapshot=()=>null,journal=document.getElementById('journal'),privateOrigin=location.origin==='https://0dte-options-command-center.h69htk56cq.workers.dev',read=requestJSON}){
  const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const panel=document.createElement('section');panel.id='privateOptionQuote';panel.className='panel';panel.style.overflowWrap='anywhere';panel.hidden=true;board.before(panel);
- let selected=null,record=null,busy=false,inFlight=false,generation=0,error='',errorCode='',refreshButton;
+ let selected=null,record=null,busy=false,inFlight=false,generation=0,error='',errorCode='',refreshButton,metrics={requests:0,successful:0,fresh:0,last_ms:null};
+ const poller=new QuotePoller({run:()=>refresh(true),allowed:()=>!!selected&&!inFlight&&!document.hidden&&quoteSessionOpen(getSnapshot())&&!(record&&optionQuoteView(record).reasons.includes('DEADLINE_UNKNOWN_OR_PASSED')),onChange:()=>renderAutoStatus()});
+ function renderAutoStatus(){const node=panel.querySelector('[data-auto-status]');if(node)node.textContent=`Auto-refresh ${poller.enabled?'ON':'OFF'} · ${Math.round(poller.interval*Math.min(16,2**poller.failures)/1000)}s after completion. ${document.hidden?'Paused while hidden. ':!quoteSessionOpen(getSnapshot())?'Waiting for a current OPEN-session snapshot. ':''}${metrics.successful}/${metrics.requests} successful responses · ${metrics.fresh} fresh checks · last request ${metrics.last_ms===null?'unknown':(metrics.last_ms/1000).toFixed(1)+'s'}. Safari must remain open; this is polling.`;const toggle=panel.querySelector('[data-quote-auto]');if(toggle){toggle.checked=poller.enabled;toggle.disabled=busy||(!poller.enabled&&(!record||optionQuoteView(record).status!=='FRESH QUOTE · CHECKS PASSED'||!quoteSessionOpen(getSnapshot())));}}
+ const positionPlans=attachPositionPlanControls({panel,journal,getTrades,getContract:()=>selected,privateOrigin,read});
  const money=x=>typeof x!=='number'||!Number.isFinite(x)?'Unknown':'$'+x.toFixed(3);
  function fillHtml(){const fills=matchingQuoteFills(selected,getTrades());return fills.length?'<h4>Matching local open fills</h4>'+fills.map(t=>`<p>Recorded entry ${money(t.entry)} · quantity ${escape(t.qty)} · opened ${escape(t.time)}<br>Saved loss-review ${money(t.lossReview)} · profit-review ${money(t.target)}. Compare with the observed bid above; quotes do not change your saved plan.</p>`).join(''):'<p class="smallnote">No matching open fills in this private site’s journal.</p>';}
 
@@ -43,20 +48,22 @@ export function attachDashboardOptionQuotes({board,getTrades=()=>[],privateOrigi
   if(!selected)return;
   const view=optionQuoteView(record),label=[selected.ticker,selected.expiry,selected.strike,selected.side.toUpperCase()].join(' · ');
   panel.hidden=false;
-  panel.innerHTML=`<h3>Private Robinhood option quote</h3><p><b>${escape(label)}</b><br><small>${escape(selected.contract_id)}</small></p><p role="status" data-quote-status>${escape(busy?'Checking exact contract and fetching quote…':error||view?.status||'Ready to request a quote.')}</p>${view?`<table><caption>Premium per share · provider observation</caption><thead><tr><th>Bid</th><th>Ask</th><th>Midpoint</th></tr></thead><tbody><tr><td>${money(view.bid)}</td><td>${money(view.ask)}</td><td>${money(view.midpoint)}</td></tr></tbody></table><p class="smallnote">Provider time ${escape(view.observed_at||'unknown')} · age <span data-quote-age>${view.age_seconds===null?'unknown':Math.floor(view.age_seconds)+'s'}</span><br>Received ${escape(view.received_at||'unknown')}. ${escape(view.reasons.join(' · '))}</p>`:''}<div data-quote-fills>${fillHtml()}</div><details><summary>Quote privacy and limitations</summary><p class="smallnote">Quotes stay in this private tab. Journal entries saved on GitHub Pages remain there; they are not automatically copied here. Manual refresh only. Fresh means a provider timestamp within 60 seconds and passing quote checks; it does not establish streaming prices, exchange latency, market-open status, scanner eligibility, or a guaranteed fill. Midpoint is arithmetic, not an executable price. Research prices and your recorded fill remain separate.</p></details>`;
-  refreshButton=document.createElement('button');refreshButton.type='button';refreshButton.textContent='Refresh Robinhood quote';refreshButton.disabled=busy;refreshButton.onclick=refresh;panel.insertBefore(refreshButton,panel.querySelector('[data-quote-fills]'));
+  panel.innerHTML=`<h3>Private Robinhood option quote</h3><p><b>${escape(label)}</b><br><small>${escape(selected.contract_id)}</small></p><p role="status" data-quote-status>${escape(busy?'Checking exact contract and fetching quote…':error||view?.status||'Ready to request a quote.')}</p>${view?`<table><caption>Premium per share · provider observation</caption><thead><tr><th>Bid</th><th>Ask</th><th>Midpoint</th></tr></thead><tbody><tr><td>${money(view.bid)}</td><td>${money(view.ask)}</td><td>${money(view.midpoint)}</td></tr></tbody></table><p class="smallnote">Provider time ${escape(view.observed_at||'unknown')} · age <span data-quote-age>${view.age_seconds===null?'unknown':Math.floor(view.age_seconds)+'s'}</span><br>Received ${escape(view.received_at||'unknown')}. ${escape(view.reasons.join(' · '))}</p>`:''}<div data-quote-fills>${fillHtml()}</div><details><summary>Quote privacy and limitations</summary><p class="smallnote">The quote display stays in this private tab; reviewed exit plans can be stored privately on the server. Journal entries saved on GitHub Pages remain there; they are not automatically copied here. Optional auto-refresh polls only while this tab is visible and a current OPEN-session snapshot is available. Fresh means a provider timestamp within 60 seconds and passing quote checks; it does not establish streaming prices, exchange latency, market-open status, scanner eligibility, or a guaranteed fill. Midpoint is arithmetic, not an executable price. Research prices and your recorded fill remain separate.</p></details>`;
+  refreshButton=document.createElement('button');refreshButton.type='button';refreshButton.textContent='Refresh Robinhood quote';refreshButton.disabled=busy;refreshButton.onclick=()=>void refresh();panel.insertBefore(refreshButton,panel.querySelector('[data-quote-fills]'));
   if(['SIGN_IN','ACCESS_DENIED'].includes(errorCode)){const signIn=document.createElement('a');signIn.href=quoteSignInUrl(selected);signIn.target='_blank';signIn.rel='noopener';signIn.className='broker-link';signIn.textContent='Sign in to private quotes';panel.insertBefore(signIn,refreshButton);const help=document.createElement('p');help.className='smallnote';help.textContent='Complete private website sign-in in the new tab, then return here and refresh. This does not disconnect Robinhood or replace its authorization.';panel.insertBefore(help,refreshButton);}
-  const close=document.createElement('button');close.type='button';close.textContent='Close quote';close.onclick=()=>{generation++;selected=null;record=null;busy=false;error='';errorCode='';panel.hidden=true;};panel.insertBefore(close,panel.querySelector('[data-quote-fills]'));
-  const connection=document.createElement('a');connection.href='candidate-quotes.html';connection.textContent='Robinhood connection and quote diagnostics';panel.append(connection);
+  const close=document.createElement('button');close.type='button';close.textContent='Close quote';close.onclick=()=>{poller.enable(false);generation++;selected=null;record=null;busy=false;error='';errorCode='';panel.hidden=true;};panel.insertBefore(close,panel.querySelector('[data-quote-fills]'));
+  const auto=document.createElement('label');auto.innerHTML='<input type="checkbox" data-quote-auto> Auto-refresh selected quote';auto.querySelector('input').onchange=e=>{poller.enable(e.target.checked);renderAutoStatus();};panel.insertBefore(auto,panel.querySelector('[data-quote-fills]'));const schedule=document.createElement('p');schedule.className='smallnote';schedule.dataset.autoStatus='';panel.insertBefore(schedule,panel.querySelector('[data-quote-fills]'));renderAutoStatus();
+  const connection=document.createElement('a');connection.href='candidate-quotes.html';connection.textContent='Robinhood connection and quote diagnostics';panel.append(connection);positionPlans.render();
  }
- async function refresh(){
-  if(inFlight||!selected||!privateOrigin)return;
-  inFlight=true;busy=true;error='';errorCode='';record=null;const version=++generation,contract=selected;render();
-  try{const result=await fetchOptionQuote(contract,(...args)=>{if(version!==generation)throw Error('Quote selection changed.');return read(...args);});if(version===generation)record=result;}
-  catch(e){if(version===generation){errorCode=e.code||'';error=errorCode==='SIGN_IN'?'Private website sign-in required. Sign in below, then refresh this quote. Robinhood authorization has not been checked.':e.message||'Private quote unavailable. Retry when ready.';}}
-  finally{inFlight=false;if(version===generation){busy=false;render();}}
+ async function refresh(automatic=false){
+  if(inFlight||!selected||!privateOrigin)return {ok:false,code:'BUSY'};
+  inFlight=true;busy=true;error='';errorCode='';record=null;const version=++generation,contract=selected,started=performance.now();metrics.requests++;render();let outcome={ok:false};
+  try{const result=await fetchOptionQuote(contract,(...args)=>{if(version!==generation)throw Error('Quote selection changed.');return read(...args);});if(version===generation){record=result;metrics.successful++;if(optionQuoteView(record).status==='FRESH QUOTE · CHECKS PASSED')metrics.fresh++;outcome={ok:optionQuoteView(record).status==='FRESH QUOTE · CHECKS PASSED'};if(optionQuoteView(record).reasons.includes('DEADLINE_UNKNOWN_OR_PASSED'))outcome.code='EXPIRED';}}
+  catch(e){if(version===generation){errorCode=e.code||'';outcome={ok:false,code:errorCode};error=errorCode==='SIGN_IN'?'Private website sign-in required. Sign in below, then refresh this quote. Robinhood authorization has not been checked.':e.message||'Private quote unavailable. Retry when ready.';}}
+  finally{inFlight=false;if(version===generation){metrics.last_ms=performance.now()-started;busy=false;render();if(!automatic){if(['SIGN_IN','ACCESS_DENIED','AUTHORIZATION','SETUP','EXPIRED'].includes(outcome.code))poller.enable(false);else poller.postpone();}}}
+  return outcome;
  }
- function select(raw){if(inFlight)return;selected=optionIdentity(raw);generation++;busy=false;record=null;error='';errorCode='';render();panel.scrollIntoView({block:'center'});}
+ function select(raw){if(inFlight)return;poller.enable(false);metrics={requests:0,successful:0,fresh:0,last_ms:null};selected=optionIdentity(raw);generation++;busy=false;record=null;error='';errorCode='';render();panel.scrollIntoView({block:'center'});}
  function addControls(){
   for(const source of board.querySelectorAll('.purchase-action [data-record-fill],button[data-watch]')){
    if(source.parentElement.querySelector('[data-rh-quote]'))continue;
@@ -70,7 +77,8 @@ export function attachDashboardOptionQuotes({board,getTrades=()=>[],privateOrigi
  }
  new MutationObserver(addControls).observe(board,{childList:true,subtree:true});addControls();
  if(privateOrigin&&location.hash.startsWith('#rh-quote=')&&location.hash.length<2000){try{select(JSON.parse(decodeURIComponent(location.hash.slice(10))));}catch{/* invalid handoff never makes a request */}}
- const timer=setInterval(()=>{if(selected&&record&&!busy&&!document.hidden){const view=optionQuoteView(record);panel.querySelector('[data-quote-status]').textContent=view.status;panel.querySelector('[data-quote-age]').textContent=view.age_seconds===null?'unknown':Math.floor(view.age_seconds)+'s';const fills=panel.querySelector('[data-quote-fills]'),html=fillHtml();if(fills.innerHTML!==html)fills.innerHTML=html;}},1000);
- window.addEventListener('pagehide',()=>clearInterval(timer),{once:true});
- return {select,refresh,getState:()=>({selected,record,busy,error})};
+ const timer=setInterval(()=>{if(selected&&record&&!busy&&!document.hidden){const view=optionQuoteView(record);if(view.reasons.includes('DEADLINE_UNKNOWN_OR_PASSED')&&poller.enabled)poller.enable(false);renderAutoStatus();panel.querySelector('[data-quote-status]').textContent=view.status;panel.querySelector('[data-quote-age]').textContent=view.age_seconds===null?'unknown':Math.floor(view.age_seconds)+'s';const fills=panel.querySelector('[data-quote-fills]'),html=fillHtml();if(fills.innerHTML!==html)fills.innerHTML=html;}},1000);
+ document.addEventListener('visibilitychange',()=>{poller.postpone();renderAutoStatus();});
+ window.addEventListener('pagehide',()=>{poller.enable(false);clearInterval(timer);},{once:true});
+ return {select,refresh,getState:()=>({selected,record,busy,error,metrics,auto:poller.enabled})};
 }
