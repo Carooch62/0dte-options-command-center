@@ -28,7 +28,7 @@ export function exitPlanDraft(contract, candidate, snapshot, entry, quantity=1, 
 }
 
 export function exitReview(trade, candidate, snapshot) {
-  if (!trade || trade.exit !== null) return null;
+  if (!trade || trade.exit != null) return null;
   const notes = [];
   if(Number(trade.entry)>.30)notes.push('Recorded entry exceeds the scanner’s $0.30 premium limit. This personal trade remains separate from scanner-qualified entries.');
   if (trade.lossReview == null || trade.target == null) notes.push('Set your own loss-review and profit-review bids before relying on a price checkpoint.');
@@ -131,7 +131,7 @@ export function attachTradeExitAssistant({board, journal, getSnapshot}) {
           $('je').value = fill.price;
           $('jq').value = fill.quantity;
           const date = new Date(fill.executed_at);
-          $('jtime').value = new Date(+date-date.getTimezoneOffset()*60000).toISOString().slice(0,16);
+          $('jtime').value = new Date(+date-date.getTimezoneOffset()*60000).toISOString().slice(0,23);
           $('jf').value = '';
           renderDraft();
           status.textContent = 'Confirmed execution prefilled. Verify this fill and enter known total fees; then save the journal entry yourself. Separate partial fills must be reviewed separately.';
@@ -194,7 +194,16 @@ export function attachTradeExitAssistant({board, journal, getSnapshot}) {
     }
     // Keep the guard active if journal validation rejects the save.
   }, true);
-  journal.addEventListener('click', event => { if (event.target.closest('[data-edit]')) awaitingFill = false; }, true);
+  journal.addEventListener('click', event => {
+    if(!event.target.closest('[data-edit]'))return;
+    awaitingFill=false;
+    // The journal's bubble handler populates fields before this draft is rebuilt.
+    queueMicrotask(()=>{
+      draftSnapshot=getSnapshot();draftCandidate=draftSnapshot?.candidates?.find(c=>c.ticker===$('jt').value);
+      draftContract=savedExitContract({ticker:$('jt').value,contract:$('jc').value,expiry:$('jexpiry').value},draftCandidate);
+      draft.dataset.manualCheckpoints='true';renderDraft();
+    });
+  }, true);
   new MutationObserver(addButtons).observe(board, {childList:true,subtree:true});
   new MutationObserver(renderPlan).observe(journal, {childList:true});
   addButtons();

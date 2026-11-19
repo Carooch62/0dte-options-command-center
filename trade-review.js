@@ -67,6 +67,6 @@ export function positionAlerts(t,now=Date.now()){
 export function validPlan(t){
  for(const k of ['lossReview','target','maxEntry','bid','mark'])if(t[k]!=null&&(finite(t[k])===null||t[k]<0))return false;
  for(const k of ['quoteAt','confirmationAt'])if(t[k]&&!Number.isFinite(Date.parse(t[k])))return false;
- if(t.expiry&&(!/^\d{4}-\d{2}-\d{2}$/.test(t.expiry)||new Date(t.expiry+'T00:00:00Z').toISOString().slice(0,10)!==t.expiry))return false;
+ if(t.expiry){const expiry=new Date(t.expiry+'T00:00:00Z');if(!/^\d{4}-\d{2}-\d{2}$/.test(t.expiry)||!Number.isFinite(+expiry)||expiry.toISOString().slice(0,10)!==t.expiry)return false;}
  return !['entryReason','exitConditions'].some(k=>t[k]!=null&&typeof t[k]!=='string');
 }

@@ -9,7 +9,8 @@ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 let browser;
 try{
  browser=await chromium.launch({headless:true});
- const page=await browser.newPage({viewport:{width:390,height:844},timezoneId:'America/New_York'}),errors=[];
+ for(const width of [390,430,1280]){
+ const page=await browser.newPage({viewport:{width,height:844},timezoneId:'America/New_York'}),errors=[];
  page.on('pageerror',e=>errors.push(e.message));
  page.on('dialog',dialog=>dialog.type()==='prompt'?dialog.accept('0.20'):dialog.accept());
  await page.clock.install({time:new Date('2026-11-02T14:50:00Z')});
@@ -82,8 +83,21 @@ try{
  assert.equal(captured.length,2);assert.equal(captured[0].time,'2026-11-02T14:49:30Z');
  await page.locator('#addTrade').click();assert.match(await page.locator('#journalNotice').innerText(),/already recorded/);
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('0dteJournal')).length),2);
+ await record.click();
+ assert.match(await page.locator('#purchaseExitDraft').innerText(),/\$0.20/);
+ // Editing an older fill must replace the prior draft and preserve exact execution time.
+ await page.locator('#journal [data-edit]').first().click();
+ await page.locator('#purchaseExitDraft').getByText(/your edited checkpoint/).first().waitFor();
+ assert.match(await page.locator('#purchaseExitDraft').innerText(),/\$0.50/);
+ await page.locator('#addTrade').click();
+ assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('0dteJournal'))[0].time),'2026-11-02T14:49:30Z');
+ await page.locator('#journal [data-edit]').last().click();
+ await page.locator('#purchaseExitDraft').getByText(/your edited checkpoint/).first().waitFor();
+ assert.equal(await page.locator('#jloss').inputValue(),'0.33');
+ assert.match(await page.locator('#purchaseExitDraft').innerText(),/\$0.33/);
  assert.deepEqual(errors,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
  console.log('Contract watch render, transition, removal and mobile width passed');
  await page.close();
+ }
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}
 
