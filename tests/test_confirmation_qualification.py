@@ -45,6 +45,15 @@ def evaluate(data, previous):
 
 
 class ConfirmationQualificationTests(unittest.TestCase):
+    def test_state_boundary_rejects_missing_or_unusable_freshness(self):
+        for freshness in (None, '', 'UNKNOWN', 'STALE', 'FUTURE', 'DELAYED'):
+            for side in ('call', 'put'):
+                data, previous = fixtures(side)
+                row = normalize(data, NOW)['candidates'][0]
+                row['price_freshness'] = freshness
+                self.assertEqual(execution_state(row, previous['candidates'][0]),
+                                 ('DATA UNAVAILABLE', False))
+
     def test_qualified_calls_and_puts_still_confirm(self):
         for side in ('call', 'put'):
             with self.subTest(side=side):

@@ -11,3 +11,9 @@ Production news records now preserve publication, retrieval and search-check tim
 The separate `staging-next-20261117` branch receives a standalone public evidence collector and an optional additional-news coverage probe. The probe records later retrieval times and runtime and never backdates a later headline into an earlier decision. Its extra 50-search budget is explicit; it is not an equal-budget performance comparison. Observe multiple future market sessions before deciding whether rotation or scoring should change. No historical win rate is manufactured from these records.
 
 Verification still required: first authenticated server evidence export after deployment, live option capture tied to a current scan, actual token renewal, and several fresh staging sessions. Existing successful equity fetching does not establish those outcomes. Production Discord signals remain disabled until the separately defined activation checks pass.
+
+Current collection branch, equal-budget experiment and remaining release/live gates:
+[staging collection](docs/staging-collection.md), [experiment protocol](docs/research-experiment-plan.md),
+[post-close evidence](docs/post-close-evidence.md), [action ledger](docs/action-ledger.md).
+Live scan-bound option capture and renewal remain separate outstanding checks. Historical extra-budget
+probe instructions above do not describe the new equal-budget switchback.

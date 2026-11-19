@@ -34,6 +34,7 @@ const assets = [
   "robinhood-review.js",
   "robinhood-panel.js",
   "robinhood-connect.js",
+  "server-evidence-link.js",
   "candidate-quotes.html",
   "candidate-quotes.js",
   "candidate-quotes-panel.js",

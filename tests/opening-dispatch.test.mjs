@@ -12,7 +12,7 @@ async function run(stamp,active=false){
 }
 test('one-time dispatch starts after the completed opening bar and targets staging only',async()=>{
  assert.equal((await run('2026-10-15T13:35:00Z')).length,0);
- const dispatched=await run('2026-10-15T13:36:00Z');assert.equal(dispatched.length,1);assert.equal(dispatched[0].ref,'staging-algorithm');assert.equal(dispatched[0].workflow_id,'staging-scan.yml');
+ const dispatched=await run('2026-10-15T13:36:00Z');assert.equal(dispatched.length,1);assert.equal(dispatched[0].ref,'staging-next-20261117');assert.equal(dispatched[0].workflow_id,'staging-scan.yml');
 });
 test('active runs, session close and future annual cron matches cannot trigger extra scans',async()=>{
  assert.equal((await run('2026-10-15T13:36:00Z',true)).length,0);

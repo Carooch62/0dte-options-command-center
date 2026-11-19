@@ -1,17 +1,20 @@
 name: Staging Algorithm Scan
 on:
   push:
-    branches: [staging-algorithm]
-    paths: ['*.py', '*.js', '*.toml', 'news_event_reviews.json', 'requirements.txt', 'tests/**', '.github/workflows/staging-scan.yml']
+    branches: [staging-next-20261117]
+    paths: ['*.py', '*.js', 'tests/**', '.github/workflows/staging-scan.yml']
+  schedule:
+    # Both DST offsets; calendar gate below admits only actual regular sessions.
+    - cron: '10,25,40,55 13-20 * * 1-5'
   workflow_dispatch:
 permissions:
   contents: write
 concurrency:
-  group: staging-algorithm-scan
+  group: staging-next-20261117-scan
   cancel-in-progress: false
 jobs:
   scan:
-    if: github.ref == 'refs/heads/staging-algorithm'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging-next-20261117'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -21,7 +24,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: staging-algorithm
+          ref: staging-next-20261117
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !/data/archive/
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -30,45 +37,44 @@ jobs:
         with:
           node-version: 22
       - run: pip install -r requirements.txt
+      - name: Check actual session and supported collection code
+        id: gate
+        run: |
+          python scripts/staging_session_gate.py >> "$GITHUB_OUTPUT"
       - name: Run combined regression tests
+        if: steps.gate.outputs.collect == 'true'
         run: |
           python -m unittest discover -s tests -p 'test_*.py'
           node --test tests/*.test.mjs
-      - name: Initialize isolated staging history
+      - name: Hydrate complete archive days before updating isolated history
+        if: steps.gate.outputs.collect == 'true'
         run: |
+          python scripts/prepare_scan_checkout.py
+          git sparse-checkout add --no-cone /data/shadow-evidence/ /data/news-coverage-probes/
+      - name: Require isolated staging history
+        if: steps.gate.outputs.collect == 'true'
+        run: |
+          test "$(git branch --show-current)" = staging-next-20261117
           python - <<'PY'
+          import json
           from pathlib import Path
-          import shutil
-          data=Path('data')
-          if not (data/'staging-environment.json').exists():
-              shutil.rmtree(data,ignore_errors=True)
-              data.mkdir()
-              (data/'staging-environment.json').write_text('{"environment":"staging","source":"public research feeds","production_history_imported":false}')
+          assert json.loads(Path('data/staging-environment.json').read_text())['environment']=='staging'
           PY
-      - name: Run staging pipeline using public research sources
+      - name: Run isolated public-source staging pipeline
+        if: steps.gate.outputs.collect == 'true'
         run: python pipeline.py
-      - name: Capture public shadow evidence after a validated scan
-        run: |
-          python - <<'PY'
-          import json, subprocess
-          from pathlib import Path
-          from shadow_evidence import capture
-          health=json.loads(Path('data/scan-health.json').read_text())
-          if health.get('stage') == 'VALIDATED' and health.get('status') in ('SUCCESS','DEGRADED'):
-              print(json.dumps(capture('data', source_commit=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip())))
-          else:
-              print('No new validated scan; retained evidence keeps its original timestamps.')
-          PY
+      - name: Capture frozen evidence from the newly validated OPEN scan
+        if: steps.gate.outputs.collect == 'true'
+        run: python scripts/capture_staging.py
       - name: Publish staging results only
-        if: always() && !cancelled()
+        if: always() && !cancelled() && steps.gate.outputs.collect == 'true'
         run: |
-          test "${GITHUB_REF}" = refs/heads/staging-algorithm
+          test "$(git branch --show-current)" = staging-next-20261117
           test -f data/staging-environment.json
           git config user.name '0DTE Staging Scanner'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add data/
+          git add --sparse data/
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'Update isolated staging scan results'
-          git pull --rebase origin staging-algorithm
-          git push origin HEAD:staging-algorithm
-
+          git commit -m 'Update isolated prospective staging evidence'
+          git pull --rebase origin staging-next-20261117
+          git push origin HEAD:staging-next-20261117

@@ -1,0 +1,44 @@
+name: Final delayed-bar research capture
+on:
+  schedule:
+    # Covers regular/early closes in EST/EDT; exchange-calendar gate is authoritative.
+    - cron: '20,35,50 17,18,20,21 * * 1-5'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: closing-research-capture
+  cancel-in-progress: false
+jobs:
+  capture:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !/data/
+            /data/market-dashboard.json
+            /data/scan-history.json
+            /data/closing-evidence/
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Collect separately without account credentials or scanner publication
+        run: python closing_capture.py
+      - name: Publish only closing research evidence
+        run: |
+          if ! test -d data/closing-evidence; then exit 0; fi
+          git config user.name '0DTE Closing Evidence'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add --sparse data/closing-evidence/
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Archive separate post-close research bars'
+          git pull --rebase origin main
+          git push origin HEAD:main

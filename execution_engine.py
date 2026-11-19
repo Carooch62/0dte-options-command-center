@@ -227,7 +227,7 @@ def market_regime(rows):
 
 
 def execution_state(x, previous):
-    if x.get('price_freshness') not in (None,'RECENT'):
+    if x.get('price_freshness') != 'RECENT':
         return 'DATA UNAVAILABLE',False
     crossed=crossing(x,previous) and bool(x.get('direction_confirmed'))
     confirmation=bool(x.get('momentum_confirmed') or x.get('acceleration_confirmed'))

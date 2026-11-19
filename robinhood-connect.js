@@ -1,3 +1,4 @@
+import {evidenceExportLink} from './server-evidence-link.js';
 import {requestJSON} from './private-request.js';
 const $=id=>document.getElementById(id);
 const status=$('rh-live-status');
@@ -20,3 +21,10 @@ $('rh-live-test').onclick=async()=>{
  }catch(e){status.textContent=e.message;}finally{$('rh-live-test').disabled=false;}
 };
 await load();
+
+const evidenceDay=$('server-evidence-day'),evidenceLink=$('server-evidence-export');
+if(evidenceDay&&evidenceLink){
+ evidenceDay.value=new Date().toISOString().slice(0,10);
+ const update=()=>{try{const link=evidenceExportLink(evidenceDay.value);evidenceLink.href=link.href;evidenceLink.textContent=link.label;$('server-evidence-help').textContent='UTC receipt date selected. Keep exported quotes private.';}catch{evidenceLink.removeAttribute('href');$('server-evidence-help').textContent='Choose a valid UTC date before exporting.';}};
+ evidenceDay.onchange=update;update();
+}
