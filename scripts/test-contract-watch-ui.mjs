@@ -11,6 +11,7 @@ try{
  browser=await chromium.launch({headless:true});
  const page=await browser.newPage({viewport:{width:390,height:844},timezoneId:'America/New_York'}),errors=[];
  page.on('pageerror',e=>errors.push(e.message));
+ page.on('dialog',dialog=>dialog.type()==='prompt'?dialog.accept('0.20'):dialog.accept());
  await page.clock.install({time:new Date('2026-11-02T14:50:00Z')});
  const row=execution_state=>({ticker:'TEST',direction:'UP',price:10,score:1,execution_state,bar_end:'2026-11-02T14:45:00Z',options:[],eligible_contracts:[],preferred_contracts:[],news_items:[],chain_status:'SUCCESS'});
  const base={market_session:'OPEN',session_open_at:'2026-11-02T14:30:00Z',session_close_at:'2026-11-02T21:00:00Z',coverage:{},candidates:[row('WATCH')]};
@@ -37,7 +38,7 @@ try{
  await manual.waitFor({state:'visible'});assert.equal(await manual.innerText(),'Record an option purchase');
  assert.equal(await page.locator('#board .clean-drawer').evaluate(el=>el.open),false);
  await manual.click();assert.equal(await page.locator('#jt').inputValue(),'TEST');assert.equal(await page.locator('#jc').inputValue(),'');
- assert.equal(await page.locator('#jtime').inputValue(),'');assert.equal(await page.locator('#je').inputValue(),'');
+ assert.equal(await page.locator('#jtime').inputValue(),'');assert.equal(await page.locator('#je').inputValue(),'0.2');
  await page.locator('#jc').fill('MANUAL-CONTRACT');await page.locator('#jexpiry').fill('2026-11-06');await page.locator('#je').fill('0.20');
  assert.equal(await page.locator('#jloss').inputValue(),'0.14');assert.match(await page.locator('#purchaseExitDraft').innerText(),/MANUAL-CONTRACT/);
  assert.match(await page.locator('#contractWatchList').innerText(),/WATCH/);
@@ -58,7 +59,7 @@ try{
  scan={...base,scan_id:'with-contract',generated_at:'2026-11-02T14:50:00Z',candidates:[{...row('WATCH'),options:[option],eligible_contracts:[option]}]};
  await page.locator('#check').click();
  const record=page.locator('#board .purchase-action').getByRole('button',{name:'I bought this contract · record fill',exact:true});await record.waitFor({state:'visible'});assert.equal(await page.locator('#board .clean-drawer').evaluate(el=>el.open),false);await record.click();
- assert.equal(await page.locator('#je').inputValue(),'');assert.equal(await page.locator('#jtime').inputValue(),'');
+ assert.equal(await page.locator('#je').inputValue(),'0.2');assert.equal(await page.locator('#jtime').inputValue(),'');
  assert.equal(await page.locator('#jf').inputValue(),'');assert.equal(await page.locator('#jc').inputValue(),'TEST261106C00011000');
  assert.match(await page.locator('#purchaseExitDraft').innerText(),/Your option exit-plan draft/);
  assert.equal(await page.locator('#jloss').inputValue(),'0.14');assert.equal(await page.locator('#jtarget').inputValue(),'0.3');
