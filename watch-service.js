@@ -27,11 +27,12 @@ const sameOrigin=(request,url)=>request.headers.get('Origin')===url.origin&&requ
 
 export function verifiedAlertReadiness(env,discordConfigured=!!env.DISCORD_WATCH_WEBHOOK_URL) {
  const requirements={
-  scan_scheduler:env.FAST_SCAN_ENABLED==='true'&&!!env.SCAN_COORDINATOR,
+  scan_scheduler:!!env.SCAN_COORDINATOR,
   discord_webhook:discordConfigured,
   private_robinhood_connection:env.ROBINHOOD_CONNECTION_ENABLED==='true',
-  hosted_quote_permission:false,
-  exact_contract_link:false
+  hosted_quote_permission:env.ROBINHOOD_UNATTENDED_CONFIRMED==='true',
+  automatic_token_renewal:!!env.ROBINHOOD_COORDINATOR,
+  manual_contract_navigation:true
  };
  return {ok:true,live:false,quote_pilot_enabled:env.WATCH_QUOTE_PILOT_ENABLED==='true',
   verified_alerts_enabled:env.WATCH_VERIFIED_ALERTS_ENABLED==='true',
@@ -61,6 +62,14 @@ export async function handleWatchService(request,env){
   let body;try{body=JSON.parse(raw);}catch{return reply({ok:false,error:'Invalid webhook request'},400);}
   try{await storeDiscordWebhook(env,body?.webhook_url);}catch{return reply({ok:false,error:'Invalid Discord webhook or encryption configuration'},400);}
   return reply({ok:true,configured:true});
+ }
+ if(url.pathname==='/private/watch/pilot'){
+  if(request.method!=='POST')return reply({ok:false,error:'POST required'},405);
+  if(!sameOrigin(request,url))return reply({ok:false,error:'Invalid request origin'},403);
+  if(env.WATCH_QUOTE_PILOT_ENABLED!=='true'||env.ROBINHOOD_UNATTENDED_CONFIRMED!=='true'||!env.ROBINHOOD_COORDINATOR)return reply({ok:false,error:'Pilot prerequisites not configured'},503);
+  const owner=env.ROBINHOOD_COORDINATOR.get(env.ROBINHOOD_COORDINATOR.idFromName('private-alert-pilot'));
+  const result=await owner.fetch('https://credentials/pilot',{method:'POST'});
+  return reply({ok:result.ok,pilot:await result.json()},result.status);
  }
  if(url.pathname==='/private/watch/readiness') {
   if(request.method!=='GET')return reply({ok:false,error:'GET required'},405);
@@ -116,3 +125,4 @@ export async function scheduledWatchCheck(env,now=Date.now(),fetcher=fetch){
  await env.PLAID_STORE.put(CHECKPOINT_KEY,JSON.stringify({revision:list.revision,previous:scan}));
  return events.length?'sent':'checkpointed';
 }
+

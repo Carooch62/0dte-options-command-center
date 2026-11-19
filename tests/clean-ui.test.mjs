@@ -47,3 +47,14 @@ test('current scanner layouts label source timestamps in Eastern rather than bro
   assert.equal(format('bad'),'Unknown');
  }
 });
+
+test('streamlined status legend explains all displayed scanner states without implying a live entry',()=>{
+ const html=readFileSync(new URL('../dashboard_clean.html',import.meta.url),'utf8');
+ const legend=html.slice(html.indexOf('<details id="statusLegend"'),html.indexOf('id="candidateBoard"'));
+ assert.match(legend,/<details id="statusLegend">/);
+ for(const state of ['WATCH','SECOND-WAVE','TRIGGERED','LEVEL CROSSED · UNQUALIFIED','CONFIRMED DELAYED','DECAYING','SKIP','NO RECORDED STATUS','STALE PRICE DATA','STALE SCAN','DATA UNAVAILABLE','MARKET CLOSED']){
+  assert.ok(legend.includes(state),state);
+ }
+ assert.match(legend,/not a live option entry/);
+ assert.match(legend,/not a live broker quote/i);
+});

@@ -4,7 +4,7 @@ Prepared October 20, 2026 for the next regular market session. All times below a
 
 ## Before starting
 
-Open [Scanner](https://carooch62.github.io/0dte-options-command-center/dashboard_glass.html), reload once, and check the source scan timestamp and health. A retained snapshot with an old `OPEN` label is historical evidence, not proof the market is currently open or the data is current. If the scan is stale, collect connection diagnostics separately and postpone any claim about current scanner coverage.
+Open [Scanner](https://carooch62.github.io/0dte-options-command-center/dashboard_liquid.html), reload once, and check the source scan timestamp and health. A retained snapshot with an old `OPEN` label is historical evidence, not proof the market is currently open or the data is current. If the scan is stale, collect connection diagnostics separately and postpone any claim about current scanner coverage.
 
 Start at or after **9:40 a.m. ET**, provided the regular session is open. Open [Private candidate quote check](https://0dte-options-command-center.h69htk56cq.workers.dev/candidate-quotes). If needed, use [Connections](https://0dte-options-command-center.h69htk56cq.workers.dev/brokerage.html) and finish sign-in. A connected label does not by itself verify a successful quote request.
 

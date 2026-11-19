@@ -3,8 +3,9 @@ import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from quality import ET
 
-STOCK=('direction','execution_state','setup_qualified','qualification_reasons','price','price_source','bar_end','news_status','news_checked_at','news_items','trend_context','trigger_price','invalidation_price')
+STOCK=('direction','execution_state','setup_qualified','qualification_reasons','price','price_source','bar_end','news_status','news_checked_at','news_items','pattern_research','relative_volume_research','research_context','trend_context','trigger_price','invalidation_price')
 OPTION=('contract_id','expiry','side','strike','ask','bid','delta','theta','volume','oi','dte','quote_valid','delta_ok','near_atm','usable_spread','source','option_timestamp','received_at','minimum_delay_minutes')
 def clock(value):
     if not isinstance(value,str): raise ValueError('Timezone-aware clock required')
@@ -28,7 +29,7 @@ def packet(snapshot,captured_at,source_commit=None):
             if len(selected)>=20 or counts.get(ticker,0)>=2:continue
             counts[ticker]=counts.get(ticker,0)+1
             selected.append({'candidate_id':ident,'ticker':ticker,'stock':{k:stock[k] for k in STOCK if k in stock},'contract':{k:option[k] for k in OPTION if k in option}})
-    result={'format':'shadow-evidence-v1','scan_id':snapshot['scan_id'],'generated_at':snapshot['generated_at'],'captured_at':captured_at,'source_commit':source_commit,'market_session':snapshot.get('market_session'),'candidates':selected,'news_coverage':coverage,'coverage':{'examined':examined,'qualifying':qualifying,'included':len(selected),'omitted':qualifying-len(selected)},'ranking_effect':'NONE','limitations':['Public research, not executions. Unsearched news is unknown, not no catalyst. Missing reviewed components and quote clocks prevent performance claims. Rotation and scoring changes require prospective multi-session comparison.']}
+    result={'format':'shadow-evidence-v1','scan_id':snapshot['scan_id'],'generated_at':snapshot['generated_at'],'captured_at':captured_at,'source_commit':source_commit,'market_session':snapshot.get('market_session'),'candidates':selected,'news_coverage':coverage,'news_selection':snapshot.get('news_selection'),'candidate_controls':[{k:r.get(k) for k in ('ticker','direction','score','bar_end','execution_state','setup_qualified','news_status','pattern_research','relative_volume_research','research_context')} for r in snapshot.get('candidates',[])[:500]],'controls_omitted':max(0,len(snapshot.get('candidates',[]))-500),'coverage':{'examined':examined,'qualifying':qualifying,'included':len(selected),'omitted':qualifying-len(selected)},'ranking_effect':'NONE','limitations':['Public research, not executions. Unsearched news is unknown, not no catalyst. Missing reviewed components and quote clocks prevent performance claims. Rotation and scoring changes require prospective multi-session comparison.']}
     raw=json.dumps(result,sort_keys=True,separators=(',',':'),allow_nan=False).encode()
     if len(raw)>1000000:raise ValueError('Evidence packet exceeds bounded size')
     return {**result,'packet_id':hashlib.sha256(raw).hexdigest()}
@@ -41,6 +42,14 @@ def capture(data_dir,captured_at=None,source_commit=None):
     captured_at=captured_at or datetime.now(timezone.utc).isoformat()
     path=data/'shadow-evidence'/hashlib.sha256(str(snapshot.get('scan_id')).encode()).hexdigest()
     if path.exists():return {'status':'ALREADY_CAPTURED','scan_id':snapshot['scan_id']}
+    now=clock(captured_at)
+    from market_clock import session_info
+    info=session_info(now)
+    age=(now-clock(snapshot['generated_at'])).total_seconds()
+    if info['session']!='OPEN' or snapshot.get('market_session')!='OPEN' or not 0<=age<=480:
+        raise ValueError('Fresh regular-session snapshot required')
+    if clock(snapshot['generated_at']).astimezone(ET).date().isoformat()!=info['market_date']:
+        raise ValueError('Snapshot session date mismatch')
     result=packet(snapshot,captured_at,source_commit)
     def write(target,value):
         target.parent.mkdir(parents=True,exist_ok=True);temp=target.with_suffix('.tmp');temp.write_text(json.dumps(value,separators=(',',':'),allow_nan=False));temp.replace(target)

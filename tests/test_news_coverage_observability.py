@@ -12,6 +12,19 @@ class NewsCoverageObservabilityTests(unittest.TestCase):
     def tearDown(self):
         scanner.ERRORS.clear()
 
+    def test_original_publication_and_retrieval_clocks_are_preserved(self):
+        from datetime import datetime
+        import time
+        published=int(time.time())-60
+        candidate={'ticker':'TEST'}
+        with patch.object(scanner,'news',return_value=[{'title':'Test catalyst','publisher':'Original publisher','link':'https://example.com/article','providerPublishTime':published,'relatedTickers':['TEST']}]):
+            scanner.add_news([candidate])
+        item=candidate['news_items'][0]
+        self.assertEqual(datetime.fromisoformat(item['published_at']).timestamp(),published)
+        self.assertGreaterEqual(datetime.fromisoformat(item['retrieved_at']).timestamp(),published)
+        self.assertEqual(item['url'],'https://example.com/article')
+        self.assertEqual(item['publisher'],'Original publisher')
+
     def test_empty_success_is_distinct_from_unsearched(self):
         searched = {'ticker': 'TEST'}
         unsearched = {'ticker': 'OTHER', 'news_status': 'NOT_SCANNED'}
@@ -49,3 +62,4 @@ class NewsCoverageObservabilityTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+

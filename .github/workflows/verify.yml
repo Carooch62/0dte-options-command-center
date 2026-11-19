@@ -10,6 +10,13 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Historical quote archives are not needed to verify or deploy code.
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !/data/
+            /data/*.json
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -25,3 +32,4 @@ jobs:
           node --check worker.js
           node scripts/build-assets.mjs
           git diff --check
+

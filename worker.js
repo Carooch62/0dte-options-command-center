@@ -1,8 +1,17 @@
 import {handleRobinhood} from './robinhood-live.js';
+export {RobinhoodCoordinator} from './robinhood-live.js';
 import {handleShadowResearch} from './shadow-research.js';
 import {handlePlaid,scheduledPlaidSync} from './plaid-sync.js';
 import {handleWatchService,scheduledWatchCheck} from './watch-service.js';
 import {runWatchQuotePilot} from './watch-quote-pilot.js';
+export async function runCoordinatedQuotePilot(env){
+ if(env.ROBINHOOD_UNATTENDED_CONFIRMED!=='true')return {status:'support-confirmation-required'};
+ if(!env.ROBINHOOD_COORDINATOR)return {status:'coordinator-required'};
+ const owner=env.ROBINHOOD_COORDINATOR.get(env.ROBINHOOD_COORDINATOR.idFromName('private-alert-pilot'));
+ const response=await owner.fetch('https://credentials/pilot',{method:'POST'});
+ if(!response.ok)return {status:'verification-failed'};
+ return response.json();
+}
 const REPO = 'Carooch62/0dte-options-command-center';
 const WORKFLOW = 'market-scan.yml';
 const VERSION = '2026-11-06.scan-handoff';
@@ -104,7 +113,7 @@ export default {
     }
     if(!legacyTick)return;
     if(regularWeekday(now)&&env.WATCH_QUOTE_PILOT_ENABLED==='true'){
-      try{console.log(JSON.stringify({watch_quote_pilot:await runWatchQuotePilot(env)}));}
+      try{console.log(JSON.stringify({watch_quote_pilot:await runCoordinatedQuotePilot(env)}));}
       catch{console.log(JSON.stringify({watch_quote_pilot:{status:'verification-failed'}}));}
     }
     if(regularWeekday(now)){
@@ -188,5 +197,6 @@ export default {
     }catch(e){return response({ok:false,error:e.message},502,request);}
   }
 };
+
 
 

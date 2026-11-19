@@ -1,3 +1,19 @@
+# Robinhood hosted support request — archived request, current decision
+
+Updated November 18, 2026. The current implementation supports unattended
+personal MCP use. This workflow does
+not require separate approval or a market-data subscription. Rotating refresh
+tokens must be saved. No numeric rate limits or supported exact option-contract
+links were supplied. The current quote pilot is enabled; signal delivery remains
+disabled until live gates pass. See [current handoff](verified-alert-handoff.md).
+
+Hosted client authorization must be verified independently;
+it is distinct from permission to run unattended. Do not resend the historical
+request below or treat its obsolete blockers as current requirements. Raw provider
+quotes/Greeks remain excluded from Discord under our current implementation.
+
+## Historical request and pre-release implementation notes
+
 # Robinhood hosted read-only monitor: Support request
 
 Robinhood's external-agent onboarding page lists ChatGPT and Codex but says other platforms should contact Support. Our Cloudflare Worker is a separate hosted OAuth client; the existing ChatGPT connection does not grant it ongoing access. Manual owner-authorized equity quote retrieval succeeded on November 5, 2026. Automated quote polling has never been enabled.

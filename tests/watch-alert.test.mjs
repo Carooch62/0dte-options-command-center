@@ -20,7 +20,7 @@ test('formats a verified alert with the actual contract and quote clocks',()=>{
  assert.match(alert.text,/https:\/\/robinhood.com\/options\/example/);
 });
 test('never invents a Robinhood URL or accepts an unrelated instrument link',()=>{
- for(const value of [null,{...link,verified:false},{...link,instrument_id:'other'},
+ for(const value of [{...link,verified:false},{...link,instrument_id:'other'},
   {...link,href:'https://robinhood.com.attacker.example/options/example'},
   {...link,href:'https://robinhood.com@evil.example/options/example'},
   {...link,href:'http://robinhood.com/options/example'}])
@@ -31,4 +31,14 @@ test('requires the current open scan and a qualifying exact quote',()=>{
  assert.equal(prepareVerifiedOptionAlert(candidate,observation,link,scan,now+6*60_000),null);
  for(const patch of [{ask_price:.31},{updated_at:new Date(now-61_000).toISOString()},{volume:0},{delta:.1}])
   assert.equal(prepareVerifiedOptionAlert(candidate,{...observation,quote:{...observation.quote,...patch}},link,scan,now),null);
+});
+
+
+test('missing deep link uses explicit manual lookup without weakening qualification',()=>{
+ const alert=prepareVerifiedOptionAlert(candidate,observation,null,scan,now);
+ assert.equal(alert.link,'https://robinhood.com/');
+ assert.equal(alert.link_kind,'manual-contract-lookup');
+ assert.match(alert.text,/manually select the exact contract/);
+ assert.doesNotMatch(alert.discord_text,/bid|ask|delta|volume|0\.26/);
+ assert.equal(prepareVerifiedOptionAlert(candidate,{...observation,quote:{...observation.quote,ask_price:.31}},null,scan,now),null);
 });

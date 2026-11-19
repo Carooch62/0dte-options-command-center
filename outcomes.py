@@ -5,6 +5,25 @@ from pathlib import Path
 from datetime import datetime, timezone
 from quality import parse_time, valid_quote, ET
 
+PUBLIC_OBSERVATION_POLICY={'profile':'public-delayed-5-15-30-v1','horizons_minutes':[5,15,30],'window_tolerance_minutes':10,'entry':'ask','exit':'bid','interpretation':'QUOTED_OBSERVATIONS_NOT_FILLS'}
+
+def observation_reason(candidate):
+    """Return why a candidate belongs in prospective reporting.
+
+    This is deliberately reporting-only: it does not alter setup qualification,
+    execution state, ranking, eligibility, or alerts.  Qualified WATCH and
+    restored SECOND-WAVE rows must be retained even when a transition event was
+    not emitted in the current scan.
+    """
+    state = candidate.get('execution_state')
+    if state in ('TRIGGERED', 'CONFIRMED'):
+        return 'PRICE_TRIGGER'
+    if candidate.get('second_wave_event'):
+        return 'SECOND_WAVE_EVENT'
+    if candidate.get('setup_qualified') is True and state in ('WATCH', 'SECOND-WAVE'):
+        return 'QUALIFIED_' + state.replace('-', '_')
+    return None
+
 def update(data, path='data/option-observations.json'):
     p=Path(path)
     try: events=json.loads(p.read_text())
@@ -38,13 +57,14 @@ def update(data, path='data/option-observations.json'):
     seen={(e['scan_id'],e['contract_id']) for e in events}
     active={e['contract_id'] for e in events if e['market_date']==today and (now-parse_time(e['observed_at'])).total_seconds()<1800}
     for x in data['candidates']:
-        if x.get('execution_state') not in ('TRIGGERED','CONFIRMED') and not x.get('second_wave_event'):continue
+        reason=observation_reason(x)
+        if not reason:continue
         for o in x.get('preferred_contracts',[])[:3]:
             cid=o['contract_id']
             if cid in active or (data['scan_id'],cid) in seen:continue
             events.append({'scan_id':data['scan_id'],'market_date':today,'observed_at':now.isoformat(),
                 'ticker':x['ticker'],'contract_id':cid,'expiry':o.get('expiry'),'side':o['side'],'strike':o['strike'],
-                'entry_ask':o['ask'],'entry_bid':o['bid'],'volume':o.get('volume'),'delta':o.get('delta'),'theta':o.get('theta'),
+                'observation_policy':deepcopy(PUBLIC_OBSERVATION_POLICY),'entry_ask':o['ask'],'entry_bid':o['bid'],'volume':o.get('volume'),'delta':o.get('delta'),'theta':o.get('theta'),
                 'theta_available':o.get('theta_available'),'spread':o.get('spread'),'spread_pct':o.get('spread_pct'),
                 'quote_freshness':o.get('quote_freshness'),'minimum_delay_minutes':o.get('minimum_delay_minutes'),
                 'received_at':o.get('received_at'),'timestamp_basis':o.get('timestamp_basis'),
@@ -62,10 +82,12 @@ def update(data, path='data/option-observations.json'):
                                  'recent_move':x.get('recent_move'),'volume_ratio':x.get('volume_ratio'),
                                  'invalidation_price':x.get('invalidation_price'),
                                  'second_wave_event':x.get('second_wave_event'),
+                                 'observation_reason':reason,
                                  'trend_context':deepcopy(x.get('trend_context'))},'markouts':{}})
             active.add(cid)
     events=events[-2000:]
     p.write_text(json.dumps(events,separators=(',',':'),allow_nan=False))
-    data['option_feedback']={'observation_count':len(events),'today_count':sum(e['market_date']==today for e in events),
+    data['option_feedback']={'observation_policy':deepcopy(PUBLIC_OBSERVATION_POLICY),'observation_count':len(events),'today_count':sum(e['market_date']==today for e in events),
                             'recent':events[-10:],'interpretation':'Prospective quoted observations, not executed returns; fees excluded.'}
     return data
+
