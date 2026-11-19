@@ -50,7 +50,7 @@ jobs:
         if: steps.gate.outputs.collect == 'true'
         run: |
           python scripts/prepare_scan_checkout.py
-          git sparse-checkout add --no-cone /data/shadow-evidence/ /data/news-coverage-probes/
+          git sparse-checkout add /data/shadow-evidence/ /data/news-coverage-probes/
       - name: Require isolated staging history
         if: steps.gate.outputs.collect == 'true'
         run: |
