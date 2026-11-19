@@ -8,6 +8,7 @@ const fixture={generated_at:stamp,scan_id:'synthetic-private',market_session:'OP
 const browser=await chromium.launch({headless:true});
 try{for(const width of [390,1280]){
  const page=await browser.newPage({viewport:{width,height:844},timezoneId:'America/New_York'}),errors=[],calls=[];let failure=false,wrong=false,quoteTime=stamp;
+ await page.addInitScript(({origin,contract,stamp})=>{if(location.origin===origin)localStorage.setItem('0dteJournal',JSON.stringify([{id:'synthetic-fill',ticker:contract.ticker,contract:contract.contract_id,expiry:contract.expiry,entry:.18,qty:1,fees:0,exit:null,time:stamp,lossReview:.14,target:.27}]));},{origin,contract,stamp});
  page.on('pageerror',e=>errors.push(e.message));await page.clock.install({time:new Date(stamp)});
  await page.route('**/*',async route=>{
   const url=new URL(route.request().url()),path=url.pathname.slice(1);
@@ -17,7 +18,7 @@ try{for(const width of [390,1280]){
   if(path==='private/plaid/robinhood/quotes'){
    calls.push('quotes');assert.deepEqual(route.request().postDataJSON(),{kind:'option',instrument_ids:[id]});return route.fulfill(failure?{status:401,json:{error:'synthetic sign in'}}:{json:{received_at:await page.evaluate(()=>new Date().toISOString()),observations:[{quote:{instrument_id:id,bid_price:'.19',ask_price:'.20',updated_at:quoteTime}}]}});
   }
-  if(path.startsWith('data/'))return route.fulfill({json:path.endsWith('market-dashboard-today.json')||path.endsWith('market-dashboard.json')?fixture:{status:'SUCCESS'}});
+  if(path.startsWith('data/')||path.includes('/data/'))return route.fulfill({json:path.endsWith('market-dashboard-today.json')||path.endsWith('market-dashboard.json')?fixture:{status:'SUCCESS'}});
   if(path==='health')return route.fulfill({json:{ok:true,latestRun:null}});
   if(!files.has(path))return route.abort();
   return route.fulfill({contentType:path.endsWith('.js')?'text/javascript':path.endsWith('.css')?'text/css':'text/html',body:await readFile(new URL('../'+path,import.meta.url))});
@@ -30,6 +31,8 @@ try{for(const width of [390,1280]){
  await page.goto(href);await page.locator('#privateOptionQuote').waitFor({state:'visible'});assert.deepEqual(calls,[]);
  await page.getByRole('button',{name:'Refresh Robinhood quote',exact:true}).click();
  await page.locator('#privateOptionQuote [role=status]').filter({hasText:'FRESH QUOTE · CHECKS PASSED'}).waitFor();
+ assert.match(await page.locator('#privateOptionQuote [data-quote-fills]').innerText(),/Recorded entry \$0.180/);
+ assert.match(await page.locator('#privateOptionQuote [data-quote-fills]').innerText(),/profit-review \$0.270/);
  assert.deepEqual(calls,['resolve','quotes']);assert.match(await page.locator('#privateOptionQuote tbody').innerText(),/0.190.*0.200.*0.195/s);
  assert.equal(await page.locator('#privateOptionQuote a').getAttribute('href'),'candidate-quotes.html');
  await page.clock.fastForward(61000);await page.locator('#privateOptionQuote [role=status]').filter({hasText:'STALE QUOTE'}).waitFor();assert.deepEqual(calls,['resolve','quotes']);

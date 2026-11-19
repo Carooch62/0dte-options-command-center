@@ -413,7 +413,7 @@ function setupCleanLayout(){
 }
 setupCleanLayout();
 attachTradeExitAssistant({board:$('board'),journal:$('journal'),getSnapshot:()=>data});
-attachDashboardOptionQuotes({board:$('board')});
+attachDashboardOptionQuotes({board:$('board'),getTrades:()=>trades});
 
 active=read('0dteActiveScan',null);lastRefresh=read('0dteLastRefresh',null);enableScan(!refreshBlocksNewRequest(active));renderRefresh();renderJournal();await load();startTimer();if(active)pollRun();
 setInterval(()=>{if(!document.hidden){$('clock').textContent=new Date().toLocaleString('en-US',{timeZone:'America/New_York'})+' ET';render();renderJournal();}},15000);
