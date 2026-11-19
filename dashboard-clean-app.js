@@ -1,5 +1,5 @@
 import {coverageReport} from './coverage-report.js';
-import {attachTradeExitAssistant,purchaseRecordAction} from './trade-exit-assistant.js?v=20261118-visible-fill';
+import {attachTradeExitAssistant,purchaseRecordAction} from './trade-exit-assistant.js?v=20261118-exit-draft';
 import {loadDashboardSnapshot} from './dashboard-delivery.js';
 import {entryReadiness,trendSummary,matchesTrend,quoteKey,observePremiums,premiumChange,positionEstimate,reentryProblem,positionAlerts,validPlan} from './trade-review.js?v=20261002-trend-filters';
 import {watchKey,watchTransitions} from './contract-watch.js';

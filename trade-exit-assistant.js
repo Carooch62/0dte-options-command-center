@@ -7,6 +7,20 @@ export function purchaseRecordAction(candidate, option) {
   } : {label:'Record an option purchase',contract:{ticker:candidate.ticker}};
 }
 
+export function exitPlanDraft(contract, candidate, snapshot, entry, quantity=1, lossPct=30, profitPct=50) {
+  const options=[...(candidate?.options||[]),...Object.values(candidate?.expiry_groups||{}).flatMap(g=>g.options||[])];
+  const option=options.find(o=>o.contract_id===contract?.contract_id&&o.expiry===contract?.expiry&&o.side===contract?.side&&Number(o.strike)===Number(contract?.strike));
+  const actual=entry!==null&&entry!==''&&Number.isFinite(Number(entry))&&Number(entry)>0;
+  const observed=Number(option?.ask),basis=actual?Number(entry):Number.isFinite(observed)&&observed>0?observed:null;
+  const q=Number.isInteger(Number(quantity))&&Number(quantity)>0?Number(quantity):null;
+  const valid=basis!==null&&Number.isFinite(lossPct)&&lossPct>0&&lossPct<100&&Number.isFinite(profitPct)&&profitPct>0;
+  const round=n=>Math.round(n*100)/100;
+  return {basis,source:actual?'ACTUAL_FILL':'OBSERVED_RESEARCH_ASK',quote_at:option?.option_timestamp||null,scan_at:snapshot?.generated_at||null,
+    loss:valid?round(basis*(1-lossPct/100)):null,target:valid?round(basis*(1+profitPct/100)):null,
+    premium_at_risk:basis!==null&&q?round(basis*q*100):null,
+    invalidation:candidate?.invalidation_price??null,side:contract?.side||null,expiry:contract?.expiry||null};
+}
+
 export function exitReview(trade, candidate, snapshot) {
   if (!trade || trade.exit !== null) return null;
   const notes = [];
@@ -34,6 +48,20 @@ export function attachTradeExitAssistant({board, journal, getSnapshot}) {
   plan.id = 'exitReviewPanel';
   plan.setAttribute('aria-live', 'polite');
   journal.before(plan);
+  const draft=document.createElement('div');draft.id='purchaseExitDraft';draft.setAttribute('aria-live','polite');
+  $('jt').closest('.grid').before(draft);
+  let draftContract=null,draftCandidate=null,draftSnapshot=null;
+  function renderDraft() {
+    if(!draftContract)return;
+    const result=exitPlanDraft(draftContract,draftCandidate,draftSnapshot,$('je').value,$('jq').value);
+    if(draft.dataset.manualCheckpoints){for(const [key,id] of [['loss','jloss'],['target','jtarget']])result[key]=$(id).value.trim()&&Number.isFinite(Number($(id).value))?Number($(id).value):null;}
+    const money=n=>n===null?'Unknown':'$'+Number(n).toFixed(2);
+    draft.innerHTML=`<h3>Your option exit-plan draft</h3><p><b>${escape(draftContract.ticker)} ${escape(draftContract.contract_id||'Select exact contract below')}</b> · expiration ${escape(draftContract.expiry||'unknown')}</p><p>${result.source==='ACTUAL_FILL'?'Based on your entered fill':'Estimate based on the displayed research ask, not your execution'}: ${money(result.basis)}. Source quote time ${escape(result.quote_at||'unknown')}; scan ${escape(result.scan_at||'unknown')}.</p><ul><li>Loss-review bid: <b>${money(result.loss)}</b> ${draft.dataset.manualCheckpoints?'(your edited checkpoint)':'(example: about 30% below reference)' }.</li><li>Profit-review bid: <b>${money(result.target)}</b> ${draft.dataset.manualCheckpoints?'(your edited checkpoint)':'(example: about 50% above reference)' }.</li><li>Underlying invalidation: ${result.invalidation===null?'not available':escape(result.side==='put'?'review a move above ':result.side==='call'?'review a move below ':'review the level ')+money(Number(result.invalidation))}.</li><li>Premium at risk for the entered quantity, assuming standard 100-share contracts: ${money(result.premium_at_risk)} before fees; the entire premium can be lost.</li><li>Expiration ${escape(result.expiry||'unknown')}: verify the broker’s exercise/close-out deadline and reassess before it.</li></ul><p class="smallnote">30%/50% are editable example checkpoints, not validated strategy thresholds. Change Loss-review bid and Profit-review bid below to your own plan. Use a current executable bid to review a sale; quotes may be stale and stops are not guaranteed. This draft places no orders and does not confirm a purchase.</p>`;
+    if(!draft.dataset.manualCheckpoints){$('jloss').value=result.loss??'';$('jtarget').value=result.target??'';}
+  }
+  for(const id of ['je','jq'])$(id).addEventListener('input',renderDraft);
+  for(const id of ['jloss','jtarget'])$(id).addEventListener('input',()=>{draft.dataset.manualCheckpoints='true';renderDraft();});
+  for(const id of ['jt','jc','jexpiry'])$(id).addEventListener('input',()=>{draftContract={ticker:$('jt').value.trim().toUpperCase(),contract_id:$('jc').value.trim(),expiry:$('jexpiry').value};draftCandidate=null;draftSnapshot=null;delete draft.dataset.manualCheckpoints;for(const field of ['je','jtime','jf','jconditions','jreason'])$(field).value='';renderDraft();});
   function renderPlan() {
     let trades = [];
     try { trades = JSON.parse(localStorage.getItem('0dteJournal') || '[]'); } catch { /* unavailable */ }
@@ -89,6 +117,7 @@ export function attachTradeExitAssistant({board, journal, getSnapshot}) {
           const date = new Date(fill.executed_at);
           $('jtime').value = new Date(+date-date.getTimezoneOffset()*60000).toISOString().slice(0,16);
           $('jf').value = '';
+          renderDraft();
           status.textContent = 'Confirmed execution prefilled. Verify this fill and enter known total fees; then save the journal entry yourself. Separate partial fills must be reviewed separately.';
           $('je').focus();
         };
@@ -118,20 +147,21 @@ export function attachTradeExitAssistant({board, journal, getSnapshot}) {
     $('jloss').value = '';
     $('jtarget').value = '';
     $('jmax').value = '';
-    $('jconditions').value = candidate?.invalidation_price != null ? `Review if underlying breaks ${candidate.invalidation_price} (scanner observation; verify live)` : '';
-    $('jreason').value = '';
+    $('jconditions').value = candidate?.invalidation_price != null ? `Review if underlying moves ${contract.side==='put'?'above':contract.side==='call'?'below':'through'} ${candidate.invalidation_price} (scanner observation; verify live)` : '';
+    $('jreason').value = candidate ? `Scanner observation: ${candidate.direction||'unknown direction'} / ${candidate.execution_state||'unknown state'}; setup qualified ${candidate.setup_qualified===true?'yes':candidate.setup_qualified===false?'no':'unknown'}. Verify the pre-entry evidence separately.` : '';
     $('jtime').value = '';
     $('jconfirm').value = '';
+    draftContract=contract;draftCandidate=candidate;draftSnapshot=snapshot;delete draft.dataset.manualCheckpoints;
+    renderDraft();
     awaitingFill = true;
     const collapsible = heading.closest('#cleanJournal');
     if (collapsible) collapsible.open = true;
-    $('jt').scrollIntoView({block:'center'});
-    $('je').focus();
+    draft.scrollIntoView({block:'start'});
     const notice = $('journalNotice');
     notice.textContent = (candidate?.setup_qualified === false ? 'Shadow review: the latest displayed ticker setup is unqualified in delayed research. Verify the actual pre-entry snapshot and live quote. ' : '') + 'Enter the actual Robinhood fill premium, quantity, execution time, and total known fees. Scanner ask is not your fill. Saving is a separate confirmation.';
     void lookupAndOffer(contract, notice);
   }, true);
-  for(const id of ['jt','jc','je','jq','jtime'])$(id).addEventListener('input',()=>{delete $('addTrade').dataset.executionId;delete $('addTrade').dataset.executedAt;});
+  for(const id of ['jt','jc','jexpiry','je','jq','jtime'])$(id).addEventListener('input',()=>{delete $('addTrade').dataset.executionId;delete $('addTrade').dataset.executedAt;});
   $('addTrade').addEventListener('click', event => {
     if (!awaitingFill) return;
     if (!$('jtime').value || !$('jf').value.trim()) {
