@@ -1,1 +1,1 @@
-{"updated_at":"2026-11-19T03:52:52.943703+00:00","run_id":"44454418865","request_id":null,"status":"CLOSED","stage":"MARKET_CALENDAR","stage_timings_ms":{"archive_existing":390},"pipeline_ms":473}
+{"updated_at":"2026-11-19T14:31:59.252100+00:00","run_id":"44544640470","request_id":"febc19c4-391e-4cbd-8135-1dc7cbbb81fc","status":"WAITING_FOR_BAR","stage":"MARKET_CALENDAR","retry_after":"2026-11-19T14:35:00+00:00","message":"Waiting for the first completed five-minute regular-session bar; last snapshot retained.","stage_timings_ms":{"archive_existing":391},"pipeline_ms":487}
