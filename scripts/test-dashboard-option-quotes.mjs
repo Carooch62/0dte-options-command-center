@@ -18,14 +18,14 @@ try{for(const width of [390,1280]){
   if(path==='private/plaid/robinhood/quotes'){
    calls.push('quotes');assert.deepEqual(route.request().postDataJSON(),{kind:'option',instrument_ids:[id]});return route.fulfill(failure?{status:401,json:{error:'synthetic sign in'}}:{json:{received_at:await page.evaluate(()=>new Date().toISOString()),observations:[{quote:{instrument_id:id,bid_price:'.19',ask_price:'.20',updated_at:quoteTime}}]}});
   }
-  if(path.startsWith('data/')||path.includes('/data/'))return route.fulfill({json:path.endsWith('market-dashboard-today.json')||path.endsWith('market-dashboard.json')?fixture:{status:'SUCCESS'}});
+  if(path.startsWith('data/')||path.includes('/data/'))return route.fulfill({headers:{'Access-Control-Allow-Origin':'*'},json:path.endsWith('market-dashboard-today.json')||path.endsWith('market-dashboard.json')?fixture:{status:'SUCCESS'}});
   if(path==='health')return route.fulfill({json:{ok:true,latestRun:null}});
   if(!files.has(path))return route.abort();
   return route.fulfill({contentType:path.endsWith('.js')?'text/javascript':path.endsWith('.css')?'text/css':'text/html',body:await readFile(new URL('../'+path,import.meta.url))});
  });
  // Public dashboard links hand off identity, never request private data cross-origin.
  await page.goto('https://carooch62.github.io/dashboard_liquid.html');
- const link=page.locator('#board .purchase-action [data-rh-quote]');await link.waitFor();
+ const link=page.locator('#board .purchase-action [data-rh-quote]');try{await link.waitFor();}catch(e){console.log({errors,board:await page.locator('#board').innerText()});throw e;}
  const href=await link.getAttribute('href');assert.ok(href.startsWith(origin+'/dashboard_liquid.html'));assert.deepEqual(calls,[]);
  // Private dashboard is still the real rendered UI; hash handoff does not auto-fetch.
  await page.goto(href);await page.locator('#privateOptionQuote').waitFor({state:'visible'});assert.deepEqual(calls,[]);
