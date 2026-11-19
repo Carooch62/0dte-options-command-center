@@ -3,7 +3,7 @@ import {readFile} from 'node:fs/promises';
 import {createRequire} from 'node:module';
 import assert from 'node:assert/strict';
 const {chromium}=createRequire(import.meta.url)('playwright');
-const files=new Set(['dashboard_clean.html','dashboard-clean-app.js','coverage-report.js','dashboard-logic.js','dashboard-delivery.js','dashboard-mobile.css','connection-ui.css','trade-review.js','signal-checklist.js','refresh-progress.js','contract-watch.js','trade-exit-assistant.js']);
+const files=new Set(['index.html','dashboard_liquid.html','dashboard_clean.html','dashboard-clean-app.js','coverage-report.js','dashboard-logic.js','dashboard-delivery.js','dashboard-mobile.css','connection-ui.css','trade-review.js','signal-checklist.js','refresh-progress.js','contract-watch.js','trade-exit-assistant.js']);
 const server=createServer(async(req,res)=>{try{const path=new URL(req.url,'http://localhost').pathname.slice(1);if(!files.has(path)){res.writeHead(404);res.end();return;}res.setHeader('Content-Type',path.endsWith('.js')?'text/javascript':path.endsWith('.css')?'text/css':'text/html');res.end(await readFile(new URL('../'+path,import.meta.url)));}catch{res.writeHead(500);res.end();}});
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 let browser;
@@ -30,7 +30,8 @@ try{
   return route.fulfill({json:{status:'SUCCESS'}});
  });
  await page.route('https://**/*',route=>route.request().url().includes('/health')?route.fulfill({json:{latestRun:null}}):route.abort());
- await page.goto(`http://127.0.0.1:${server.address().port}/dashboard_clean.html`);
+ await page.goto(`http://127.0.0.1:${server.address().port}/index.html`);
+ await page.waitForURL('**/dashboard_liquid.html');
  await page.locator('#contractWatchList').filter({hasText:'TEST'}).waitFor();
  assert.match(await page.locator('#contractWatchList').innerText(),/WATCH/);
  scan={...base,scan_id:'new',generated_at:'2026-11-02T14:49:00Z',candidates:[row('TRIGGERED')]};

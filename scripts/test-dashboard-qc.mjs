@@ -4,7 +4,7 @@ import {createServer} from 'node:http';
 import {readFile,mkdir} from 'node:fs/promises';
 import assert from 'node:assert/strict';
 const {chromium}=createRequire(import.meta.url)('playwright');
-const allowed=new Set(['dashboard_glass.html','dashboard-app.js','dashboard-logic.js','dashboard-delivery.js','dashboard-mobile.css','connection-ui.css','trade-review.js','signal-checklist.js','refresh-progress.js']);
+const allowed=new Set(['dashboard_glass.html','dashboard-app.js','dashboard-logic.js','dashboard-delivery.js','dashboard-mobile.css','connection-ui.css','trade-review.js','signal-checklist.js','refresh-progress.js','brokerage.html','dashboard-broker.js','dashboard-broker-logic.js','brokerage-history.js','execution-evidence.js','robinhood-review.js','robinhood-panel.js','robinhood-connect.js','server-evidence-link.js','private-request.js']);
 const server=createServer(async(req,res)=>{
  try{
   const path=new URL(req.url,'http://localhost').pathname.slice(1);
@@ -18,6 +18,18 @@ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 let browser;
 try{
  browser=await chromium.launch({headless:true});
+ const brokerage=await browser.newPage({viewport:{width:390,height:844}});
+ await brokerage.route('https://**/*',r=>r.abort());
+ await brokerage.route('**/private/**',r=>r.fulfill({status:503,json:{error:'Synthetic disconnected state'}}));
+ await brokerage.goto(`http://127.0.0.1:${server.address().port}/brokerage.html`);
+ await brokerage.locator('#server-evidence-export').filter({hasText:'UTC'}).waitFor();
+ await brokerage.locator('#server-evidence-day').fill('2026-11-18');
+ await brokerage.locator('#server-evidence-day').dispatchEvent('change');
+ assert.equal(await brokerage.locator('#server-evidence-export').getAttribute('href'),'/private/plaid/robinhood/evidence?day=2026-11-18');
+ assert.match(await brokerage.locator('#server-evidence-export').innerText(),/2026-11-18 UTC/);
+ assert.ok(await brokerage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'brokerage page overflow');
+ await brokerage.close();
+
  for(const width of [390,430,1280]){
   const context=await browser.newContext({viewport:{width,height:900},timezoneId:'UTC'}),page=await context.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(e.message));

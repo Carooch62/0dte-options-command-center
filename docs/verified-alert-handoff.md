@@ -1,11 +1,39 @@
-# Verified option alert handoff
+# Verified option alert handoff — current status, November 18, 2026
 
-`watch-alert.js` prepares the exact contract message from a current OPEN scan and a fresh, individually checked Robinhood option quote. It rejects stale, ambiguous, wide, expensive or untradeable contracts and a link that is missing or tied to a different Robinhood instrument ID. The supplied link must come from a separately verified provider-supported contract URL resolver; a plausible URL string alone does not establish a working deep link. This module does not infer or manufacture a Robinhood link.
+The hosted quote pilot is enabled; verified Discord signal delivery remains disabled.
+`ROBINHOOD_UNATTENDED_CONFIRMED=true`, `WATCH_QUOTE_PILOT_ENABLED=true`,
+`WATCH_VERIFIED_ALERTS_ENABLED=false`, `ROBINHOOD_FILL_LOOKUP_ENABLED=false` and
+`FAST_SCAN_ENABLED=false`. Inspect authenticated readiness/status for current
+configuration; these declarations do not prove successful live operation.
 
-The scheduled quote pilot now calls a guarded alert pipeline after checking exact instrument metadata, current option quotes, spread, price, delta and volume. The pipeline has no production contract-link resolver, so it cannot send an option alert. `WATCH_QUOTE_PILOT_ENABLED` and `WATCH_VERIFIED_ALERTS_ENABLED` both remain off. A missing or unrelated contract URL never results in delivery. A failed Discord delivery leaves that scan uncheckpointed for retry. The existing Discord watch messages are delayed research rechecks, not verified option alerts. Before sending real verified alerts: confirm the provider permits unattended collection and how sessions renew; establish an exact provider link from a tested source; configure the owner-controlled Discord webhook; test live delivery and duplicate suppression. Keep secrets private and never place an order from the alert handler.
+The configured personal MCP workflow supports unattended collection without a
+separate market-data subscription. Hosted OAuth redirect/client verification is
+a separate account-specific prerequisite. Rotating refresh tokens must persist;
+actual renewal followed by an authenticated option quote still needs live proof.
 
-## Private readiness check
+A specific option-contract deep link is unsupported. The implementation uses
+supported general Robinhood navigation and exact ticker/expiry/strike/side manual
+selection. Missing deep links are no longer an activation blocker. Never invent
+an instrument URL. Discord receives contract identity and derived setup summaries,
+without raw provider prices or Greeks under the current personal-use decision.
 
-The owner-protected `GET /private/watch/readiness` reports non-secret requirements and enabled flags. It does not collect quotes, resolve a Robinhood link, send a Discord message, or change any switch. Hosted polling permission and the exact contract link remain unverified and are reported as missing until a provider-supported implementation is reviewed.
+Before activation require: fresh OPEN-session scan, exact instrument metadata,
+valid source clocks, live ask <= $0.30, signed delta, spread, volume and existing
+setup gates; then prove renewal, successful delivery, unchanged-scan suppression,
+failure/retry handling and the owner's destination. A TEST ONLY webhook receipt
+and an equity export do not satisfy these checks. Do not manufacture a qualifying
+candidate to force a send. Ambiguous webhook timeout can duplicate delivery;
+Discord has no application idempotency key, so do not claim exactly-once delivery.
 
-The owner-protected `/private/watch/setup` page accepts a private Discord webhook URL. `PUT /private/watch/webhook` encrypts it with the existing private 32-byte Worker encryption key and stores it in the private KV namespace. Status returns only `configured` and its management source; it never returns the webhook. `DELETE` removes a URL set through this page. A pre-existing Cloudflare secret takes priority and is managed in Cloudflare instead. The page's Send test message button uses the existing `POST /private/watch` action and sends a labeled `TEST ONLY` Discord message; it does not change the live alert switches. Keep the webhook URL out of chat and GitHub.
+## Owner controls
+
+Use `/private/watch/setup` for encrypted webhook status/management, TEST ONLY
+messages and a manual quote pilot. `/private/watch/readiness` reports non-secret
+requirements. Webhook secrets are never returned or published. The scheduled
+quote pilot uses the existing five-minute tick and separate serialized coordinator;
+the legacy delayed-research saved-watch monitor is a separate notification path.
+Verify saved-contract synchronization independently and avoid duplicate active
+notification paths. Do not send an unsolicited test from maintenance work.
+
+Full activation/rollback: [Robinhood monitor rollout](../ROBINHOOD_MONITOR_ROLLOUT.md).
+The current backlog and live-evidence gates are in [action ledger](action-ledger.md).

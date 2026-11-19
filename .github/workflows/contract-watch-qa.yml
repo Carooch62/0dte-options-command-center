@@ -8,6 +8,9 @@ on:
       - 'worker.js'
       - 'dashboard-clean-app.js'
       - 'dashboard_clean.html'
+      - 'dashboard_liquid.html'
+      - 'index.html'
+      - 'dashboard.html'
       - 'scripts/test-contract-watch-ui.mjs'
       - '.github/workflows/contract-watch-qa.yml'
   workflow_dispatch:

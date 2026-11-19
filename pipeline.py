@@ -76,7 +76,7 @@ def run():
             return 0
         with tempfile.TemporaryDirectory(prefix='scan-') as folder:
             stage=Path(folder);(stage/'data').mkdir()
-            for name in ('scan-history.json','option-observations.json','trend-cache.json'):
+            for name in ('scan-history.json','option-observations.json','trend-cache.json','staging-environment.json'):
                 if (dest/name).exists():shutil.copy2(dest/name,stage/'data'/name)
             for name in ('scanner.py','trend_context.py','option_expander.py','core_0dte.py','schema_normalizer.py','execution_normalizer.py','later_expiry_shadow.py'):
                 health['stage']=name

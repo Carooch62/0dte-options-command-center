@@ -4,7 +4,7 @@ import {handleShadowResearch} from '../shadow-research.js';
 test('reader uses fixed staging branch, checks isolation marker, never falls back',async()=>{
  const calls=[],fetcher=async url=>{calls.push(url);return calls.length===1?Response.json({environment:'staging'}):Response.json({format:'test'});};
  const r=await handleShadowResearch(new Request('https://example.com/data/staging-shadow-review-queue.json'),fetcher);
- assert.equal(r.status,200);assert.ok(calls.every(url=>url.includes('/staging-algorithm/data/')));assert.ok(calls[1].includes('/shadow-review-queue.json'));assert.equal(r.headers.get('Cache-Control'),'no-store');
+ assert.equal(r.status,200);assert.ok(calls.every(url=>url.includes('/staging-next-20261117/data/')));assert.ok(calls[1].includes('/shadow-review-queue.json'));assert.equal(r.headers.get('Cache-Control'),'no-store');
 });
 test('missing marker and unpublished data stay unavailable',async()=>{
  const r=await handleShadowResearch(new Request('https://example.com/data/staging-shadow-outcomes.json'),async()=>Response.json({environment:'production'}));assert.equal(r.status,503);
