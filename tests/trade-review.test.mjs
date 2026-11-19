@@ -74,3 +74,8 @@ test('intraday trend filters use signed movement and reject stale or missing dat
  assert(!matchesTrend(row,'intraday','DOWN','ALL',data,now+600000));
  assert(!matchesTrend(row,'intraday','DOWN'));
 });
+
+ test('malformed saved expiration is rejected without crashing journal initialization',()=>{
+ for(const expiry of ['2026-99-99','2026-02-30','garbage'])assert.equal(validPlan({expiry}),false);
+ assert.equal(validPlan({expiry:'2026-11-20'}),true);
+ });
