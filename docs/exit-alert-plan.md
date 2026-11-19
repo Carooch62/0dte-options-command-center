@@ -39,3 +39,32 @@ Required implementation and activation sequence:
 
 Next release must include private plan sync and a separately gated position monitor;
 this document does not claim those components are implemented or activated.
+
+## Detailed benchmark display
+
+The purchase draft and saved open-position review now show three loss and three
+profit premiums per share, with a compact tier-2 profit reference and expandable
+input/source-clock reasoning. Changing actual entry/time recomputes the draft;
+manually edited checkpoints remain intact. Saved checkpoints are not overwritten
+by subsequent reference tables. Exact contract ID and expiry are required to
+retrieve option-specific context for saved positions; missing contracts stay unknown.
+
+The reference ladder is explicitly illustrative: loss -10/-20/-30%, profit
++25/+50/+75%, rounded to cents. It is not a calibrated recommended strategy. With
+aligned entry/underlying/option clocks, an OPEN session, valid expiration, usable
+signed delta/gamma/daily theta, two-sided spread and directional stock targets,
+the module can instead show provisional local Greek sensitivity scenarios. The
+15/30/60-minute horizons start at the fill, stay within the current session and
+limit stock displacements to 3%. These bounds are engineering guardrails, not
+empirical accuracy claims. An incomplete ladder uses reference mode throughout.
+
+The scenario proxy is paid premium + delta*dS + gamma*dS^2/2 + theta*minutes/1440
+minus the observed spread. Constant IV/Greeks and unverified Greek calculation
+clocks prevent an executable-price or forecast claim. Theta diagnostics remain
+observations and are not measured decay since entry. Expiration is displayed in
+calendar days; broker deadlines remain separate. Catalyst/headline timing, setup,
+trend, pattern and volume context explain thesis review, without an arbitrary
+numeric catalyst uplift. A resolved catalyst never cancels a loss review.
+
+This is a display/planning release. It does not implement or activate exit alerts,
+private position sync, streaming monitoring, broker orders or automatic sales.

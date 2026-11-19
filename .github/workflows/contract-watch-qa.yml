@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - 'contract-watch.js'
+      - 'trade-exit-assistant.js'
+      - 'exit-benchmarks.js'
       - 'contract-watch.test.js'
       - 'watch-*.js'
       - 'worker.js'
