@@ -101,6 +101,15 @@ try{
  await page.locator('#purchaseExitDraft').getByText(/your edited checkpoint/).first().waitFor();
  assert.equal(await page.locator('#jloss').inputValue(),'0.33');
  assert.match(await page.locator('#purchaseExitDraft').innerText(),/\$0.33/);
+ const beforeBackup=await page.evaluate(()=>JSON.parse(localStorage.getItem('0dteJournal')));
+ const downloadEvent=page.waitForEvent('download');await page.locator('#export').click();const backupPath=await (await downloadEvent).path();
+ const backup=JSON.parse(await readFile(backupPath,'utf8'));assert.deepEqual(backup.trades,beforeBackup);
+ await page.evaluate(()=>localStorage.removeItem('0dteJournal'));await page.reload();
+ await page.locator('#import').setInputFiles({name:'synthetic-backup.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(backup))});
+ await page.waitForFunction(n=>JSON.parse(localStorage.getItem('0dteJournal')).length===n,beforeBackup.length);
+ assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('0dteJournal'))),beforeBackup);
+ await page.locator('#import').setInputFiles({name:'synthetic-backup-again.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(backup))});
+ assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('0dteJournal'))),beforeBackup);
  assert.deepEqual(errors,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
  console.log('Contract watch render, transition, removal and mobile width passed');
  await page.close();
