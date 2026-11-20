@@ -398,15 +398,24 @@ def nasdaq_options(t):
             'status':'SUCCESS' if any(o['dte']==0 for o in opts) else 'EMPTY_UNVERIFIED'}
 
 def options(t):
-    failures=[]
+    failures=[]; diagnostics=[]
     for provider_name,provider in (('fetch_cboe',fetch_cboe),('nasdaq_options',nasdaq_options)):
+        started=time.perf_counter()
         try:
-            result=provider(t); result['errors']=failures
+            result=provider(t)
+            diagnostics.append({'provider':provider_name,'status':result.get('status','UNKNOWN'),
+                                'duration_ms':round((time.perf_counter()-started)*1000)})
+            result['errors']=failures; result['provider_diagnostics']=diagnostics
             return result
         except Exception as exc:
+            diagnostic={'provider':provider_name,'status':'SOURCE_FAILURE',
+                        'duration_ms':round((time.perf_counter()-started)*1000),'error':type(exc).__name__}
+            if isinstance(exc,requests.HTTPError) and exc.response is not None:
+                diagnostic['http_status']=exc.response.status_code
+            diagnostics.append(diagnostic)
             record_error(t,provider_name,exc); failures.append(provider_name+':'+type(exc).__name__)
     return {'contracts':[],'source':'Options providers unavailable','timestamp':None,
-            'status':'SOURCE_FAILURE','errors':failures}
+            'status':'SOURCE_FAILURE','errors':failures,'provider_diagnostics':diagnostics}
 
 
 def contract_score(o, stock):
@@ -455,7 +464,7 @@ def enrich_options(x, result):
              option_call_put_ratio=ratio,option_flow_direction=balance,option_direction=balance,
              volume_balance=balance, option_source=result['source'],option_timestamp=result.get('timestamp'),
              option_payload_timestamp=result.get('payload_timestamp'), chain_status=result['status'],
-             chain_attempted=True, chain_errors=result.get('errors',[]), expirations=result.get('expirations',[]),
+             chain_attempted=True, chain_errors=result.get('errors',[]), chain_provider_diagnostics=result.get('provider_diagnostics',[]), expirations=result.get('expirations',[]),
              options_quality='FULL_GREEKS' if any(o.get('greeks_verified') for o in zero) else 'CHAIN_ONLY' if zero else 'NONE')
 
 CORE_TICKERS=('SPY','QQQ','IWM','SMH','GLD','XLF')
