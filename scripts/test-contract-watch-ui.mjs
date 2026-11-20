@@ -38,7 +38,9 @@ try{
  await page.locator('#allStocks').click();
  assert.equal(await page.locator('#state').inputValue(),'ALL');
  assert.match(await page.locator('#filterSummary').innerText(),/All states, including SKIP/);
+ await page.locator('#filterPanel > summary').click();
  await page.locator('#state').selectOption('ACTIVE');
+ await page.locator('#filterPanel > summary').click();
  for(const id of ['earlyWatchPanel','laterExpiryShadowPanel','contractWatchPanel','cleanChanges']){
   const disclosure=page.locator('#'+id+' > details');assert.equal(await disclosure.evaluate(el=>el.open),false);
   await disclosure.locator(':scope > summary').click();assert.equal(await disclosure.evaluate(el=>el.open),true);
