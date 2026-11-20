@@ -68,8 +68,8 @@ Worker dry run for implementation `2eb2fd36cbdd53681a1a2969741856bb327a063a`.
 Local Chromium is unavailable due to the runtime socket restriction. No live
 acceptance is inferred from synthetic tests or the separate chat capability check.
 
-After review and a supported staging deployment, the owner uses the authorized
-private Quotes page: open Missing-delta recovery, choose one window, load the
+After the reviewed deployment to the existing owner-protected site, the owner
+uses the authorized private Quotes page: open Missing-delta recovery, choose one window, load the
 research identities, then explicitly match and fetch. Repeat for the other
 window. Check exact identity, clock age, book and Greeks; retain private exports.
 If the website's authorization fails, preserve that failure separately from the
@@ -79,3 +79,25 @@ U01's actual 5/10/15 windows, at least 20 passing quotes over two sessions and
 real token rotation remain separate requirements. Private Discord, fee/net
 reconciliation and prospective IWM research requirements remain unchanged.
 Automatic public option eligibility has not been restored by this review.
+
+## November 20 release evidence
+
+[PR155](https://github.com/Carooch62/0dte-options-command-center/pull/155) merged as
+`31aec9952f7743a845c26c302e0d05101bef785f`. Latest-head scanner/dashboard
+[44775253503](https://github.com/Carooch62/0dte-options-command-center/actions/runs/44775253503)
+and mobile/recovery/Worker-dry-run
+[44775253499](https://github.com/Carooch62/0dte-options-command-center/actions/runs/44775253499)
+passed with synthetic broker responses.
+
+[Worker deployment 44775631361](https://github.com/Carooch62/0dte-options-command-center/actions/runs/44775631361)
+succeeded; version `2b146a53-0d62-4c0c-8bbe-ed8354f85949` was deployed at
+2026-11-20T16:40:33Z. The setup check confirmed protected routes and existing
+connection configuration, with no missing bindings, no client metadata changes
+and no connection-flag update. This is deployment/setup evidence, not successful
+owner authorization or quote retrieval.
+
+There is no broker-connected preview environment in the current configuration.
+Branch previews intentionally lack private brokerage storage/connection. Owner
+validation must use the existing protected site; no private bindings are copied
+to previews. The separate Cloudflare Workers Builds failure remains queued for
+actual build-log/settings inspection; no gate was weakened.
