@@ -182,3 +182,16 @@ sessions and actual rotating-token renewal remain independently outstanding.
 U02 fees/net, U03/U04 prospective evidence, U06 actual open-position Discord
 receipt and the queued Pages/Cloudflare infrastructure work remain unchanged.
 No public eligibility, scores or live alert activation changed.
+
+## November 20 closing-session follow-up — review only
+
+The completed November 20 closing review has been processed once. This public ledger records no private account, execution, quote or fee details. No production scores, eligibility, alert behavior or trade automation changed; there is no new algorithm proposal from this session.
+
+| Item | Current evidence | Status / next acceptance |
+| --- | --- | --- |
+| A06 final delayed bars | `data/closing-evidence/` has no `2026-11-20.json` at this check. The latest public receipt was generated at `2026-11-20T20:57:31.771326Z`, before the regular close; `data/scan-health.json` marks it DEGRADED with 197/201 stock rows and 3 source-failed chains. | PENDING. Preserve original collection/source clocks when a separate close capture arrives. Missing final bars stay incomplete; never use post-close evidence as pre-entry input. |
+| U01/U05 private option validation | PR155 and Worker deployment are released; public recovery identities are research-only and do not provide broker-verified quotes or Greeks. | DEPLOYED, NOT LIVE-VERIFIED. Owner-session exact-contract age/book/Greeks and private 5/10/15 windows remain separate from public 5/15/30 outcomes; verify token renewal independently. |
+| A01 staging collection | The supported `staging-next-20261117` receipt list ends with an OPEN packet generated `2026-11-19T19:05:24.749682Z`; no November 20 packet is present in that list. | PENDING FRESH PACKET. Inspect actual market-hours collection timestamps and coverage before treating the schedule or prior off-hours skip as acceptance. |
+| U03/U04 strategy review | Closing evidence and multi-session prospective coverage are insufficient for a missed-candidate, false-signal or scoring conclusion. | DEFERRED. Keep frozen controls and held-out review; propose changes only after multiple covered sessions and explicit approval. |
+
+This is a review-branch ledger entry, not a deployed or live-verified feature. Recheck the closing capture and authorized owner-session exports when available; add an addendum only for material new evidence. The separate Pages/publish and legacy Cloudflare preview-build checks retain their own release evidence and are not inferred from this review.
