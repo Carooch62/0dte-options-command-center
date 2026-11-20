@@ -34,6 +34,11 @@ try{
  await page.route('https://**/*',route=>route.request().url().includes('/health')?route.fulfill({json:{latestRun:null}}):route.abort());
  await page.goto(`http://127.0.0.1:${server.address().port}/index.html`);
  await page.waitForURL('**/dashboard_liquid.html');
+ for(const id of ['earlyWatchPanel','laterExpiryShadowPanel','contractWatchPanel','cleanChanges']){
+  const disclosure=page.locator('#'+id+' > details');assert.equal(await disclosure.evaluate(el=>el.open),false);
+  await disclosure.locator(':scope > summary').click();assert.equal(await disclosure.evaluate(el=>el.open),true);
+  if(id!=='contractWatchPanel')await disclosure.locator(':scope > summary').click();
+ }
  await page.locator('#contractWatchList').filter({hasText:'TEST'}).waitFor();
  const manual=page.locator('#board > article .purchase-action button');
  await manual.waitFor({state:'visible'});assert.equal(await manual.innerText(),'Record an option purchase');
@@ -47,6 +52,7 @@ try{
  await page.locator('#check').click();
  await page.locator('#contractWatchList').filter({hasText:'live quote and setup recheck required'}).waitFor();
  assert.deepEqual(snapshotRequests,['today','today']);
+ assert.equal(await page.locator('#contractWatchPanel > details').evaluate(el=>el.open),true,'data refresh preserves expansion');
  await page.locator('#expiration').evaluate(select=>{select.value='week';select.dispatchEvent(new Event('input',{bubbles:true}));});
  await page.locator('#board').getByText('No expiration in this window',{exact:true}).waitFor();
  assert.deepEqual(snapshotRequests,['today','today','full']);
@@ -95,6 +101,15 @@ try{
  await page.locator('#purchaseExitDraft').getByText(/your edited checkpoint/).first().waitFor();
  assert.equal(await page.locator('#jloss').inputValue(),'0.33');
  assert.match(await page.locator('#purchaseExitDraft').innerText(),/\$0.33/);
+ const beforeBackup=await page.evaluate(()=>JSON.parse(localStorage.getItem('0dteJournal')));
+ const downloadEvent=page.waitForEvent('download');await page.locator('#export').click();const backupPath=await (await downloadEvent).path();
+ const backup=JSON.parse(await readFile(backupPath,'utf8'));assert.deepEqual(backup.trades,beforeBackup);
+ await page.evaluate(()=>localStorage.removeItem('0dteJournal'));await page.reload();
+ await page.locator('#import').setInputFiles({name:'synthetic-backup.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(backup))});
+ await page.waitForFunction(n=>JSON.parse(localStorage.getItem('0dteJournal')).length===n,beforeBackup.length);
+ assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('0dteJournal'))),beforeBackup);
+ await page.locator('#import').setInputFiles({name:'synthetic-backup-again.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(backup))});
+ assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('0dteJournal'))),beforeBackup);
  assert.deepEqual(errors,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
  console.log('Contract watch render, transition, removal and mobile width passed');
  await page.close();

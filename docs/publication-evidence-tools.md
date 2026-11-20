@@ -1,0 +1,9 @@
+# Publication and offline evidence tools
+
+Run `node scripts/build-pages-candidate.mjs` to produce a candidate static bundle and pages-candidate-size.json. It includes browser assets and the current dashboard delivery files. Brokerage archive/history readers already use repository raw URLs. Source archives are not deleted or rewritten. The active Pages source remains unchanged: existing direct historical Pages URLs need a compatibility decision before a switch. Measure actual checkout/build/upload/deploy time on the same runner before claiming faster production publishing. Candidate byte reduction alone is not a measured speedup.
+
+Run `node scripts/analyze-quote-exports.mjs /private/path/session1.json /private/path/session2.json` locally. Redirect results only to a private location. Each exact contract is analyzed separately. Duplicate exports do not inflate counts; conflicting duplicate samples fail. Clocks and OPEN metadata are rechecked rather than trusting passing labels. Reports remain bounded to 500 samples per contract and disclose omissions. Token renewal, exchange latency and Discord receipt remain unverified. No private export is included in repository tests.
+
+The browser contract-watch suite now exports synthetic journal entries, clears the synthetic local journal, restores it, and imports again to verify exact preservation and duplicate suppression. It runs at phone and desktop widths. This does not access or clear the owner's real journal.
+
+The separate Cloudflare Workers Builds check reports only a build identifier and dashboard link through GitHub. The actual GitHub Worker deployment succeeds. Cloudflare build logs/settings remain required to diagnose the separate integration; do not weaken checks or change the working production deployment based on an unexplained failure.
