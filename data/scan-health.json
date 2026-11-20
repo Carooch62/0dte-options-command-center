@@ -1,1 +1,1 @@
-{"updated_at":"2026-11-20T03:08:24.705853+00:00","run_id":"44665588702","request_id":null,"status":"CLOSED","stage":"MARKET_CALENDAR","stage_timings_ms":{"archive_existing":530},"pipeline_ms":693}
+{"updated_at":"2026-11-20T03:34:27.748326+00:00","run_id":"44668572824","request_id":null,"status":"CLOSED","stage":"MARKET_CALENDAR","stage_timings_ms":{"archive_existing":569},"pipeline_ms":741}
