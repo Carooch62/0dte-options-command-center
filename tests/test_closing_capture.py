@@ -44,3 +44,34 @@ class ClosingCaptureTests(unittest.TestCase):
             result=collect(folder,datetime(2026,11,18,21,20,tzinfo=timezone.utc),scan)
             self.assertEqual(result['status'],'FINAL_BARS_CAPTURED')
             self.assertEqual(fetched,['BEFORE'])
+
+    def test_late_recovery_uses_archive_original_clocks_and_actual_collection(self):
+        import gzip
+        from closing_capture import capture_session
+        now=datetime.fromisoformat('2026-11-20T01:00:00+00:00')
+        self.assertEqual(capture_session(now)['market_date'],'2026-11-19')
+        with tempfile.TemporaryDirectory() as folder:
+            archive=Path(folder,'archive','2026-11-19','scans');archive.mkdir(parents=True)
+            with gzip.open(archive/'original.json.gz','wt') as f:
+                json.dump({'scan_id':'original','generated_at':'2026-11-19T20:55:00Z','candidate_state':[{'ticker':'A'},{'ticker':'B'}]},f)
+            calls=[]
+            def scan(t,n):
+                calls.append(n)
+                if t=='B':raise RuntimeError('provider unavailable')
+                return {'ticker':t,'bar_end':'2026-11-19T21:00:00Z'}
+            self.assertEqual(collect(folder,now,scan)['status'],'INCOMPLETE')
+            result=json.loads(Path(folder,'closing-evidence','2026-11-19.json').read_text())
+            self.assertEqual(result['collection_mode'],'LATE_RECOVERY')
+            self.assertEqual(result['collected_at'],now.isoformat())
+            self.assertEqual(result['source_generated_at'],'2026-11-19T20:55:00Z')
+            self.assertTrue(all(n==datetime.fromisoformat('2026-11-19T21:20:00+00:00') for n in calls))
+            self.assertEqual(result['final_bars'],1)
+
+    def test_recovery_bounds_and_non_sessions(self):
+        from closing_capture import capture_session
+        now=datetime.fromisoformat('2026-11-20T01:00:00+00:00')
+        self.assertIsNone(capture_session(now,'2026-11-21'))
+        self.assertIsNone(capture_session(now,'2026-11-01'))
+        self.assertIsNone(capture_session(now,'2026-11-07'))
+        self.assertIsNone(capture_session(datetime.fromisoformat('2026-11-20T16:00:00+00:00')))
+        self.assertEqual(capture_session(datetime.fromisoformat('2026-11-28T01:00:00+00:00'))['market_date'],'2026-11-27')

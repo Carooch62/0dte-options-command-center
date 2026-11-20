@@ -3,7 +3,14 @@ on:
   schedule:
     # Covers regular/early closes in EST/EDT; exchange-calendar gate is authoritative.
     - cron: '20,35,50 17,18,20,21 * * 1-5'
+    # Bounded recovery covers queued jobs and next-morning retries, including Saturday UTC.
+    - cron: '25 0,2,12 * * 1-6'
   workflow_dispatch:
+    inputs:
+      market_date:
+        description: 'Optional exchange session YYYY-MM-DD (last seven days)'
+        required: false
+        type: string
 permissions:
   contents: write
 concurrency:
@@ -30,9 +37,25 @@ jobs:
           python-version: '3.12'
           cache: pip
       - run: pip install -r requirements.txt
+      - name: Hydrate the selected public source archive
+        env:
+          CAPTURE_MARKET_DATE: ${{ inputs.market_date }}
+        run: |
+          python - <<'PYCODE'
+          import os, subprocess
+          from datetime import datetime, timezone
+          from closing_capture import capture_session
+          info=capture_session(datetime.now(timezone.utc),os.environ.get('CAPTURE_MARKET_DATE') or None)
+          if info:
+              day=info['market_date']
+              subprocess.run(['git','sparse-checkout','add',f'/data/archive/{day}/scans/'],check=True)
+          PYCODE
       - name: Collect separately without account credentials or scanner publication
+        env:
+          CAPTURE_MARKET_DATE: ${{ inputs.market_date }}
         run: python closing_capture.py
       - name: Publish only closing research evidence
+        if: always()
         run: |
           if ! test -d data/closing-evidence; then exit 0; fi
           git config user.name '0DTE Closing Evidence'
