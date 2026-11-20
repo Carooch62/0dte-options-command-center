@@ -34,7 +34,6 @@ RTX SBUX SCHW SLB SNOW SNAP SPOT XYZ TGT TMO TTD TWLO TXN U V VEEV VLO
 WBD WDC WDAY XLF XLK XLU XLY ZM ZS
 """.split()
 
-CBOE_BASE = "https://cdn.cboe.com/api/global/delayed_quotes/options"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     "Accept": "application/json,text/plain,*/*",
@@ -301,7 +300,13 @@ def parse_osi(symbol):
 
 
 def fetch_cboe(t):
-    payload = request_json(f'{CBOE_BASE}/{t}.json', headers=HEADERS)
+    # Cboe's public delayed dashboard prohibits automated extraction. Never
+    # retry it through another host, header, cookie, or network identity.
+    raise RuntimeError('Cboe dashboard automated access is unsupported')
+
+
+def parse_cboe(payload):
+    # Legacy-format fixture parser only; no network access or access approval.
     rows = (payload.get('data') or {}).get('options')
     if not isinstance(rows, list) or not rows:
         raise ValueError('empty or malformed CBOE chain')
@@ -398,8 +403,8 @@ def nasdaq_options(t):
             'status':'SUCCESS' if any(o['dte']==0 for o in opts) else 'EMPTY_UNVERIFIED'}
 
 def options(t):
-    failures=[]; diagnostics=[]
-    for provider_name,provider in (('fetch_cboe',fetch_cboe),('nasdaq_options',nasdaq_options)):
+    failures=[]; diagnostics=[{'provider':'fetch_cboe','status':'AUTOMATED_ACCESS_UNSUPPORTED','duration_ms':0}]
+    for provider_name,provider in (('nasdaq_options',nasdaq_options),):
         started=time.perf_counter()
         try:
             result=provider(t)

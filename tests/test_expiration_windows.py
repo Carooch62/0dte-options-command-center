@@ -12,8 +12,7 @@ class ExpirationWindowsTests(unittest.TestCase):
         for days in [-1,0,1,7,8,14,15,31,32]:
             exp=(now+timedelta(days=days)).strftime('%y%m%d')
             rows.append({'option':f'TEST{exp}C00100000','bid':.19,'ask':.21,'delta':.45 if days<=14 else .75,'gamma':.1,'volume':100})
-        with patch.object(scanner,'request_json',return_value={'data':{'options':rows}}):
-            result=scanner.fetch_cboe('TEST')
+        result=scanner.parse_cboe({'data':{'options':rows}})
         self.assertEqual([o['dte'] for o in result['contracts']],[0,1,7,8,14,15,31])
         x={'ticker':'TEST','price':100,'direction':'UP'}
         scanner.enrich_options(x,result)
@@ -31,7 +30,7 @@ class ExpirationWindowsTests(unittest.TestCase):
     def test_future_only_is_not_a_zero_dte_chain_and_missing_delta_fails(self):
         now=datetime.now(scanner.ET)
         row={'option':f"TEST{(now+timedelta(days=7)).strftime('%y%m%d')}C00100000",'bid':.19,'ask':.21,'volume':100}
-        with patch.object(scanner,'request_json',return_value={'data':{'options':[row]}}):result=scanner.fetch_cboe('TEST')
+        result=scanner.parse_cboe({'data':{'options':[row]}})
         self.assertEqual(result['status'],'NO_EXPIRATION_TODAY')
         x={'ticker':'TEST','price':100,'direction':'UP'}
         scanner.enrich_options(x,result)

@@ -120,3 +120,24 @@ filters, All stocks recovery and an old unversioned dependency. Local Chromium
 is blocked by the runtime socket restriction; browser CI remains independent.
 Changes remain review-only; actual source recovery and owner-session acceptance
 are still outstanding. No private data or production flags change.
+
+## November 20 source-recovery review
+
+PR154 subsequently merged the board explanation; GitHub Worker deployment
+[44772612223](https://github.com/Carooch62/0dte-options-command-center/actions/runs/44772612223)
+succeeded. This release does not restore verified option data.
+The public Pages HTML was independently checked and serves the board-availability
+release marker; this is asset delivery verification, not owner quote acceptance.
+
+The source review found an explicit automated-extraction prohibition on Cboe's
+delayed dashboard. A follow-up review removes that request path and keeps Nasdaq
+observations as research-only when delta is missing. A separate bounded private
+recovery batch permits explicit metadata matching and quote/Greek review, without
+turning missing-delta contracts into production eligibility or alert candidates.
+Read-only capability checks succeeded privately; actual hosted owner-session
+validation is pending. See option-source-recovery.md for source decisions,
+historical-versus-prospective evidence and exact remaining acceptance steps.
+
+U01/U05 recovery work is review-only. U02 fee/net evidence, U03/U04 prospective
+session gates and U06 actual owner-confirmed delivery remain open. Production
+scores, eligibility, live alert settings and unrelated automations are unchanged.

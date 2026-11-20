@@ -11,10 +11,11 @@ class OptionProviderDiagnosticsTests(unittest.TestCase):
         response.status_code = 429
         error = requests.HTTPError('secret URL and response body', response=response)
         result = {'contracts': [], 'source': 'Nasdaq public chain', 'timestamp': None, 'status': 'EMPTY_UNVERIFIED'}
-        with patch.object(scanner, 'fetch_cboe', side_effect=error), patch.object(scanner, 'nasdaq_options', return_value=result), patch.object(scanner.time, 'perf_counter', side_effect=[1, 1.125, 2, 2.25]), patch.object(scanner, 'record_error'):
+        with patch.object(scanner, 'fetch_cboe') as unsupported, patch.object(scanner, 'nasdaq_options', return_value=result), patch.object(scanner.time, 'perf_counter', side_effect=[1, 1.25]), patch.object(scanner, 'record_error'):
             actual = scanner.options('TEST')
+            unsupported.assert_not_called()
         self.assertEqual(actual['provider_diagnostics'], [
-            {'provider': 'fetch_cboe', 'status': 'SOURCE_FAILURE', 'duration_ms': 125, 'error': 'HTTPError', 'http_status': 429},
+            {'provider': 'fetch_cboe', 'status': 'AUTOMATED_ACCESS_UNSUPPORTED', 'duration_ms': 0},
             {'provider': 'nasdaq_options', 'status': 'EMPTY_UNVERIFIED', 'duration_ms': 250},
         ])
         self.assertNotIn('secret', json.dumps(actual))
@@ -23,13 +24,19 @@ class OptionProviderDiagnosticsTests(unittest.TestCase):
         self.assertEqual(row['chain_provider_diagnostics'], actual['provider_diagnostics'])
         self.assertEqual(row['chain_status'], 'EMPTY_UNVERIFIED')
 
-    def test_success_does_not_call_fallback_and_total_failure_keeps_both_attempts(self):
-        with patch.object(scanner, 'fetch_cboe', return_value={'status': 'SUCCESS'}), patch.object(scanner, 'nasdaq_options') as fallback:
+    def test_unsupported_dashboard_never_makes_network_calls_and_fallback_errors_are_sanitized(self):
+        with patch.object(scanner, 'request_json') as network:
+            with self.assertRaisesRegex(RuntimeError, 'unsupported'):
+                scanner.fetch_cboe('TEST')
+            network.assert_not_called()
+        with patch.object(scanner, 'fetch_cboe') as unsupported, patch.object(scanner, 'nasdaq_options', return_value={'status':'SUCCESS'}):
             actual = scanner.options('TEST')
-            fallback.assert_not_called()
-        self.assertEqual(len(actual['provider_diagnostics']), 1)
-        with patch.object(scanner, 'fetch_cboe', side_effect=ValueError('private body')), patch.object(scanner, 'nasdaq_options', side_effect=requests.Timeout('private URL')), patch.object(scanner, 'record_error'):
+            unsupported.assert_not_called()
+        self.assertEqual(len(actual['provider_diagnostics']), 2)
+        response=requests.Response();response.status_code=429
+        with patch.object(scanner, 'nasdaq_options', side_effect=requests.HTTPError('private URL',response=response)), patch.object(scanner, 'record_error'):
             actual = scanner.options('TEST')
         self.assertEqual(actual['status'], 'SOURCE_FAILURE')
-        self.assertEqual([x['error'] for x in actual['provider_diagnostics']], ['ValueError', 'Timeout'])
+        self.assertEqual(actual['provider_diagnostics'][1]['http_status'],429)
+        self.assertEqual(actual['provider_diagnostics'][1]['error'],'HTTPError')
         self.assertNotIn('private', json.dumps(actual))

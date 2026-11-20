@@ -1,6 +1,7 @@
 // Separate, private OAuth client. Never inherits the ChatGPT connection.
 import {evidenceRecords,mergeEvidence} from './private-evidence.js';
 import {contractRequest,resolveContracts,readSnapshot} from './private-candidates.js';
+import {validateRecoveryBatch} from './private-recovery.js';
 import {verifyAccess} from './plaid-sync.js';
 import {quoteRequestTiming} from './quote-timing.js';
 import {runWatchQuotePilot} from './watch-quote-pilot.js';
@@ -243,6 +244,10 @@ export async function handleRobinhood(request,env){
  }
  if(path==='/private/plaid/robinhood/candidates'&&request.method==='GET'){
   try{const r=await fetch(`https://raw.githubusercontent.com/Carooch62/0dte-options-command-center/main/data/candidate-quote-batch.json?v=${Date.now()}`,{cf:{cacheTtl:0},signal:AbortSignal.timeout(15000)});return reply({ok:true,snapshot:await readSnapshot(r)});}catch{return reply({ok:false,error:'Current scanner snapshot unavailable or too large. Import a JSON snapshot instead.'},502);}
+ }
+ if(path==='/private/plaid/robinhood/recovery-candidates'&&request.method==='GET'){
+  const window=url.searchParams.get('window');if(!['today','week'].includes(window))return reply({ok:false,error:'Choose today or week'},400);
+  try{const r=await fetch(`https://raw.githubusercontent.com/Carooch62/0dte-options-command-center/main/data/quote-recovery-${window}.json?v=${Date.now()}`,{cf:{cacheTtl:0},signal:AbortSignal.timeout(15000)});return reply({ok:true,snapshot:await readSnapshot(r,65536,b=>validateRecoveryBatch(b,window))});}catch{return reply({ok:false,error:'Recovery research batch is unavailable. No fallback contract was approved.'},502);}
  }
  if(path==='/private/plaid/robinhood/status'&&request.method==='GET'){
   const state=await connectionState(env),saved=state.connection,connected=!!saved&&saved.expires_at>Date.now();
