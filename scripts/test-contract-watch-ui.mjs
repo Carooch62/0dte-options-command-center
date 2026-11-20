@@ -34,6 +34,11 @@ try{
  await page.route('https://**/*',route=>route.request().url().includes('/health')?route.fulfill({json:{latestRun:null}}):route.abort());
  await page.goto(`http://127.0.0.1:${server.address().port}/index.html`);
  await page.waitForURL('**/dashboard_liquid.html');
+ for(const id of ['earlyWatchPanel','laterExpiryShadowPanel','contractWatchPanel','cleanChanges']){
+  const disclosure=page.locator('#'+id+' > details');assert.equal(await disclosure.evaluate(el=>el.open),false);
+  await disclosure.locator(':scope > summary').click();assert.equal(await disclosure.evaluate(el=>el.open),true);
+  if(id!=='contractWatchPanel')await disclosure.locator(':scope > summary').click();
+ }
  await page.locator('#contractWatchList').filter({hasText:'TEST'}).waitFor();
  const manual=page.locator('#board > article .purchase-action button');
  await manual.waitFor({state:'visible'});assert.equal(await manual.innerText(),'Record an option purchase');
@@ -47,6 +52,7 @@ try{
  await page.locator('#check').click();
  await page.locator('#contractWatchList').filter({hasText:'live quote and setup recheck required'}).waitFor();
  assert.deepEqual(snapshotRequests,['today','today']);
+ assert.equal(await page.locator('#contractWatchPanel > details').evaluate(el=>el.open),true,'data refresh preserves expansion');
  await page.locator('#expiration').evaluate(select=>{select.value='week';select.dispatchEvent(new Event('input',{bubbles:true}));});
  await page.locator('#board').getByText('No expiration in this window',{exact:true}).waitFor();
  assert.deepEqual(snapshotRequests,['today','today','full']);
