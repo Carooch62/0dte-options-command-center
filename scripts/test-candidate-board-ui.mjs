@@ -40,6 +40,7 @@ try{
   const valid={...option,contract_id:'TEST261120C00010000',delta:.4,delta_verified:true,delta_ok:true,near_atm:true,expiry_verified:true,volume:100,spread:.01,spread_pct:5,distance_pct:0};
   candidates=[{...row('TEST','WATCH'),options:[valid],eligible_contracts:[valid]}];
   await page.locator('#expiration').evaluate(el=>{el.value='today';el.dispatchEvent(new Event('input',{bubbles:true}));});
+  await page.locator('#check').click();
   await page.waitForFunction(()=>document.querySelector('#boardAvailability').textContent.includes('1 stocks have contracts'));
   assert.doesNotMatch(await page.locator('#boardAvailability').innerText(),/missing provider/);
   assert.deepEqual(errors,[]);
