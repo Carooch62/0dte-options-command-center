@@ -40,3 +40,16 @@ class StagingCollectionTests(unittest.TestCase):
             context=session_context(start,op)
             self.assertTrue(context['window_1300_1400_et']);self.assertFalse(context['first_hour'])
             self.assertEqual(context['event_day'],'UNKNOWN')
+
+    def test_iwm_controls_keep_unqualified_states_without_changing_option_selection(self):
+        from shadow_evidence import packet
+        source={'scan_id':'iwm-test','generated_at':'2026-11-19T15:00:00Z','candidates':[{'ticker':'IWM','execution_state':'WATCH','setup_qualified':False,'invalidation_price':265,'bar_end':'2026-11-19T14:55:00Z'}]}
+        original=json.dumps(source,sort_keys=True)
+        result=packet(source,'2026-11-19T15:01:00Z')
+        self.assertFalse(result['iwm_control']['missing'])
+        self.assertFalse(result['iwm_control']['rows'][0]['setup_qualified'])
+        self.assertEqual(result['iwm_control']['rows'][0]['invalidation_price'],265)
+        self.assertEqual(result['candidates'],[])
+        self.assertEqual(json.dumps(source,sort_keys=True),original)
+        source['candidates']=[]
+        self.assertTrue(packet(source,'2026-11-19T15:01:00Z')['iwm_control']['missing'])
