@@ -148,3 +148,37 @@ commit `2eb2fd36cbdd53681a1a2969741856bb327a063a`, passed
 and [phone/desktop recovery plus Worker dry run 44774751882](https://github.com/Carooch62/0dte-options-command-center/actions/runs/44774751882).
 Those checks use synthetic broker responses. The review is not deployed and
 does not establish hosted owner authorization, token renewal or live acceptance.
+
+## November 20 PR155 released — owner acceptance pending
+
+This release status supersedes the review-only state above. [PR155](https://github.com/Carooch62/0dte-options-command-center/pull/155)
+merged as `31aec9952f7743a845c26c302e0d05101bef785f`.
+Latest-head [scanner/dashboard CI 44775253503](https://github.com/Carooch62/0dte-options-command-center/actions/runs/44775253503)
+and [mobile/recovery QA 44775253499](https://github.com/Carooch62/0dte-options-command-center/actions/runs/44775253499)
+passed using synthetic broker responses.
+[Worker deployment 44775631361](https://github.com/Carooch62/0dte-options-command-center/actions/runs/44775631361)
+succeeded at 2026-11-20T16:40:33Z, version
+`2b146a53-0d62-4c0c-8bbe-ed8354f85949`. Its setup check confirmed protected
+routes and existing connection configuration; no bindings or connection flag
+were changed. No hosted quote success or token renewal is inferred.
+
+Normal [scan 44775631463](https://github.com/Carooch62/0dte-options-command-center/actions/runs/44775631463)
+succeeded and published both research identity files in commit `73f24aa`.
+The preserved source generation clock is 2026-11-20T16:40:34.691729Z;
+publication push completed at 16:41:49Z, not at the source generation clock.
+The same-day batch retains 18 of 21 research identities; the 1–7-day batch
+retains all four. Both explicitly have zero qualifying contracts and no
+eligibility effect. These are public-source identities, not broker quote results.
+
+U01/U05 next owner action: in the authorized private Quotes session, open
+Missing-delta recovery, select same-day, load the research batch, then explicitly
+match and fetch; repeat for 1–7-day and retain private exports. Verify exact
+identity, age, book and Greeks; preserve any website authorization failure.
+The current branch-preview configuration has no private broker connection, so
+use the existing owner-protected site. Do not copy private bindings to previews.
+This release makes that check newly actionable; suppress repeated reminders
+until evidence changes. U01 5/10/15 clocks, >=20 passing quotes over two OPEN
+sessions and actual rotating-token renewal remain independently outstanding.
+U02 fees/net, U03/U04 prospective evidence, U06 actual open-position Discord
+receipt and the queued Pages/Cloudflare infrastructure work remain unchanged.
+No public eligibility, scores or live alert activation changed.
