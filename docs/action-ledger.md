@@ -1,6 +1,6 @@
 # Stock project action ledger
 
-Updated November 18, 2026. This is the canonical follow-up ledger. A passed test,
+Updated November 19, 2026. This is the canonical follow-up ledger. A passed test,
 merged PR, deployed feature and verified market-hours operation are different
 states. Keep source/PR, release, live evidence, blocker and next action together.
 Never publish private account/quote/credential records here.
@@ -12,10 +12,10 @@ Never publish private account/quote/credential records here.
 | A03 | Unknown freshness QC | DEPLOYED via PR137. Boundary now requires RECENT; normalized pipeline and call/put regression cases checked. |
 | A04 | Canonical dashboard and evidence export | RELEASED via PR137. Root/dashboard aliases select Liquid; private export has explicit UTC date control. Legacy glass/v2 remain available for rollback, not current feature parity. |
 | A05 | Equal-budget news coverage | INSTALLED in supported staging via PR138. TOP50 vs TOP40_ROTATE10 only behind isolated staging marker; prospective multi-session comparison outstanding. |
-| A06 | Final delayed-bar collection | INSTALLED via PR137. Separate calendar-aware capture workflow; verify real normal/early-close output, completeness and review addendum. |
+| A06 | Final delayed-bar collection | RELEASED via PR148. Recovered November 19 201/201 stock final bars at the actual late collection time. Bounded late recovery and visible partial/source failures installed; normal/early-close scheduled operation remains an independent acceptance check. |
 | A07 | Pattern/RVOL/1–2pm research | RELEASED research collection via PR137/PR138. Source-bar session labels and frozen public controls retained; event days unknown without calendar evidence. No production boost. See research-experiment-plan.md. |
-| A08 | Quote capture/renewal | BLOCKED LIVE EVIDENCE: exact current option, 5/10/15 windows and real rotating-token renewal still required in authorized Safari. Equity export is not this evidence. |
-| A09 | Saved-watch and Discord | Code exists; BLOCKED LIVE EVIDENCE: owner save/server sync, qualifying transition, delivery and retry/dedup checks. Signals remain off. |
+| A08 | Quote capture/renewal | Auto-refresh and private plans RELEASED via PR147; private clock/latency export implemented in the follow-up release. BLOCKED LIVE EVIDENCE: exact current option, 5/10/15 windows and real rotating-token renewal still required in authorized Safari. Equity export is not this evidence. |
+| A09 | Saved-watch and Discord | PR147 added separately opted-in private position checkpoint alerts (five-minute checks); this does not enable the saved-watch signal system. BLOCKED LIVE EVIDENCE: owner save/server sync, qualifying transition, delivery and retry/dedup checks. Signals remain off. |
 | A10 | Fill lookup | BLOCKED PROVIDER: hosted authorization and exact authorized account/schema. Manual fill/exit journal previously released; lookup remains off. |
 | A11 | Speed acceptance / one-minute cadence | Existing optimizations released; comparable quote p50/p95 across >=20 successful requests and >=2 open sessions outstanding. Measure runner/checkout/pipeline/publish separately. FAST_SCAN stays off. |
 | A12 | Scoring / early first-hour hypotheses | DEFERRED EVIDENCE: fixed/adaptive components, reviewed provenance and chronological holdout. Existing 12-bar rule preserved. |
@@ -47,9 +47,26 @@ Staging run [44431882173](https://github.com/Carooch62/0dte-options-command-cent
 correctly skipped collection outside the regular session, without publishing new
 evidence. That is a calendar-gate check, not successful market-hours collection.
 
-No production alert, fill or scan-cadence flags were changed. Verified alerts,
-automatic fill lookup and fast scans remain off; quote pilot remains on.
+PR137 did not change production alert, fill or scan-cadence flags. PR147 subsequently released the separately opted-in private position monitor; no actual active position or successful Discord receipt is inferred. Automatic fill lookup, saved-watch verified signals and fast scans remain gated; quote pilot remains on.
 Actual authorization, renewal, market-hours capture and multi-session strategy
 evidence remain open. Deployment does not satisfy those gates.
 
 Pages deployment [44431765568](https://github.com/Carooch62/0dte-options-command-center/actions/runs/44431765568) succeeded for the released code. The earlier Pages run was superseded by the scanner data commit, not a code-build failure.
+
+
+## Current upgrade queue and unblock conditions
+
+This table supersedes older implementation summaries above; live evidence remains independent of deployment. See upgrade-acceptance.md for exact acceptance steps.
+
+| ID | Current work | Resume when | Acceptance / next action |
+| --- | --- | --- | --- |
+| U01 | Private quote export and request metrics implemented; market acceptance pending | Exchange OPEN, owner can access the private dashboard, exact current contract | Retain/export 5/10/15-minute windows; at least 20 passing quotes over two sessions for comparable speed; actual rotating-token renewal separately observed. |
+| U02 | Private fill reconciliation prepared; actual reconciliation blocked | Exact authorized broker execution records, position quantity, and fee evidence available | Compare exact contract, times, partial fills and later sells; do not infer missing fees/net P&L or import ambiguous fills. |
+| U03 | IWM 15/30/60-minute stock-only matcher and scheduled staging report implemented | Five coverage-eligible prospective sessions under iwm-control-v1 | Review report coverage, arm/direction/time-of-day confounding and frozen catalyst/pattern context. Missing horizons stay missing; no automatic tuning. |
+| U04 | Catalyst, pattern and afternoon scoring improvements deferred | U03 and existing equal-budget news / pattern cohorts have reviewed multi-session evidence | Propose versioned hypotheses, use held-out sessions, preserve risk/liquidity gates and perform explicit production review. |
+| U05 | Quote status/latency/export visibility implemented; broader UI follow-up evidence-gated | Owner market-hours acceptance identifies a specific usability gap | Verify phone layout, quote age, selected contract, active versus paused plans and connection state; do not describe an enabled setting as verified delivery. |
+| U06 | Background position delivery operational check blocked | Actual open position, current passing exact-contract quote, reviewed levels, owner TEST ONLY receipt | Verify trigger crossing, deduplication and pause/retry behavior. Do not enable old closed positions or inject synthetic market data into production. |
+
+Blocked work must retain its ID, exact prerequisite, owner/session requirement and evidence needed. Recheck the queue independently of whether a new closing review was posted. Do not create duplicate trading/exit monitors. A future follow-up may implement authorized small fixes and produce review PRs; algorithm promotion and live alert activation retain their separate evidence requirements.
+
+A dedicated conditional follow-up now rechecks this queue hourly on weekdays during New York business/trading hours, separately from Closing Review Follow-up. It resumes supported work or reports a newly required owner action, suppressing duplicate notifications. The calendar and actual evidence, not the scheduled check alone, determine readiness.

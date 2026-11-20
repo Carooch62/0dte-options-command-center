@@ -13,6 +13,7 @@ const assets = [
   "dashboard_liquid.html",
   "dashboard-clean-app.js",
   "dashboard-option-quotes.js",
+  "dashboard-quote-validation.js",
   "quote-poller.js",
   "dashboard-position-plans.js",
   "trade-exit-assistant.js",
