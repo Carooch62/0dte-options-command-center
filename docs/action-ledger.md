@@ -217,3 +217,15 @@ configuration/activation, comparable real publishing timing and actual Cloudflar
 preview build logs/settings remain queued. The available GitHub interface cannot
 read Pages configuration; no cause is inferred for Cloudflare's separate build
 status and no working deployment gate is weakened.
+
+
+### PR157 CI follow-up
+
+[Scanner/dashboard verification 44788750182](https://github.com/Carooch62/0dte-options-command-center/actions/runs/44788750182)
+passed on the initial review head. [Candidate Mobile QA 44788750645](https://github.com/Carooch62/0dte-options-command-center/actions/runs/44788750645)
+failed because the setup link label had changed from “Open” to “open”, breaking
+the existing exact accessible-name assertion at scripts/test-candidate-mobile.mjs:160.
+The follow-up restores the established accessible label while retaining conditional
+guidance. The browser assertion and deployment gates are unchanged. All 30 panel
+tests still pass locally; latest-head browser CI must pass independently. The
+change remains in PR157, not deployed. No acceptance gate or owner reminder changes.
