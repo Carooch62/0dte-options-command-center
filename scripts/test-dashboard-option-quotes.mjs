@@ -1,6 +1,6 @@
 import {readFile} from 'node:fs/promises';import {createRequire} from 'node:module';import assert from 'node:assert/strict';
 const {chromium}=createRequire(import.meta.url)('playwright');
-const files=new Set(['dashboard_liquid.html','dashboard-clean-app.js','dashboard-option-quotes.js','quote-poller.js','dashboard-position-plans.js','coverage-report.js','dashboard-logic.js','dashboard-delivery.js','dashboard-mobile.css','connection-ui.css','trade-review.js','signal-checklist.js','refresh-progress.js','contract-watch.js','trade-exit-assistant.js','exit-benchmarks.js','candidate-quotes.js','private-request.js','robinhood-review.js','quote-timing.js']);
+const files=new Set(['dashboard_liquid.html','dashboard-clean-app.js','dashboard-option-quotes.js','dashboard-quote-validation.js','quote-poller.js','dashboard-position-plans.js','coverage-report.js','dashboard-logic.js','dashboard-delivery.js','dashboard-mobile.css','connection-ui.css','trade-review.js','signal-checklist.js','refresh-progress.js','contract-watch.js','trade-exit-assistant.js','exit-benchmarks.js','candidate-quotes.js','private-request.js','robinhood-review.js','quote-timing.js']);
 const origin='https://0dte-options-command-center.h69htk56cq.workers.dev',stamp='2026-11-19T18:00:00Z',id='22222222-2222-4222-8222-222222222222';
 const option={contract_id:'TEST261120C00100000',expiry:'2026-11-20',side:'call',strike:100,bid:.19,ask:.20,delta:.4,delta_verified:true,quote_valid:true,delta_ok:true,tight_spread:true,near_atm:true,expiry_verified:true,volume:100,spread:.01,spread_pct:5,distance_pct:1};
 const contract={ticker:'TEST',contract_id:option.contract_id,expiry:option.expiry,side:option.side,strike:option.strike};
@@ -44,6 +44,8 @@ try{for(const width of [390,1280]){
  assert.match(await page.locator('#privateOptionQuote [data-quote-fills]').innerText(),/profit-review \$0.270/);
  assert.deepEqual(calls,['resolve','quotes']);assert.match(await page.locator('#privateOptionQuote tbody').innerText(),/0.190.*0.200.*0.195/s);
  assert.equal(await page.locator('#privateOptionQuote a').getAttribute('href'),'candidate-quotes.html');
+ await page.getByText('Private quote validation',{exact:true}).click();
+ const downloaded=page.waitForEvent('download');await page.getByRole('button',{name:'Export private quote validation',exact:true}).click();const exportPath=await (await downloaded).path();const evidence=JSON.parse(await readFile(exportPath,'utf8'));assert.equal(evidence.passing_open_quotes,1);assert.equal(evidence.token_renewal_status,'NOT_VERIFIED');assert.ok(!JSON.stringify(evidence).includes('bid_price'));
  await page.clock.fastForward(61000);await page.locator('#privateOptionQuote [role=status]').filter({hasText:'STALE QUOTE'}).waitFor();assert.deepEqual(calls,['resolve','quotes']);
  failure=true;await page.getByRole('button',{name:'Refresh Robinhood quote',exact:true}).click();
  await page.locator('#privateOptionQuote [role=status]').filter({hasText:'sign-in required'}).waitFor();assert.equal(await page.locator('#privateOptionQuote tbody').count(),0);
