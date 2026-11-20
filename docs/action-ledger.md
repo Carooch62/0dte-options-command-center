@@ -182,3 +182,50 @@ sessions and actual rotating-token renewal remain independently outstanding.
 U02 fees/net, U03/U04 prospective evidence, U06 actual open-position Discord
 receipt and the queued Pages/Cloudflare infrastructure work remain unchanged.
 No public eligibility, scores or live alert activation changed.
+
+## November 20 connection guidance — unblock review
+
+U05 has a concrete status-copy gap: the candidate quote page can show a successful
+request beside unconditional instructions to sign in again. The review change
+makes setup guidance conditional on a request requiring sign-in or renewal,
+acknowledges a quote request completed in this visit, and preserves an explicitly
+checked connection status. Restored requests do not become new live verification.
+Later failures remain visible and retry remains manual. The panel asset version
+changes so the updated copy is fetched.
+
+Local verification: all 30 candidate quote panel tests pass, including new
+success/status/failure/reload regressions; panel syntax check passes. These are
+synthetic tests. This change is review-only, not deployed or owner accepted.
+No private evidence, contracts, quote values, execution records or identifiers
+are included in this review. Remaining owner evidence is reviewed privately;
+U01's two-session speed and actual rotating-token renewal gates remain open.
+A successful request does not establish renewal, setup eligibility or delivery.
+
+U02 reconciliation remains complete privately; fees/net results remain unknown.
+U03's current iwm-control-v1 report on staging-next-20261117 still reports zero
+coverage-eligible sessions (report checked_at 2026-11-20T03:34:29.517948+00:00).
+U04 remains evidence-gated; U06 still requires actual open-position delivery
+acceptance. No prior owner reminder is repeated by this update.
+
+The [official NYSE calendar](https://www.nyse.com/markets/hours-calendars)
+confirms November 20 is a regular 09:30–16:00 ET cash-equity session,
+November 26 is closed and November 27 closes at 13:00 ET. Eligible options'
+13:15 early close is a separate product rule, not an extra XNYS stock horizon.
+Existing collectors/scans continue without a dispatch, cancellation or data rewrite.
+PR152 remains complete. Historical Pages URL compatibility, Pages source
+configuration/activation, comparable real publishing timing and actual Cloudflare
+preview build logs/settings remain queued. The available GitHub interface cannot
+read Pages configuration; no cause is inferred for Cloudflare's separate build
+status and no working deployment gate is weakened.
+
+
+### PR157 CI follow-up
+
+[Scanner/dashboard verification 44788750182](https://github.com/Carooch62/0dte-options-command-center/actions/runs/44788750182)
+passed on the initial review head. [Candidate Mobile QA 44788750645](https://github.com/Carooch62/0dte-options-command-center/actions/runs/44788750645)
+failed because the setup link label had changed from “Open” to “open”, breaking
+the existing exact accessible-name assertion at scripts/test-candidate-mobile.mjs:160.
+The follow-up restores the established accessible label while retaining conditional
+guidance. The browser assertion and deployment gates are unchanged. All 30 panel
+tests still pass locally; latest-head browser CI must pass independently. The
+change remains in PR157, not deployed. No acceptance gate or owner reminder changes.

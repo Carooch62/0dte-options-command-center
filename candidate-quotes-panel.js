@@ -7,14 +7,17 @@ import {quoteRequestTiming} from './quote-timing.js';
 import {requestJSON,safeRequestAttempts} from './private-request.js?v=20261120-private-recovery';
 const $=id=>document.getElementById(id);
 const failure=e=>e.message;
-let attempts=[],retryPath=null;
+let attempts=[],retryPath=null,authorizationChecked=false;
 async function readPrivate(path,body){
  const operation=path.split('?')[0];
  const started=performance.now(),started_at=new Date().toISOString();let code='SUCCESS',http_status=null;
  try{
   const d=await requestJSON('/private/plaid/robinhood/'+path,{method:body?'POST':'GET',...(body?{headers:{'Content-Type':'application/json','X-Requested-With':'RobinhoodQuotes'},body:JSON.stringify(body)}:{})},path==='resolve'?120000:30000);
   retryPath=null;$('connection-state').textContent=`Private service reached: ${['candidates','recovery-candidates'].includes(operation)?'scanner batch':path==='quotes'?'quote request':path==='resolve'?'contract matching':'connection status'}.`;
-  if(path==='quotes')d.request_timing=quoteRequestTiming({...d.request_timing,browser_ms:performance.now()-started});
+  if(path==='quotes'){
+   d.request_timing=quoteRequestTiming({...d.request_timing,browser_ms:performance.now()-started});
+   if(!authorizationChecked)$('authorization-state').textContent='A quote request succeeded in this visit. Stored authorization expiry and rotating-token renewal have not been checked.';
+  }
   return d;
  }catch(e){code=e.code||'INVALID_RESPONSE';http_status=e.status??null;retryPath=path;$('connection-state').textContent=`${['candidates','recovery-candidates'].includes(operation)?'Scanner batch could not be loaded. ':''}${e.message}`;throw e;}
  finally{attempts=safeRequestAttempts([...attempts,{operation,code,http_status,started_at,finished_at:new Date().toISOString(),browser_ms:performance.now()-started}]);}
@@ -169,7 +172,7 @@ $('refresh').onclick=async()=>{
  return $('refresh').onclick();
  };
  $('verified-only').onchange=render;
- $('check-connection').onclick=async()=>{if(busy)return;busy=true;render();$('authorization-state').textContent='Checking private connection status…';$('connection-state').textContent='Checking private access and stored Robinhood authorization…';$('status').textContent='Checking connection status…';try{const d=await readPrivate('status');$('authorization-state').textContent=d.connected?`Authorized until ${d.expires_at}. This is separate from a successful quote request.`:'Robinhood authorization is inactive. Open Connections to connect or renew.';$('status').textContent='Connection status checked. Batch loading and quote checks are separate.';}catch(e){$('authorization-state').textContent='Authorization could not be checked; the previous stored connection may still be active.';$('status').textContent=failure(e);}finally{busy=false;persist();render();}};
+ $('check-connection').onclick=async()=>{if(busy)return;busy=true;render();$('authorization-state').textContent='Checking private connection status…';$('connection-state').textContent='Checking private access and stored Robinhood authorization…';$('status').textContent='Checking connection status…';try{const d=await readPrivate('status');authorizationChecked=true;$('authorization-state').textContent=d.connected?`Authorized until ${d.expires_at}. This is separate from a successful quote request.`:'Robinhood authorization is inactive. Open Connections to connect or renew.';$('status').textContent='Connection status checked. Batch loading and quote checks are separate.';}catch(e){$('authorization-state').textContent='Authorization could not be checked; the previous stored connection may still be active.';$('status').textContent=failure(e);}finally{busy=false;persist();render();}};
  $('retry-request').onclick=()=>{const id={status:'check-connection',candidates:'load-current','recovery-candidates':'load-recovery',resolve:'resolve',quotes:'refresh'}[retryPath?.split('?')[0]];if(!busy&&id)return $(id).onclick();};
  $('clear-session').onclick=()=>{if(busy||!mayReplace())return;scanner=null;observations=[];evidenceHistory=[];attempts=[];retryPath=null;persist();render();$('status').textContent='Session cleared in this tab. Exported files are unchanged.';};
  render();
@@ -195,3 +198,4 @@ $('export-review-quotes').onclick=()=>{
   $('status').textContent='Private quote-only snapshot exported. Import into Connections after a full order snapshot to preserve your fills.';
  }catch(e){$('status').textContent='Quote-only export failed: '+e.message;}
 };
+
