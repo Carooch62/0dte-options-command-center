@@ -96,3 +96,27 @@ concurrency, scan budget, scores, eligibility and alerts are unchanged. U01/U06
 owner acceptance and U03/U04 prospective evidence gates remain open. PR152
 packaging is complete; Pages activation/compatibility, comparable publish timing
 and actual Cloudflare preview diagnostics remain queued.
+
+## November 20 empty candidate board diagnosis — review pending
+
+Public scan `4140bb62-a804-4f6e-8716-9b0857045ed9`, generated at
+2026-11-20T16:05:18.343537Z, contains 198 stock rows (45 non-PASS states),
+but no eligible same-day or 1–7-day contracts. Its new provider diagnostics
+record 71 Cboe HTTP 403 failures; the Nasdaq fallback succeeds for 69 symbols
+but supplies no verified Greeks. All 12,594 same-day option observations lack
+verified delta. This is one observed snapshot, not a claim about every scan
+today, nor evidence that no suitable contracts exist in the market.
+
+The Display setting is saved on each device. Matching contracts only can hide
+every stock when no option passes; the owner's actual saved settings remain
+unobserved. The review fix adds a board-level stock/matching-contract count,
+explicit missing-delta context and a matching-only recovery explanation. It
+versions the changed coverage helper to avoid reusing its old cached exports.
+No source access workaround, fabricated Greeks or relaxed eligibility is added.
+
+Local verification: 324 Node tests, syntax, asset build and diff checks pass.
+Phone/desktop browser coverage is added for both expiry views, saved matching-only
+filters, All stocks recovery and an old unversioned dependency. Local Chromium
+is blocked by the runtime socket restriction; browser CI remains independent.
+Changes remain review-only; actual source recovery and owner-session acceptance
+are still outstanding. No private data or production flags change.

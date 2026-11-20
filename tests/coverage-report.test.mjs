@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {coverageReport} from '../coverage-report.js';
+import {coverageReport,boardAvailability} from '../coverage-report.js';
 
 test('reports attempted coverage and limits missed-candidate conclusions', () => {
   assert.deepEqual(coverageReport({chains_attempted: 76, chains_not_attempted: 130}), {
@@ -23,4 +23,15 @@ test('source gaps identify missing stocks and bounded failed symbols without inf
   assert.equal(sourceGaps({stocks_received:200,stocks_configured:205},[{ticker:'XLU',chain_status:'SOURCE_FAILURE'},{ticker:'IWM',chain_status:'SUCCESS'}]),'Missing stock rows: 5/205. Failed option sources: XLU.');
   assert.equal(sourceGaps({},[]),'');
   assert.match(sourceGaps({},Array.from({length:14},(_,i)=>({ticker:'T'+i,chain_status:'SOURCE_FAILURE'}))),/\(\+2 more\)/);
+});
+
+test('empty board distinguishes missing delta data, no chains and filter exclusions', () => {
+  const unverified={side:'call',delta:0,greeks_verified:false};
+  assert.match(boardAvailability([{options:[unverified]},{options:[]}],0),/2 stock rows loaded.*None of the 1 returned contracts has verified delta/);
+  assert.match(boardAvailability([{options:[]}],0),/No option contracts were returned/);
+  assert.match(boardAvailability([],0),/availability is unknown/);
+  const verified={side:'call',delta:.4,delta_verified:true};
+  assert.match(boardAvailability([{options:[verified]}],0),/do not pass all selected filters/);
+  assert.doesNotMatch(boardAvailability([{options:[verified]}],1),/blocked|missing provider/);
+  for(const o of [{...verified,delta:0},{...verified,delta:2},{...verified,delta_verified:false,greeks_verified:true}])assert.match(boardAvailability([{options:[o]}],0),/None of the 1 returned/);
 });
