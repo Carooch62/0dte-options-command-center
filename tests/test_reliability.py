@@ -144,8 +144,8 @@ class ReliabilityTests(unittest.TestCase):
     def test_source_failure_is_not_no_expiry(self):
         with patch.object(scanner,'fetch_cboe',side_effect=ValueError()),patch.object(scanner,'nasdaq_options',side_effect=ValueError()):
             self.assertEqual(scanner.options('TEST')['status'],'SOURCE_FAILURE')
-        with patch.object(scanner,'fetch_cboe',return_value={'contracts':[],'status':'NO_EXPIRATION_TODAY'}),patch.object(scanner,'nasdaq_options') as fallback:
-            self.assertEqual(scanner.options('TEST')['status'],'NO_EXPIRATION_TODAY');fallback.assert_not_called()
+        with patch.object(scanner,'fetch_cboe') as unsupported,patch.object(scanner,'nasdaq_options',return_value={'contracts':[],'status':'EMPTY_UNVERIFIED'}):
+            self.assertEqual(scanner.options('TEST')['status'],'EMPTY_UNVERIFIED');unsupported.assert_not_called()
     def test_retry_only_transient_errors(self):
         import requests
         r=requests.Response();r.status_code=429

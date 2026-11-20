@@ -21,7 +21,7 @@ export async function requestJSON(url,options={},timeoutMs=20000,fetcher=fetch){
   return data;
  })()]);}finally{clearTimeout(timer);}
 }
-const operations=new Set(['status','candidates','resolve','quotes']);
+const operations=new Set(['status','candidates','recovery-candidates','resolve','quotes']);
 const codes=new Set(['SUCCESS','TIMEOUT','NETWORK','SIGN_IN','AUTHORIZATION','SETUP','ACCESS_DENIED','SERVICE','REQUEST','INVALID_RESPONSE']);
 export function safeRequestAttempts(attempts){
  return (Array.isArray(attempts)?attempts:[]).slice(-200).filter(x=>operations.has(x?.operation)&&codes.has(x.code)&&Number.isFinite(Date.parse(x.started_at))&&Number.isFinite(Date.parse(x.finished_at))&&Date.parse(x.finished_at)>=Date.parse(x.started_at)&&Number.isFinite(x.browser_ms)&&x.browser_ms>=0).map(x=>({operation:x.operation,code:x.code,started_at:x.started_at,finished_at:x.finished_at,browser_ms:Math.round(x.browser_ms),http_status:Number.isInteger(x.http_status)&&x.http_status>=100&&x.http_status<=599?x.http_status:null}));
