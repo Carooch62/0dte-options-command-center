@@ -141,3 +141,10 @@ historical-versus-prospective evidence and exact remaining acceptance steps.
 U01/U05 recovery work is review-only. U02 fee/net evidence, U03/U04 prospective
 session gates and U06 actual owner-confirmed delivery remain open. Production
 scores, eligibility, live alert settings and unrelated automations are unchanged.
+
+Review implementation [PR155](https://github.com/Carooch62/0dte-options-command-center/pull/155),
+commit `2eb2fd36cbdd53681a1a2969741856bb327a063a`, passed
+[scanner/dashboard verification 44774751415](https://github.com/Carooch62/0dte-options-command-center/actions/runs/44774751415)
+and [phone/desktop recovery plus Worker dry run 44774751882](https://github.com/Carooch62/0dte-options-command-center/actions/runs/44774751882).
+Those checks use synthetic broker responses. The review is not deployed and
+does not establish hosted owner authorization, token renewal or live acceptance.

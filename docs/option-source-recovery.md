@@ -61,9 +61,12 @@ source generation clock; it is not prospective availability or an option result.
 Local checks pass 188 Python, 330 Node and 18 Worker tests, plus syntax, asset
 build and whitespace checks. Synthetic tests cover both windows, policy
 separation, bounds, failed/invalid sources, exact metadata, private field
-sanitization and Greek conflicts. Browser CI must independently exercise the
-new private workflow; local Chromium is unavailable due to the runtime socket
-restriction. No live acceptance is inferred from tests.
+sanitization and Greek conflicts. Browser CI
+[44774751882](https://github.com/Carooch62/0dte-options-command-center/actions/runs/44774751882)
+passed the existing phone suite, new phone/desktop private recovery flow and
+Worker dry run for implementation `2eb2fd36cbdd53681a1a2969741856bb327a063a`.
+Local Chromium is unavailable due to the runtime socket restriction. No live
+acceptance is inferred from synthetic tests or the separate chat capability check.
 
 After review and a supported staging deployment, the owner uses the authorized
 private Quotes page: open Missing-delta recovery, choose one window, load the
