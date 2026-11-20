@@ -410,6 +410,19 @@ function setupCleanLayout(){
  }
  const journalLink=document.querySelector('.clean-nav [href="#cleanJournal"]');if(journalLink)journalLink.onclick=()=>{$('cleanJournal').open=true;};
  const changes=$('changes').closest('section');changes.id='cleanChanges';
+ for(const id of ['earlyWatchPanel','laterExpiryShadowPanel','contractWatchPanel','cleanChanges']){
+  const section=$(id),heading=section.querySelector('h2'),details=document.createElement('details'),summary=document.createElement('summary');
+  details.className='clean-secondary';details.open=read('0dteSectionOpen:'+id,false)===true;
+  summary.textContent=heading.textContent;summary.style.cssText='font-size:18px;font-weight:650;min-height:44px;cursor:pointer';
+  heading.remove();details.append(summary);
+  while(section.firstChild)details.append(section.firstChild);
+  section.append(details);
+  details.addEventListener('toggle',()=>save('0dteSectionOpen:'+id,details.open));
+  const reveal=()=>{if(location.hash==='#'+id)details.open=true;};
+  window.addEventListener('hashchange',reveal);reveal();
+  for(const link of document.querySelectorAll('a[href="#'+id+'"]'))link.addEventListener('click',()=>{details.open=true;});
+ }
+
 }
 setupCleanLayout();
 attachTradeExitAssistant({board:$('board'),journal:$('journal'),getSnapshot:()=>data});
