@@ -72,3 +72,27 @@ Blocked work must retain its ID, exact prerequisite, owner/session requirement a
 A dedicated conditional follow-up now rechecks this queue hourly on weekdays during New York business/trading hours, separately from Closing Review Follow-up. It resumes supported work or reports a newly required owner action, suppressing duplicate notifications. The calendar and actual evidence, not the scheduled check alone, determine readiness.
 
 Follow-up release: [PR150](https://github.com/Carooch62/0dte-options-command-center/pull/150) merged quote-validation export, the IWM stock outcome matcher/scheduled report and this unblock queue. Verification passed 186 Python, 317 Node and 18 Worker tests plus phone/desktop browser suites and Worker dry run. [Worker deployment 44668572840](https://github.com/Carooch62/0dte-options-command-center/actions/runs/44668572840) and [isolated IWM review 44668598111](https://github.com/Carooch62/0dte-options-command-center/actions/runs/44668598111) succeeded. The initial report correctly waits for five covered sessions; no live quote/alert acceptance is implied. Broker read access was checked independently: executable record retrieval is possible now, while fees and hosted autofill remain separate prerequisites. No private reconciliation details are stored here.
+
+## November 20 dashboard/scanner quality follow-up — review pending
+
+The checked public snapshot `816d0728-5008-4080-aee3-2e7423cfc768` received
+200/205 stock rows and 72/75 successful option-chain requests; core ETFs were
+present. The 61,704 ms pipeline included 46,095 ms of option expansion. These
+are one-scan measurements, not a provider latency benchmark or a proven speedup.
+
+A focused review branch corrects the collapsed filter summary (the default
+ACTIVE view previously said “All candidates”), makes All stocks select all
+states, names stock-count gaps and failed chain symbols, and treats failed or
+unverified chains as incomplete even when every planned chain was attempted.
+Sanitized per-provider durations, error categories and HTTP status codes are
+retained with new public chain observations; older observations remain unknown.
+No response bodies, URLs, credentials or private account records are collected.
+
+Local verification: 188 Python and 323 Node tests pass; browser asset build,
+syntax and diff checks pass. Phone/desktop browser assertions are extended in
+the existing Contract Watch QA suite; its CI outcome is independent of local
+unit tests. Review changes are not deployed or live accepted. Provider retries,
+concurrency, scan budget, scores, eligibility and alerts are unchanged. U01/U06
+owner acceptance and U03/U04 prospective evidence gates remain open. PR152
+packaging is complete; Pages activation/compatibility, comparable publish timing
+and actual Cloudflare preview diagnostics remain queued.

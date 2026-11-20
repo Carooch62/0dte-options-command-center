@@ -34,6 +34,11 @@ try{
  await page.route('https://**/*',route=>route.request().url().includes('/health')?route.fulfill({json:{latestRun:null}}):route.abort());
  await page.goto(`http://127.0.0.1:${server.address().port}/index.html`);
  await page.waitForURL('**/dashboard_liquid.html');
+ assert.match(await page.locator('#filterSummary').innerText(),/Watch states/);
+ await page.locator('#allStocks').click();
+ assert.equal(await page.locator('#state').inputValue(),'ALL');
+ assert.match(await page.locator('#filterSummary').innerText(),/All states, including SKIP/);
+ await page.locator('#state').selectOption('ACTIVE');
  for(const id of ['earlyWatchPanel','laterExpiryShadowPanel','contractWatchPanel','cleanChanges']){
   const disclosure=page.locator('#'+id+' > details');assert.equal(await disclosure.evaluate(el=>el.open),false);
   await disclosure.locator(':scope > summary').click();assert.equal(await disclosure.evaluate(el=>el.open),true);
