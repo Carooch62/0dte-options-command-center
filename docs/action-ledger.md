@@ -211,3 +211,15 @@ can be compared with the successful preview. It retains unknown outcomes when
 an explicit build is absent from recent history and validates IDs before requests.
 Five synthetic tests pass; historical log inspection remains pending a live run.
 No root cause, recovery date or production configuration fix is inferred.
+
+## November 20 closing-session review — corrected final-bar state
+
+The completed November 20 review was processed once. A later separate public capture now exists: `data/closing-evidence/2026-11-20.json` reports FINAL_BARS_CAPTURED, 197/197 final stock bars, `collection_mode=LATE_RECOVERY`, source scan generated `2026-11-20T20:57:31.771326Z`, and actual collection at `2026-11-20T23:11:54.472506Z` (131.91 minutes after the 21:00Z close). The late collection is outcome-only; it must never count as an available pre-entry quote, catalyst or bar. Provider revisions remain possible. No private account/trade records are published here. This corrects the earlier missing-capture statement in superseded PR158. No production scores, eligibility or alerts changed.
+
+## November 23 closing-session follow-up — review only
+
+The completed November 23 closing review was processed once. No session-specific algorithm or code change is supported. The latest public scan receipt was generated `2026-11-23T20:57:26.492257Z`, before the 21:00Z regular close. `data/scan-health.json` marked it DEGRADED: 198/202 stock rows, 14 successful chains, 56 EMPTY_UNVERIFIED chains and 2 SOURCE_FAILURE chains. Public same-day/one-week recovery identity files each report zero qualifying contracts; these are research-only identities, not live broker-verified option quotes or proof that no suitable market contracts existed. `data/closing-evidence/2026-11-23.json` was absent at this follow-up check, so final-bar outcomes and missed/false-signal assessment remain incomplete.
+
+The supported `staging-next-20261117` receipt list still ends with an OPEN packet generated `2026-11-19T19:05:24.749682Z`; no November 23 market-hours packet is present there. A schedule or prior off-hours skip does not satisfy fresh collection acceptance. Private 5/10/15-minute exact-contract quote windows, host authorization/renewal and delivery checks remain independent from public 5/15/30-minute stock outcomes. U01/U05 and U03/U04 remain evidence-gated; the November 23 diagnostics work concerns a separate Cloudflare preview check, not proof of a failed GitHub Worker deployment. No private account, execution, fee, quote or credential details are recorded here.
+
+Status: ledger change prepared in a review PR only. No production or live-verified feature is implied. Next: inspect the separate November 23 closing capture with its actual source/collection clocks when available; verify a fresh supported staging OPEN packet and owner-authorized private quote evidence before any promotion. Keep frozen controls and require multiple covered sessions, shadow/backtest validation and explicit review for strategy changes.
