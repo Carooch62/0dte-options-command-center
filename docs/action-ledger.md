@@ -229,3 +229,53 @@ The follow-up restores the established accessible label while retaining conditio
 guidance. The browser assertion and deployment gates are unchanged. All 30 panel
 tests still pass locally; latest-head browser CI must pass independently. The
 change remains in PR157, not deployed. No acceptance gate or owner reminder changes.
+
+## November 23 independent unblock check — review only
+
+Rechecked main and the private reconciliation case without repeating the closing
+review or importing private records. U02 execution/quantity reconciliation stays
+complete; fee evidence and net results remain outstanding. No later evidence is
+backdated to its scan-generation clock.
+
+The prospective `iwm-control-v1` report on `staging-next-20261117`, blob
+`f327f7d9a7929779f01b5cbeeef24e88476278e4`, was checked at
+2026-11-21T00:13:46.801395+00:00 and still reports zero coverage-eligible
+sessions, no sessions/results and WAITING_FOR_FIVE_COVERED_SESSIONS. U03/U04
+remain gated; retrospective source manifests are not substituted. Existing
+workflows may collect prospective inputs without manual dispatch or cancellation.
+
+U01's owner-session 5/10/15 clocks, 20 passing quotes across two OPEN sessions
+and actual rotating-token renewal remain unverified. U06 still needs an actual
+open-position checkpoint and owner-confirmed Discord acceptance. Previously
+recorded owner actions are unchanged and are not repeated. U05's connection-copy
+fix remains in PR157; refreshing it with current main preserves its scope.
+Prior head `c05a4c592c323a1cfd0ad75f69382980a625233a` passed
+[verification 44794779907](https://github.com/Carooch62/0dte-options-command-center/actions/runs/44794779907)
+and [mobile QA 44794779896](https://github.com/Carooch62/0dte-options-command-center/actions/runs/44794779896).
+Those are synthetic checks, not deployment or owner acceptance.
+
+The [official XNYS calendar](https://www.nyse.com/markets/hours-calendars)
+confirms November 23–25 regular 09:30–16:00 ET stock sessions, November 26
+closed and November 27 closing at 13:00 ET. Eligible options' 13:15 close does
+not extend the stock-only outcome window. Session availability alone does not
+supply any missing quote, research or delivery evidence.
+
+A fresh actual Pages baseline is available from
+[run 45189596751](https://github.com/Carooch62/0dte-options-command-center/actions/runs/45189596751),
+source `e6a7a01aefbfe6bb06957f8c295d65ebfb45b90b`: Checkout
+14:00:45–14:03:13Z (148 s), Jekyll build 14:03:13–14:03:24Z (11 s),
+upload 14:03:24–14:03:41Z (17 s), deploy 14:03:50–14:04:16Z (26 s),
+on November 23. Build and deploy use distinct GitHub-hosted runner instances.
+This is the existing publishing path, not a candidate comparison or proven
+speedup. PR152 packaging/offline analysis stay complete. Historical Pages URL
+compatibility, source configuration/activation and comparable candidate publishing
+remain queued. Actual Cloudflare preview logs/settings are still unavailable
+through the connected interface; no cause is inferred and no deployment gate
+is changed. No private identifiers, quotes, fills or owner-file links are published.
+
+Refresh validation: 188 Python and 332 JavaScript tests pass locally after
+installing the declared Python dependencies; panel syntax, browser asset build
+and diff checks pass. The installed XNYS exchange calendar independently matches
+the official November 23–27 stock-session schedule. Current-head browser CI
+remains independent of these local checks. No code beyond the existing PR157
+connection-guidance change is added by this refresh.
