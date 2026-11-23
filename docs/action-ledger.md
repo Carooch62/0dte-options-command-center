@@ -279,3 +279,42 @@ and diff checks pass. The installed XNYS exchange calendar independently matches
 the official November 23–27 stock-session schedule. Current-head browser CI
 remains independent of these local checks. No code beyond the existing PR157
 connection-guidance change is added by this refresh.
+
+## November 23 Cloudflare build quota evidence and cleanup
+
+Owner-provided dashboard evidence supersedes the unexplained-build status:
+build fb53f6f9 for review head 59417fa is explicitly SKIPPED, and the
+Worker settings report builds paused after all 3,000 included monthly build
+minutes were consumed. The displayed reset is November 30, 2026 at 18:59 EST.
+This establishes the current account quota pause, not a code compilation error
+or proof that every older failed check had the same cause.
+
+The screenshot shows main as production branch, include path `*`, asset build
+command `node scripts/build-assets.mjs`, and deploy command
+`npx wrangler deploy`. The earlier review build shows `npx wrangler preview`.
+No branch-specific private bindings should be copied into previews.
+
+Proposed first cleanup, NOT APPLIED to the account: keep include `*` and
+existing exclusions, add `data/*` and `docs/*` to Cloudflare build watch
+exclusions. The Worker asset allowlist in scripts/build-assets.mjs copies no
+data or documentation; live public data is fetched separately. Thus data-only
+scanner/archive updates and documentation-only changes do not need a Worker
+rebuild. Code, asset, configuration and build-script changes remain eligible
+to trigger builds. Verify the next data-only push skips intentionally and
+a later code change builds after quota availability returns. Cloudflare may
+bypass path matching for empty pushes, 3,000+ changed files or 20+ commits.
+
+Source: https://developers.cloudflare.com/workers/ci-cd/builds/build-watch-paths/
+and https://developers.cloudflare.com/workers/ci-cd/builds/limits-and-pricing/.
+The existing filtered GitHub deploy-worker workflow is a separate production
+delivery path and remains unchanged. No build/check bypass, plan upgrade,
+history/cache purge, runtime setting, secret, storage binding, cron, scan,
+score, eligibility or alert change is made. Keep current production and known
+rollback versions. Removing historical build logs does not reverse consumed
+build time. A consolidation of duplicate production deployment paths requires
+an explicit reviewed configuration decision; do not silently disable either.
+
+Account configuration still needs to be applied and verified in an authorized
+Cloudflare session. The earlier browser sign-in returned 403; a screenshot
+does not grant that browser an authenticated session. The PR records a
+prepared settings cleanup, not a completed account change or production release.
