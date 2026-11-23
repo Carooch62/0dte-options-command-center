@@ -44,11 +44,11 @@ export function validateBatch(s){
  if(s.included_contracts!==contracts.length||!Number.isInteger(s.total_contracts)||s.total_contracts<contracts.length||s.omitted_contracts!==s.total_contracts-contracts.length||s.qualifying_contracts!==s.total_contracts)throw Error('Invalid batch coverage');
  return s;
 }
-export async function readSnapshot(response,limit=65536){
+export async function readSnapshot(response,limit=65536,validate=validateBatch){
  if(!response.ok)throw Error('Current scanner snapshot is unavailable');
  if(Number(response.headers.get('Content-Length'))>limit)throw Error('Scanner snapshot exceeds private loader limit');
  const reader=response.body.getReader(),decoder=new TextDecoder();let size=0,text='';
- try{while(true){const {value,done}=await reader.read();if(done)break;size+=value.byteLength;if(size>limit)throw Error('Scanner snapshot exceeds private loader limit');text+=decoder.decode(value,{stream:true});}text+=decoder.decode();return validateBatch(JSON.parse(text));}finally{await reader.cancel().catch(()=>{});}
+ try{while(true){const {value,done}=await reader.read();if(done)break;size+=value.byteLength;if(size>limit)throw Error('Scanner snapshot exceeds private loader limit');text+=decoder.decode(value,{stream:true});}text+=decoder.decode();return validate(JSON.parse(text));}finally{await reader.cancel().catch(()=>{});}
 }
 export async function resolveContracts(contracts,call){
  const chains=new Map(),results=[],identities=new Map();

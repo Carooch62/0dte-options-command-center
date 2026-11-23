@@ -58,3 +58,15 @@ test('streamlined status legend explains all displayed scanner states without im
  assert.match(legend,/not a live option entry/);
  assert.match(legend,/not a live broker quote/i);
 });
+
+test('All stocks exposes skipped rows and collapsed summary names the actual state filter',()=>{
+ const controls={onlyContracts:{value:'starred'},state:{value:'ACTIVE'}};let persisted=0,rendered=0;
+ const ctx={$:id=>controls[id]||(controls[id]={}),persistFilters:()=>persisted++,render:()=>rendered++};
+ vm.runInNewContext(source.split('\n').find(l=>l.startsWith("$('allStocks').onclick=")),ctx);
+ controls.allStocks.onclick();
+ assert.equal(controls.state.value,'ALL');assert.equal(controls.onlyContracts.value,'all');assert.equal(persisted,1);assert.equal(rendered,1);
+ const summary=source.split('\n').find(l=>l.includes("$('filterSummary').textContent="));
+ const output={};
+ vm.runInNewContext(summary,{$:id=>id==='filterSummary'?output:id==='state'?{selectedOptions:[{textContent:'Watch states (default)'}]}:{value:'0.10'},changed:[],money:()=>'$0.10'});
+ assert.match(output.textContent,/Watch states \(default\)/);assert.doesNotMatch(output.textContent,/All candidates/);
+});

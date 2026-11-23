@@ -1,4 +1,5 @@
 name: Staging Algorithm Scan
+run-name: Staging ${{ inputs.request_id || github.run_id }}
 on:
   push:
     branches: [staging-next-20261117]
@@ -7,6 +8,12 @@ on:
     # Both DST offsets; calendar gate below admits only actual regular sessions.
     - cron: '10,25,40,55 13-20 * * 1-5'
   workflow_dispatch:
+    inputs:
+      request_id:
+        description: Public staging collection request ID
+        required: false
+        default: ""
+        type: string
 permissions:
   contents: write
 concurrency:

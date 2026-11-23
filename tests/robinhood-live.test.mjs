@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {handleRobinhood,quoteRequest,quoteAge,normalizeQuotes,rpc} from '../robinhood-live.js';
 import worker from '../worker.js';
 import {marketSessions} from '../market-session.js';
+import {projectRecoveryBatch} from '../private-recovery.js';
 const host='https://example.workers.dev';
 const request=(path,method='GET',headers={},body)=>new Request(`${host}/private/plaid/robinhood/${path}`,{method,headers,...(body===undefined?{}:{body:JSON.stringify(body)})});
 const base={ROBINHOOD_CONNECTION_ENABLED:'true',ROBINHOOD_CLIENT_ID:'client-test',ROBINHOOD_REDIRECT_URI:host+'/private/plaid/robinhood/callback',PLAID_ENCRYPTION_KEY:Buffer.alloc(32,17).toString('base64'),CF_ACCESS_TEAM_DOMAIN:'test.cloudflareaccess.com',CF_ACCESS_AUD:'aud',CF_ACCESS_EMAIL:'me@example.com'};
@@ -155,6 +156,16 @@ test('stateless provider setup is reused, protocols are explicit, and a failure 
 test('private scanner route projects the fixed main source without needing stored broker credentials',async()=>harness(async({env,auth,setUpstream})=>{
  setUpstream(async(url)=>{assert.match(url,/^https:\/\/raw.githubusercontent.com\/Carooch62\/0dte-options-command-center\/main\/data\/candidate-quote-batch.json\?v=\d+$/);return Response.json({format:'candidate-identities-v1',selection_policy:'published-research-screens-v1',max_per_ticker:2,generated_at:'2026-10-14T14:00:00Z',included_contracts:1,total_contracts:1,qualifying_contracts:1,omitted_contracts:0,candidates:[{ticker:'SPY',options:[{strike:772,side:'put',expiry:'2026-10-16',scanner_ask:.2}]}]});});
  const r=await handleRobinhood(request('candidates','GET',auth),env);assert.equal(r.status,200);assert.equal((await r.json()).snapshot.included_contracts,1);assert.equal(r.headers.get('Cache-Control'),'no-store');
+}));
+test('private recovery route requires owner access, fixed source/window and separate research policy',async()=>harness(async({env,auth,setUpstream})=>{
+ const seed={source:'Nasdaq public chain',expiry:'2026-11-20',dte:0,side:'call',strike:100,bid:.19,ask:.20,volume:100,quote_valid:true,tight_spread:true,near_atm:true,expiry_verified:true,greeks_verified:false};
+ const batch=projectRecoveryBatch({generated_at:'2026-11-20T15:00:00Z',candidates:[{ticker:'TEST',price:100,direction:'UP',options:[seed]}]},'today');
+ let requests=0,bad=false;
+ setUpstream(async url=>{requests++;assert.match(url,/^https:\/\/raw.githubusercontent.com\/Carooch62\/0dte-options-command-center\/main\/data\/quote-recovery-today.json\?v=\d+$/);return Response.json({...batch,...(bad?{eligibility_effect:'PASS'}:{account_number:'SECRET'})});});
+ assert.equal((await handleRobinhood(request('recovery-candidates?window=today'),env)).status,401);assert.equal(requests,0);
+ assert.equal((await handleRobinhood(request('recovery-candidates?window=../../anything','GET',auth),env)).status,400);assert.equal(requests,0);
+ const r=await handleRobinhood(request('recovery-candidates?window=today','GET',auth),env),body=await r.json();assert.equal(r.status,200);assert.equal(r.headers.get('Cache-Control'),'no-store');assert.equal(body.snapshot.eligibility_effect,'NONE');assert.equal(body.snapshot.qualifying_contracts,0);assert.ok(!JSON.stringify(body).includes('SECRET'));
+ bad=true;assert.equal((await handleRobinhood(request('recovery-candidates?window=today','GET',auth),env)).status,502);
 }));
 test('authenticated metadata path discovers only read-only tools and sanitizes exact match',async()=>harness(async({env,auth,setUpstream})=>{
  const started=await handleRobinhood(request('connect','POST',auth,{}),env),target=new URL((await started.json()).authorization_url);

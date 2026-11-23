@@ -34,7 +34,6 @@ RTX SBUX SCHW SLB SNOW SNAP SPOT XYZ TGT TMO TTD TWLO TXN U V VEEV VLO
 WBD WDC WDAY XLF XLK XLU XLY ZM ZS
 """.split()
 
-CBOE_BASE = "https://cdn.cboe.com/api/global/delayed_quotes/options"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     "Accept": "application/json,text/plain,*/*",
@@ -301,7 +300,13 @@ def parse_osi(symbol):
 
 
 def fetch_cboe(t):
-    payload = request_json(f'{CBOE_BASE}/{t}.json', headers=HEADERS)
+    # Cboe's public delayed dashboard prohibits automated extraction. Never
+    # retry it through another host, header, cookie, or network identity.
+    raise RuntimeError('Cboe dashboard automated access is unsupported')
+
+
+def parse_cboe(payload):
+    # Legacy-format fixture parser only; no network access or access approval.
     rows = (payload.get('data') or {}).get('options')
     if not isinstance(rows, list) or not rows:
         raise ValueError('empty or malformed CBOE chain')
@@ -398,15 +403,24 @@ def nasdaq_options(t):
             'status':'SUCCESS' if any(o['dte']==0 for o in opts) else 'EMPTY_UNVERIFIED'}
 
 def options(t):
-    failures=[]
-    for provider_name,provider in (('fetch_cboe',fetch_cboe),('nasdaq_options',nasdaq_options)):
+    failures=[]; diagnostics=[{'provider':'fetch_cboe','status':'AUTOMATED_ACCESS_UNSUPPORTED','duration_ms':0}]
+    for provider_name,provider in (('nasdaq_options',nasdaq_options),):
+        started=time.perf_counter()
         try:
-            result=provider(t); result['errors']=failures
+            result=provider(t)
+            diagnostics.append({'provider':provider_name,'status':result.get('status','UNKNOWN'),
+                                'duration_ms':round((time.perf_counter()-started)*1000)})
+            result['errors']=failures; result['provider_diagnostics']=diagnostics
             return result
         except Exception as exc:
+            diagnostic={'provider':provider_name,'status':'SOURCE_FAILURE',
+                        'duration_ms':round((time.perf_counter()-started)*1000),'error':type(exc).__name__}
+            if isinstance(exc,requests.HTTPError) and exc.response is not None:
+                diagnostic['http_status']=exc.response.status_code
+            diagnostics.append(diagnostic)
             record_error(t,provider_name,exc); failures.append(provider_name+':'+type(exc).__name__)
     return {'contracts':[],'source':'Options providers unavailable','timestamp':None,
-            'status':'SOURCE_FAILURE','errors':failures}
+            'status':'SOURCE_FAILURE','errors':failures,'provider_diagnostics':diagnostics}
 
 
 def contract_score(o, stock):
@@ -455,7 +469,7 @@ def enrich_options(x, result):
              option_call_put_ratio=ratio,option_flow_direction=balance,option_direction=balance,
              volume_balance=balance, option_source=result['source'],option_timestamp=result.get('timestamp'),
              option_payload_timestamp=result.get('payload_timestamp'), chain_status=result['status'],
-             chain_attempted=True, chain_errors=result.get('errors',[]), expirations=result.get('expirations',[]),
+             chain_attempted=True, chain_errors=result.get('errors',[]), chain_provider_diagnostics=result.get('provider_diagnostics',[]), expirations=result.get('expirations',[]),
              options_quality='FULL_GREEKS' if any(o.get('greeks_verified') for o in zero) else 'CHAIN_ONLY' if zero else 'NONE')
 
 CORE_TICKERS=('SPY','QQQ','IWM','SMH','GLD','XLF')
@@ -486,11 +500,15 @@ def coverage(data):
     from collections import Counter
     rows=data['candidates']; attempted=[x for x in rows if x.get('chain_attempted')]
     counts=dict(Counter(x.get('chain_status','UNKNOWN') for x in attempted))
+    from provider_health import provider_health
+    data['option_provider_health']=provider_health(attempted)
     data['option_chain_universe']=len(attempted)
     data['coverage']={'stocks_configured':data.get('universe_size'), 'stocks_received':len(rows),
                       'chains_attempted':len(attempted),'chain_status_counts':counts,
                       'chains_with_contracts':sum(bool(x.get('zero_dte')) for x in attempted),
-                      'chains_not_attempted':len(rows)-len(attempted)}
+                      'chains_not_attempted':len(rows)-len(attempted),
+                      'same_day_contract_observations':sum(len(x.get('options',[])) for x in attempted),
+                      'same_day_verified_delta_observations':sum((o.get('delta_verified',o.get('greeks_verified')) is True and isinstance(o.get('delta'),(int,float)) and not isinstance(o.get('delta'),bool) and math.isfinite(o['delta']) and ((o.get('side')=='call' and 0<o['delta']<=1) or (o.get('side')=='put' and -1<=o['delta']<0))) for x in attempted for o in x.get('options',[]))}
     return data
 
 def scan_options(rows):
@@ -519,7 +537,7 @@ def main():
     out={'generated_at':datetime.now(timezone.utc).isoformat(), 'market_date':info['market_date'],
          'market_session':info['session'],'session_open_at':info['open_at'],'session_close_at':info['close_at'],
          'scan_mode':scan_mode,'scan_id':os.getenv('SCAN_REQUEST_ID') or os.getenv('GITHUB_RUN_ID') or str(time.time_ns()),
-         'workflow_run_id':os.getenv('GITHUB_RUN_ID'),'source':'Yahoo 5m bars + CBOE delayed options; Nasdaq fallback',
+         'workflow_run_id':os.getenv('GITHUB_RUN_ID'),'source':'Yahoo 5m bars + Nasdaq public option research; private quotes separately verified',
          'data_quality':'DELAYED_RESEARCH','universe_size':len(universe),'scanned_rows':len(rows),
          'news_universe':len(news_rows),'news_selection':news_selection,
          'news_coverage':{status:sum(x['news_status']==status for x in rows)

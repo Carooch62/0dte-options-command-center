@@ -1,22 +1,26 @@
 import {quoteOnlyResearchPack} from './quote-review-bridge.js';
-import {candidateQuotes} from './candidate-quotes.js';
+import {candidateQuotes} from './candidate-quotes.js?v=20261120-private-recovery';
 import {validateRobinhoodPack} from './robinhood-review.js';
 import {quoteGuidance,appendQuoteEvidence,quoteEvidenceInput,scannerFromEvidencePacket,validationTiming,captureWindows,captureAction} from './quote-evidence.js?v=20261102-quote-bridge';
-import {SESSION_KEY,sessionPayload,restoreSession} from './quote-session.js?v=20261102-quote-bridge';
+import {SESSION_KEY,sessionPayload,restoreSession} from './quote-session.js?v=20261120-private-recovery';
 import {quoteRequestTiming} from './quote-timing.js';
-import {requestJSON,safeRequestAttempts} from './private-request.js';
+import {requestJSON,safeRequestAttempts} from './private-request.js?v=20261120-private-recovery';
 const $=id=>document.getElementById(id);
 const failure=e=>e.message;
-let attempts=[],retryPath=null;
+let attempts=[],retryPath=null,authorizationChecked=false;
 async function readPrivate(path,body){
+ const operation=path.split('?')[0];
  const started=performance.now(),started_at=new Date().toISOString();let code='SUCCESS',http_status=null;
  try{
   const d=await requestJSON('/private/plaid/robinhood/'+path,{method:body?'POST':'GET',...(body?{headers:{'Content-Type':'application/json','X-Requested-With':'RobinhoodQuotes'},body:JSON.stringify(body)}:{})},path==='resolve'?120000:30000);
-  retryPath=null;$('connection-state').textContent=`Private service reached: ${path==='candidates'?'scanner batch':path==='quotes'?'quote request':path==='resolve'?'contract matching':'connection status'}.`;
-  if(path==='quotes')d.request_timing=quoteRequestTiming({...d.request_timing,browser_ms:performance.now()-started});
+  retryPath=null;$('connection-state').textContent=`Private service reached: ${['candidates','recovery-candidates'].includes(operation)?'scanner batch':path==='quotes'?'quote request':path==='resolve'?'contract matching':'connection status'}.`;
+  if(path==='quotes'){
+   d.request_timing=quoteRequestTiming({...d.request_timing,browser_ms:performance.now()-started});
+   if(!authorizationChecked)$('authorization-state').textContent='A quote request succeeded in this visit. Stored authorization expiry and rotating-token renewal have not been checked.';
+  }
   return d;
- }catch(e){code=e.code||'INVALID_RESPONSE';http_status=e.status??null;retryPath=path;$('connection-state').textContent=`${path==='candidates'?'Scanner batch could not be loaded. ':''}${e.message}`;throw e;}
- finally{attempts=safeRequestAttempts([...attempts,{operation:path,code,http_status,started_at,finished_at:new Date().toISOString(),browser_ms:performance.now()-started}]);}
+ }catch(e){code=e.code||'INVALID_RESPONSE';http_status=e.status??null;retryPath=path;$('connection-state').textContent=`${['candidates','recovery-candidates'].includes(operation)?'Scanner batch could not be loaded. ':''}${e.message}`;throw e;}
+ finally{attempts=safeRequestAttempts([...attempts,{operation,code,http_status,started_at,finished_at:new Date().toISOString(),browser_ms:performance.now()-started}]);}
 }
 let scanner=null,observations=[],evidenceHistory=[],busy=false,scannerSource='No snapshot';
 const openQuoteDetails=new Set();
@@ -40,18 +44,19 @@ function renderWorkflow(rows=[]){
  $('workflow-stage').textContent=finished?'4 · Export session · Keep the captured batch until exported':!hasContracts?'1 · Load batch → Match & fetch → Capture → Export':!matched?'2 · Match & fetch → Capture → Export':'3 · Refresh same batch · Export observations when finished';
  const identity=scanner?.packet_id||scanner?.scan_id||'No batch identifier supplied';
  $('batch-identity').textContent=scanner?`${scannerSource} · Batch ${identity} · Generated ${scanner.generated_at||'unknown'}`:'No batch loaded.';
- $('batch-counts').textContent=scanner?`${rows.length} selected contracts · ${matched} matched · ${rows.length-matched} unmatched · ${rows.filter(r=>r.status==='QUOTE_CHECK_PASSED').length} passing current quote checks · ${evidenceHistory.length} recorded observations. ${scanner.qualifying_contracts??scanner.total_contracts??'Unknown'} research candidates before batch limits; ${scanner.omitted_contracts??'unknown'} omitted.`:'Load a batch to see coverage.';
+ $('batch-counts').textContent=scanner?`${rows.length} selected contracts · ${matched} matched · ${rows.length-matched} unmatched · ${rows.filter(r=>r.status==='QUOTE_CHECK_PASSED').length} passing current quote checks · ${evidenceHistory.length} recorded observations. ${scanner.recovery_mode==='MISSING_DELTA_RESEARCH'?`${scanner.research_seed_contracts} missing-delta research candidates; none approved`:`${scanner.qualifying_contracts??scanner.total_contracts??'Unknown'} research candidates before batch limits`}; ${scanner.omitted_contracts??'unknown'} omitted.`:'Load a batch to see coverage.';
 }
 
 
 function render(){
  $('session-info').textContent=recoveryMessage;$('clear-session').disabled=busy||!scanner&&!attempts.length;
  $('check-connection').disabled=busy;$('retry-request').disabled=busy||!retryPath;
- $('retry-request').textContent=retryPath?`Retry ${retryPath==='candidates'?'batch load':retryPath==='quotes'?'quote refresh':retryPath==='resolve'?'contract matching':'connection check'}`:'Retry last failed request';
+ $('retry-request').textContent=retryPath?`Retry ${['candidates','recovery-candidates'].includes(retryPath.split('?')[0])?'batch load':retryPath==='quotes'?'quote refresh':retryPath==='resolve'?'contract matching':'connection check'}`:'Retry last failed request';
  const success=attempts.filter(a=>a.code==='SUCCESS').at(-1);
  $('last-success').textContent=success?`${success.operation} · ${success.finished_at}`:'No successful request recorded in this tab';
  $('request-count').textContent=`${attempts.filter(a=>a.operation==='quotes'&&a.code==='SUCCESS').length} quote responses · ${attempts.filter(a=>a.code!=='SUCCESS').length} failed requests retained (latest 200 attempts). Successful responses may contain missing or failing contract checks.`;
  $('load-scanner').disabled=busy;$('load-current').disabled=busy;$('resolve').disabled=busy||!scanner?.candidates?.length;
+ $('load-recovery').disabled=busy;$('recovery-window').disabled=busy;
  $('load-validation').disabled=busy;$('validation-clock').textContent=validationTiming(evidenceHistory);
  $('capture-windows').replaceChildren();
  const windows=captureWindows(evidenceHistory);$('capture-action').textContent=captureAction(windows);$('capture-refresh').disabled=true;
@@ -71,6 +76,7 @@ function render(){
  const generated=Date.parse(scanner?.generated_at),age=(Date.now()-generated)/60000;
  $('snapshot-info').textContent=scanner?`${scannerSource} · Generated: ${scanner.generated_at||'unknown'} · Age: ${Number.isFinite(age)&&age>=0?age.toFixed(1)+' minutes':'unknown'} · Coverage: ${scanner.included_contracts??'unknown'} included / ${scanner.total_contracts??'unknown'} total; ${scanner.omitted_contracts??'unknown'} omitted${scanner.research_rejected_contracts!==undefined?' · '+scanner.research_rejected_contracts+' price-only matches rejected by research screens':''}${scanner.scanned_contracts!==undefined?' · '+scanner.scanned_contracts+' identities examined; batch requires published research screens':''} · Snapshot freshness is separate from quote freshness.`:'No scanner snapshot loaded.';
  $('scanner').disabled=busy;$('research').disabled=busy;
+ if(scanner?.recovery_mode==='MISSING_DELTA_RESEARCH')$('snapshot-info').textContent=`${scannerSource} · Generated: ${scanner.generated_at} · ${scanner.included_contracts} included / ${scanner.research_seed_contracts} research candidates · ${scanner.omitted_contracts} omitted. Missing delta is deferred to private review; no contract or setup eligibility is approved. Snapshot freshness is separate from quote freshness.`;
  // Read the live disclosure state before rebuilding; toggle events may be queued behind an age tick.
  for(const detail of $('rows').querySelectorAll?.('details[data-contract]')||[]){const key=detail.getAttribute('data-contract');if(detail.open)openQuoteDetails.add(key);else openQuoteDetails.delete(key);}
  $('rows').replaceChildren();if(!scanner){$('refresh').disabled=true;$('quote-summary').textContent='No quotes checked.';renderWorkflow([]);return [];}
@@ -87,7 +93,7 @@ function render(){
  details.ontoggle=()=>{if(!details.isConnected)return;if(details.open)openQuoteDetails.add(row.contract);else openQuoteDetails.delete(row.contract);};
  const summary=document.createElement('summary');summary.textContent='Spread, cost & provider details';details.append(summary);
  const note=document.createElement('p'),number=v=>Number.isFinite(v)?String(v):'Unknown';
- note.textContent=`Spread: ${Number.isFinite(row.spread)?'$'+row.spread.toFixed(3):'Unknown'} / ${Number.isFinite(row.spread_pct)?row.spread_pct.toFixed(1)+'%':'Unknown'}. Standard contract ask cost: ${row.status==='QUOTE_CHECK_PASSED'&&row.metadata_multiplier===100?'$'+(row.ask*100).toFixed(2)+' before fees':'Unverified'}. Displayed bid / ask size: ${number(row.bid_size)} / ${number(row.ask_size)} contracts. Provider mark: ${number(row.mark_price)} (not an independent benchmark). Setup eligibility is not established by a quote or budget pass.`;
+ note.textContent=`Spread: ${Number.isFinite(row.spread)?'$'+row.spread.toFixed(3):'Unknown'} / ${Number.isFinite(row.spread_pct)?row.spread_pct.toFixed(1)+'%':'Unknown'}. Standard contract ask cost: ${row.status==='QUOTE_CHECK_PASSED'&&row.metadata_multiplier===100?'$'+(row.ask*100).toFixed(2)+' before fees':'Unverified'}. Displayed bid / ask size: ${number(row.bid_size)} / ${number(row.ask_size)} contracts. Provider mark: ${number(row.mark_price)} (not an independent benchmark). Delta: ${number(row.delta)} · ${row.delta_check||'UNAVAILABLE'} (0–14 DTE preference |Δ| 0.30–0.50). Gamma: ${number(row.gamma)} · theta: ${number(row.theta)}. Greek calculation time is unavailable; the quote refresh clock is not a separate Greek calculation clock. Setup eligibility is not established by a quote, delta or budget pass.`;
  details.append(note);tr.children[0].append(details);$('rows').append(tr);
  }
  const matched=rows.some(r=>r.instrument_id);
@@ -116,6 +122,15 @@ $('load-validation').onclick=async()=>{
  try{
  const replacement=scannerFromEvidencePacket(await requestJSON('/data/staging-shadow-evidence-latest.json'));scanner=replacement;observations=[];evidenceHistory=[];scannerSource='STAGING VALIDATION · frozen evidence packet';$('status').textContent=`Loaded ${scanner.included_contracts} staging contracts. Packet captured ${scanner.captured_at}; session ${scanner.market_session||'unknown'}. Require a fresh OPEN-session packet for validation. Match contracts and fetch live quotes next.`;
  }catch(e){$('status').textContent=e.message;}finally{busy=false;persist();render();}
+};
+$('load-recovery').onclick=async()=>{
+ if(busy||!mayReplace())return;busy=true;render();
+ try{
+  const window=$('recovery-window').value,d=await readPrivate('recovery-candidates?window='+encodeURIComponent(window)),s=d.snapshot;
+  if(s?.format!=='private-recovery-identities-v1'||s.recovery_mode!=='MISSING_DELTA_RESEARCH'||s.expiration_window!==window||s.eligibility_effect!=='NONE'||s.qualifying_contracts!==0||!Array.isArray(s.candidates)||s.candidates.length>20||!Number.isFinite(Date.parse(s.generated_at)))throw Error('Invalid recovery research batch');
+  candidateQuotes(s,[]);scanner=s;observations=[];evidenceHistory=[];scannerSource='PRIVATE RECOVERY RESEARCH · '+window;
+  $('status').textContent=`Loaded ${s.included_contracts} missing-delta research contracts. None is approved or added to the scanner. Match exact identities and fetch quotes to inspect Greeks privately.`;
+ }catch(e){$('status').textContent=failure(e);}finally{busy=false;persist();render();}
 };
 $('resolve').onclick=async()=>{
  if(busy||!scanner)return;
@@ -157,8 +172,8 @@ $('refresh').onclick=async()=>{
  return $('refresh').onclick();
  };
  $('verified-only').onchange=render;
- $('check-connection').onclick=async()=>{if(busy)return;busy=true;render();$('authorization-state').textContent='Checking private connection status…';$('connection-state').textContent='Checking private access and stored Robinhood authorization…';$('status').textContent='Checking connection status…';try{const d=await readPrivate('status');$('authorization-state').textContent=d.connected?`Authorized until ${d.expires_at}. This is separate from a successful quote request.`:'Robinhood authorization is inactive. Open Connections to connect or renew.';$('status').textContent='Connection status checked. Batch loading and quote checks are separate.';}catch(e){$('authorization-state').textContent='Authorization could not be checked; the previous stored connection may still be active.';$('status').textContent=failure(e);}finally{busy=false;persist();render();}};
- $('retry-request').onclick=()=>{const id={status:'check-connection',candidates:'load-current',resolve:'resolve',quotes:'refresh'}[retryPath];if(!busy&&id)return $(id).onclick();};
+ $('check-connection').onclick=async()=>{if(busy)return;busy=true;render();$('authorization-state').textContent='Checking private connection status…';$('connection-state').textContent='Checking private access and stored Robinhood authorization…';$('status').textContent='Checking connection status…';try{const d=await readPrivate('status');authorizationChecked=true;$('authorization-state').textContent=d.connected?`Authorized until ${d.expires_at}. This is separate from a successful quote request.`:'Robinhood authorization is inactive. Open Connections to connect or renew.';$('status').textContent='Connection status checked. Batch loading and quote checks are separate.';}catch(e){$('authorization-state').textContent='Authorization could not be checked; the previous stored connection may still be active.';$('status').textContent=failure(e);}finally{busy=false;persist();render();}};
+ $('retry-request').onclick=()=>{const id={status:'check-connection',candidates:'load-current','recovery-candidates':'load-recovery',resolve:'resolve',quotes:'refresh'}[retryPath?.split('?')[0]];if(!busy&&id)return $(id).onclick();};
  $('clear-session').onclick=()=>{if(busy||!mayReplace())return;scanner=null;observations=[];evidenceHistory=[];attempts=[];retryPath=null;persist();render();$('status').textContent='Session cleared in this tab. Exported files are unchanged.';};
  render();
 setInterval(render,1000);
@@ -183,3 +198,4 @@ $('export-review-quotes').onclick=()=>{
   $('status').textContent='Private quote-only snapshot exported. Import into Connections after a full order snapshot to preserve your fills.';
  }catch(e){$('status').textContent='Quote-only export failed: '+e.message;}
 };
+
