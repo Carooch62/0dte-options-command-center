@@ -183,6 +183,142 @@ U02 fees/net, U03/U04 prospective evidence, U06 actual open-position Discord
 receipt and the queued Pages/Cloudflare infrastructure work remain unchanged.
 No public eligibility, scores or live alert activation changed.
 
+## November 20 connection guidance — unblock review
+
+U05 has a concrete status-copy gap: the candidate quote page can show a successful
+request beside unconditional instructions to sign in again. The review change
+makes setup guidance conditional on a request requiring sign-in or renewal,
+acknowledges a quote request completed in this visit, and preserves an explicitly
+checked connection status. Restored requests do not become new live verification.
+Later failures remain visible and retry remains manual. The panel asset version
+changes so the updated copy is fetched.
+
+Local verification: all 30 candidate quote panel tests pass, including new
+success/status/failure/reload regressions; panel syntax check passes. These are
+synthetic tests. This change is review-only, not deployed or owner accepted.
+No private evidence, contracts, quote values, execution records or identifiers
+are included in this review. Remaining owner evidence is reviewed privately;
+U01's two-session speed and actual rotating-token renewal gates remain open.
+A successful request does not establish renewal, setup eligibility or delivery.
+
+U02 reconciliation remains complete privately; fees/net results remain unknown.
+U03's current iwm-control-v1 report on staging-next-20261117 still reports zero
+coverage-eligible sessions (report checked_at 2026-11-20T03:34:29.517948+00:00).
+U04 remains evidence-gated; U06 still requires actual open-position delivery
+acceptance. No prior owner reminder is repeated by this update.
+
+The [official NYSE calendar](https://www.nyse.com/markets/hours-calendars)
+confirms November 20 is a regular 09:30–16:00 ET cash-equity session,
+November 26 is closed and November 27 closes at 13:00 ET. Eligible options'
+13:15 early close is a separate product rule, not an extra XNYS stock horizon.
+Existing collectors/scans continue without a dispatch, cancellation or data rewrite.
+PR152 remains complete. Historical Pages URL compatibility, Pages source
+configuration/activation, comparable real publishing timing and actual Cloudflare
+preview build logs/settings remain queued. The available GitHub interface cannot
+read Pages configuration; no cause is inferred for Cloudflare's separate build
+status and no working deployment gate is weakened.
+
+
+### PR157 CI follow-up
+
+[Scanner/dashboard verification 44788750182](https://github.com/Carooch62/0dte-options-command-center/actions/runs/44788750182)
+passed on the initial review head. [Candidate Mobile QA 44788750645](https://github.com/Carooch62/0dte-options-command-center/actions/runs/44788750645)
+failed because the setup link label had changed from “Open” to “open”, breaking
+the existing exact accessible-name assertion at scripts/test-candidate-mobile.mjs:160.
+The follow-up restores the established accessible label while retaining conditional
+guidance. The browser assertion and deployment gates are unchanged. All 30 panel
+tests still pass locally; latest-head browser CI must pass independently. The
+change remains in PR157, not deployed. No acceptance gate or owner reminder changes.
+
+## November 23 independent unblock check — review only
+
+Rechecked main and the private reconciliation case without repeating the closing
+review or importing private records. U02 execution/quantity reconciliation stays
+complete; fee evidence and net results remain outstanding. No later evidence is
+backdated to its scan-generation clock.
+
+The prospective `iwm-control-v1` report on `staging-next-20261117`, blob
+`f327f7d9a7929779f01b5cbeeef24e88476278e4`, was checked at
+2026-11-21T00:13:46.801395+00:00 and still reports zero coverage-eligible
+sessions, no sessions/results and WAITING_FOR_FIVE_COVERED_SESSIONS. U03/U04
+remain gated; retrospective source manifests are not substituted. Existing
+workflows may collect prospective inputs without manual dispatch or cancellation.
+
+U01's owner-session 5/10/15 clocks, 20 passing quotes across two OPEN sessions
+and actual rotating-token renewal remain unverified. U06 still needs an actual
+open-position checkpoint and owner-confirmed Discord acceptance. Previously
+recorded owner actions are unchanged and are not repeated. U05's connection-copy
+fix remains in PR157; refreshing it with current main preserves its scope.
+Prior head `c05a4c592c323a1cfd0ad75f69382980a625233a` passed
+[verification 44794779907](https://github.com/Carooch62/0dte-options-command-center/actions/runs/44794779907)
+and [mobile QA 44794779896](https://github.com/Carooch62/0dte-options-command-center/actions/runs/44794779896).
+Those are synthetic checks, not deployment or owner acceptance.
+
+The [official XNYS calendar](https://www.nyse.com/markets/hours-calendars)
+confirms November 23–25 regular 09:30–16:00 ET stock sessions, November 26
+closed and November 27 closing at 13:00 ET. Eligible options' 13:15 close does
+not extend the stock-only outcome window. Session availability alone does not
+supply any missing quote, research or delivery evidence.
+
+A fresh actual Pages baseline is available from
+[run 45189596751](https://github.com/Carooch62/0dte-options-command-center/actions/runs/45189596751),
+source `e6a7a01aefbfe6bb06957f8c295d65ebfb45b90b`: Checkout
+14:00:45–14:03:13Z (148 s), Jekyll build 14:03:13–14:03:24Z (11 s),
+upload 14:03:24–14:03:41Z (17 s), deploy 14:03:50–14:04:16Z (26 s),
+on November 23. Build and deploy use distinct GitHub-hosted runner instances.
+This is the existing publishing path, not a candidate comparison or proven
+speedup. PR152 packaging/offline analysis stay complete. Historical Pages URL
+compatibility, source configuration/activation and comparable candidate publishing
+remain queued. Actual Cloudflare preview logs/settings are still unavailable
+through the connected interface; no cause is inferred and no deployment gate
+is changed. No private identifiers, quotes, fills or owner-file links are published.
+
+Refresh validation: 188 Python and 332 JavaScript tests pass locally after
+installing the declared Python dependencies; panel syntax, browser asset build
+and diff checks pass. The installed XNYS exchange calendar independently matches
+the official November 23–27 stock-session schedule. Current-head browser CI
+remains independent of these local checks. No code beyond the existing PR157
+connection-guidance change is added by this refresh.
+
+## November 23 Cloudflare build quota evidence and cleanup
+
+Owner-provided dashboard evidence supersedes the unexplained-build status:
+build fb53f6f9 for review head 59417fa is explicitly SKIPPED, and the
+Worker settings report builds paused after all 3,000 included monthly build
+minutes were consumed. The displayed reset is November 30, 2026 at 18:59 EST.
+This establishes the current account quota pause, not a code compilation error
+or proof that every older failed check had the same cause.
+
+The screenshot shows main as production branch, include path `*`, asset build
+command `node scripts/build-assets.mjs`, and deploy command
+`npx wrangler deploy`. The earlier review build shows `npx wrangler preview`.
+No branch-specific private bindings should be copied into previews.
+
+Proposed first cleanup, NOT APPLIED to the account: keep include `*` and
+existing exclusions, add `data/*` and `docs/*` to Cloudflare build watch
+exclusions. The Worker asset allowlist in scripts/build-assets.mjs copies no
+data or documentation; live public data is fetched separately. Thus data-only
+scanner/archive updates and documentation-only changes do not need a Worker
+rebuild. Code, asset, configuration and build-script changes remain eligible
+to trigger builds. Verify the next data-only push skips intentionally and
+a later code change builds after quota availability returns. Cloudflare may
+bypass path matching for empty pushes, 3,000+ changed files or 20+ commits.
+
+Source: https://developers.cloudflare.com/workers/ci-cd/builds/build-watch-paths/
+and https://developers.cloudflare.com/workers/ci-cd/builds/limits-and-pricing/.
+The existing filtered GitHub deploy-worker workflow is a separate production
+delivery path and remains unchanged. No build/check bypass, plan upgrade,
+history/cache purge, runtime setting, secret, storage binding, cron, scan,
+score, eligibility or alert change is made. Keep current production and known
+rollback versions. Removing historical build logs does not reverse consumed
+build time. A consolidation of duplicate production deployment paths requires
+an explicit reviewed configuration decision; do not silently disable either.
+
+Account configuration still needs to be applied and verified in an authorized
+Cloudflare session. The earlier browser sign-in returned 403; a screenshot
+does not grant that browser an authenticated session. The PR records a
+prepared settings cleanup, not a completed account change or production release.
+
 ## November 23 build diagnostics prerequisite
 
 Owner reports the separate `CLOUDFLARE_DIAGNOSTICS_API_TOKEN` repository secret
@@ -211,3 +347,17 @@ can be compared with the successful preview. It retains unknown outcomes when
 an explicit build is absent from recent history and validates IDs before requests.
 Five synthetic tests pass; historical log inspection remains pending a live run.
 No root cause, recovery date or production configuration fix is inferred.
+
+## November 23 production readiness continuation
+
+PR160 merged as 79b79de86c2b29845736678da3a12de07364f1c9 after scanner CI
+45231227692 and its Cloudflare preview succeeded. The targeted live diagnostic
+run remains outstanding: the available connector has no workflow-dispatch action
+and the current browser is signed out. Run Cloudflare build diagnostics (read only)
+on main with its default historical build IDs; retain the sanitized result.
+PR157 incorporates this main release while preserving both ledger histories;
+its connection-guidance change requires fresh head CI and preview validation.
+Earlier quota screenshots remain historical evidence; later preview successes
+do not establish the cause of earlier failures or prove account path changes.
+Live owner quote/token/Discord acceptance and prospective research gates remain
+independent. No scores, eligibility or live alert activation changes.

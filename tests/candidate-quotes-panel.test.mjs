@@ -191,6 +191,29 @@ test('active authorization survives a separately reported batch-service failure'
  assert.match(h.get('authorization-state').textContent,/Authorized until/);assert.match(h.get('connection-state').textContent,/Scanner batch could not be loaded/);assert.doesNotMatch(h.get('status').textContent,/reconnect/i);
  assert.deepEqual(JSON.parse(h.storage.get(SESSION_KEY)).requests.map(x=>x.code),['SUCCESS','SERVICE']);
 });
+test('live quote success replaces unchecked copy without claiming expiry or renewal',async()=>{
+ const h=await harness([Response.json({received_at:new Date().toISOString(),observations:[]})]);
+ await h.get('refresh').onclick();
+ assert.match(h.get('authorization-state').textContent,/quote request succeeded in this visit/);
+ assert.match(h.get('authorization-state').textContent,/expiry and rotating-token renewal have not been checked/);
+ assert.doesNotMatch(h.get('authorization-state').textContent,/Authorized until/);
+ const restored=await harness([],h.storage,false);
+ assert.doesNotMatch(restored.get('authorization-state').textContent,/succeeded in this visit/);
+ assert.equal(restored.calls.length,0);
+});
+test('successful quotes preserve explicit connection status and later failures remain visible',async()=>{
+ const h=await harness([Response.json({connected:true,expires_at:'2099-01-01T00:00:00Z'}),Response.json({received_at:new Date().toISOString(),observations:[]}),new Response('<html>Sign in</html>',{status:200,headers:{'content-type':'text/html'}})]);
+ await h.get('check-connection').onclick();
+ await h.get('refresh').onclick();
+ assert.match(h.get('authorization-state').textContent,/Authorized until 2099/);
+ await h.get('refresh').onclick();
+ assert.match(h.get('connection-state').textContent,/Private sign-in required/);
+ assert.match(h.get('status').textContent,/sign in/);
+ assert.equal(h.calls.length,3);
+ const html=await readFile(new URL('../candidate-quotes.html',import.meta.url),'utf8');
+ assert.match(html,/if a request requires sign-in or renewal/);
+ assert.match(html,/A successful quote request does not require reconnecting/);
+});
 test('a failed replacement load retains the original batch and captured evidence',async()=>{
  const id='bbdbf613-f3e0-4f68-9cc7-fc090ca84e24',now=new Date().toISOString();
  const h=await harness([Response.json({received_at:now,observations:[{quote:{instrument_id:id,bid_price:'.29',ask_price:'.30',updated_at:now}}]}),Response.json({},{status:502})]);
@@ -214,4 +237,5 @@ test('successful staging replacement clears captured history only after validati
  await h.get('refresh').onclick();assert.equal(JSON.parse(h.storage.get(SESSION_KEY)).history.length,1);
  await h.get('load-scanner').onclick();const after=JSON.parse(h.storage.get(SESSION_KEY));assert.deepEqual(after.history,[]);assert.deepEqual(after.observations,[]);assert.equal(h.get('refresh').disabled,true);
 });
+
 
