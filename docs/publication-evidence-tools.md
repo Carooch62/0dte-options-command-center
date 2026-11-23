@@ -24,3 +24,10 @@ and the logs endpoint's documented read permission. User reports the diagnostic
 secret saved November 23, 2026; its validity and actual access remain unverified
 until a manual run. Three synthetic regression tests cover denied access,
 GET-only requests and omission of sensitive response content.
+
+The follow-up diagnostic workflow accepts up to five comma-separated build UUIDs.
+Defaults select the exact failed PR152/PR155 builds and the successful PR159
+preview for comparison. Blank input retains recent-build sampling. IDs are
+validated before requests and are passed through an environment variable rather
+than inserted into shell code. Explicit builds absent from recent history retain
+unknown outcomes; no successful outcome is fabricated from readable logs.
