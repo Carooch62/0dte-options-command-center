@@ -182,3 +182,13 @@ sessions and actual rotating-token renewal remain independently outstanding.
 U02 fees/net, U03/U04 prospective evidence, U06 actual open-position Discord
 receipt and the queued Pages/Cloudflare infrastructure work remain unchanged.
 No public eligibility, scores or live alert activation changed.
+
+## November 23 build diagnostics prerequisite
+
+Owner reports the separate `CLOUDFLARE_DIAGNOSTICS_API_TOKEN` repository secret
+saved. A manual GET-only diagnostics workflow is prepared in review; three
+synthetic tests pass for denied access and response privacy. This is not a live
+permission check. Actual run, private log/settings review and root-cause evidence
+remain pending. No working deployment gates or production configuration change.
+See publication-evidence-tools.md. Pages compatibility/activation and comparable
+publish timing remain queued independently.
