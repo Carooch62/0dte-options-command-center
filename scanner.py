@@ -500,11 +500,15 @@ def coverage(data):
     from collections import Counter
     rows=data['candidates']; attempted=[x for x in rows if x.get('chain_attempted')]
     counts=dict(Counter(x.get('chain_status','UNKNOWN') for x in attempted))
+    from provider_health import provider_health
+    data['option_provider_health']=provider_health(attempted)
     data['option_chain_universe']=len(attempted)
     data['coverage']={'stocks_configured':data.get('universe_size'), 'stocks_received':len(rows),
                       'chains_attempted':len(attempted),'chain_status_counts':counts,
                       'chains_with_contracts':sum(bool(x.get('zero_dte')) for x in attempted),
-                      'chains_not_attempted':len(rows)-len(attempted)}
+                      'chains_not_attempted':len(rows)-len(attempted),
+                      'same_day_contract_observations':sum(len(x.get('options',[])) for x in attempted),
+                      'same_day_verified_delta_observations':sum((o.get('delta_verified',o.get('greeks_verified')) is True and isinstance(o.get('delta'),(int,float)) and not isinstance(o.get('delta'),bool) and math.isfinite(o['delta']) and ((o.get('side')=='call' and 0<o['delta']<=1) or (o.get('side')=='put' and -1<=o['delta']<0))) for x in attempted for o in x.get('options',[]))}
     return data
 
 def scan_options(rows):
@@ -533,7 +537,7 @@ def main():
     out={'generated_at':datetime.now(timezone.utc).isoformat(), 'market_date':info['market_date'],
          'market_session':info['session'],'session_open_at':info['open_at'],'session_close_at':info['close_at'],
          'scan_mode':scan_mode,'scan_id':os.getenv('SCAN_REQUEST_ID') or os.getenv('GITHUB_RUN_ID') or str(time.time_ns()),
-         'workflow_run_id':os.getenv('GITHUB_RUN_ID'),'source':'Yahoo 5m bars + CBOE delayed options; Nasdaq fallback',
+         'workflow_run_id':os.getenv('GITHUB_RUN_ID'),'source':'Yahoo 5m bars + Nasdaq public option research; private quotes separately verified',
          'data_quality':'DELAYED_RESEARCH','universe_size':len(universe),'scanned_rows':len(rows),
          'news_universe':len(news_rows),'news_selection':news_selection,
          'news_coverage':{status:sum(x['news_status']==status for x in rows)

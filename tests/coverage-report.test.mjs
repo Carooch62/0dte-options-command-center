@@ -35,3 +35,11 @@ test('empty board distinguishes missing delta data, no chains and filter exclusi
   assert.doesNotMatch(boardAvailability([{options:[verified]}],1),/blocked|missing provider/);
   for(const o of [{...verified,delta:0},{...verified,delta:2},{...verified,delta_verified:false,greeks_verified:true}])assert.match(boardAvailability([{options:[o]}],0),/None of the 1 returned/);
 });
+
+test('verified delta coverage does not imply quote freshness or invent legacy counts', async()=>{
+ const {sourceGaps}=await import('../coverage-report.js');
+ assert.match(sourceGaps({same_day_contract_observations:20,same_day_verified_delta_observations:0}),/Verified delta: 0\/20/);
+ assert.match(sourceGaps({same_day_contract_observations:20,same_day_verified_delta_observations:5}),/freshness and entry checks remain separate/);
+ assert.equal(sourceGaps({same_day_contract_observations:2,same_day_verified_delta_observations:3}),'');
+ assert.equal(sourceGaps({}),'');
+});
