@@ -7,6 +7,8 @@ permissions:
   contents: read
 jobs:
   package:
+    # Staging intentionally has no production delivery snapshots to package.
+    if: github.event_name == 'workflow_dispatch' || github.base_ref == 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
