@@ -5,8 +5,9 @@ export function classify(lines) {
   const text = JSON.stringify(lines).toLowerCase();
   return Object.entries({AUTHORIZATION: /authentication error|invalid api token|unauthorized|permission denied/, WORKER_NAME: /worker name.*mismatch|name.*does not match/, MISSING_COMMAND: /missing script|command not found/, DEPENDENCY: /npm err|err_pnpm|could not resolve/, CONFIGURATION: /invalid.*wrangler|could not find.*wrangler/, BUILD_FAILURE: /build failed|deployment failed|deploy failed/}).filter(([,pattern]) => pattern.test(text)).map(([label]) => label);
 }
-export async function inspect({token,account,fetcher=fetch}) {
+export async function inspect({token,account,buildIds=[],fetcher=fetch}) {
   if (!token || !/^[a-f0-9]{32}$/i.test(account || '')) throw new Error('Missing diagnostic token or valid account ID');
+  if (!Array.isArray(buildIds) || buildIds.length>5 || buildIds.some(id=>!/^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id))) throw new Error('Invalid build IDs');
   const outcomes=[];
   async function get(path,label) {
     let response;
@@ -24,17 +25,18 @@ export async function inspect({token,account,fetcher=fetch}) {
   const config=await get(`builds/workers/${worker.tag}`,'build settings');
   const builds=await get(`builds/workers/${worker.tag}/builds`,'build history');
   const reports=[];
-  for (const build of (Array.isArray(builds)?builds:[]).slice(0,5)) {
+  const selected=buildIds.length?buildIds.map(id=>(Array.isArray(builds)?builds:[]).find(x=>x.build_uuid===id)||{build_uuid:id}):(Array.isArray(builds)?builds:[]).slice(0,5);
+  for (const build of selected) {
     const id=build.build_uuid;
     if (!/^[a-f0-9-]{36}$/i.test(id || '')) continue;
     const logs=await get(`builds/builds/${id}/logs`,'build logs');
     reports.push({build_uuid:id,outcome:['success','fail','skipped','cancelled','terminated'].includes(build.build_outcome)?build.build_outcome:'UNKNOWN',categories:logs?classify(logs.lines):[],logsAvailable:!!logs,logsTruncated:logs?.truncated===true});
   }
-  return {outcomes,previewsEnabled:typeof config?.previews_enabled==='boolean'?config.previews_enabled:null,builds:reports,acceptance:outcomes.every(x=>x.status==='OK')&&reports.length?'READ_ACCESS_CHECKED':'INCOMPLETE',limitations:'Only first five returned builds and first log page reviewed. Error categories are clues; raw evidence requires private review. No production diagnosis or configuration change inferred.'};
+  return {outcomes,selection:buildIds.length?'EXPLICIT_BUILD_IDS':'RECENT_BUILDS',previewsEnabled:typeof config?.previews_enabled==='boolean'?config.previews_enabled:null,builds:reports,acceptance:outcomes.every(x=>x.status==='OK')&&reports.length?'READ_ACCESS_CHECKED':'INCOMPLETE',limitations:'At most five selected builds and first log page reviewed. Explicit IDs absent from recent history have unknown outcomes. Error categories are clues; raw evidence requires private review. No production diagnosis or configuration change inferred.'};
 }
 if (process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {
   try {
-    const report=await inspect({token:process.env.CLOUDFLARE_DIAGNOSTICS_API_TOKEN,account:process.env.CLOUDFLARE_ACCOUNT_ID});
+    const report=await inspect({token:process.env.CLOUDFLARE_DIAGNOSTICS_API_TOKEN,account:process.env.CLOUDFLARE_ACCOUNT_ID,buildIds:(process.env.DIAGNOSTIC_BUILD_IDS||'').split(',').map(x=>x.trim()).filter(Boolean)});
     const output=JSON.stringify(report,null,2);
     console.log(output);
     if(process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY,`## Cloudflare read-only diagnostics\n\n\`\`\`json\n${output}\n\`\`\`\n`);

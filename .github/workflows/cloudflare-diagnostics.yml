@@ -1,6 +1,12 @@
 name: Cloudflare build diagnostics (read only)
 on:
   workflow_dispatch:
+    inputs:
+      build_ids:
+        description: 'Comma-separated build UUIDs (at most five); blank samples recent builds'
+        required: false
+        default: 'c2a4779d-51c6-40ce-811e-f783f28ca357,556ae2ec-a6a5-4cad-8cc1-dcf066f5e977,60256d7d-698e-4350-aa5c-8b79d5c2d1d6'
+        type: string
 permissions:
   contents: read
 jobs:
@@ -19,4 +25,5 @@ jobs:
         run: node scripts/cloudflare-build-diagnostics.mjs
         env:
           CLOUDFLARE_DIAGNOSTICS_API_TOKEN: ${{ secrets.CLOUDFLARE_DIAGNOSTICS_API_TOKEN }}
+          DIAGNOSTIC_BUILD_IDS: ${{ inputs.build_ids }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
