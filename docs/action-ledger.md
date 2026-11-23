@@ -318,3 +318,46 @@ Account configuration still needs to be applied and verified in an authorized
 Cloudflare session. The earlier browser sign-in returned 403; a screenshot
 does not grant that browser an authenticated session. The PR records a
 prepared settings cleanup, not a completed account change or production release.
+
+## November 23 build diagnostics prerequisite
+
+Owner reports the separate `CLOUDFLARE_DIAGNOSTICS_API_TOKEN` repository secret
+saved. A manual GET-only diagnostics workflow is prepared in review; three
+synthetic tests pass for denied access and response privacy. This is not a live
+permission check. Actual run, private log/settings review and root-cause evidence
+remain pending. No working deployment gates or production configuration change.
+See publication-evidence-tools.md. Pages compatibility/activation and comparable
+publish timing remain queued independently.
+
+## November 23 diagnostic access verified; historical failures remain separate
+
+PR159 merged as ec8f0efdccf66ab76bbd57e17bdf506621fac6da. Live manual
+[diagnostic run 45230435757](https://github.com/Carooch62/0dte-options-command-center/actions/runs/45230435757)
+succeeded: metadata, settings, history and five first log pages were accessible;
+previews were enabled. Two sampled outcomes succeeded, one skipped and two
+were unknown. No recognized error category appeared. This establishes read
+access only, not historical failure resolution.
+
+PR159's Cloudflare preview check subsequently succeeded for build
+60256d7d-698e-4350-aa5c-8b79d5c2d1d6. PR152 build
+c2a4779d-51c6-40ce-811e-f783f28ca357 and PR155 build
+556ae2ec-a6a5-4cad-8cc1-dcf066f5e977 still have failed GitHub checks.
+A targeted read-only follow-up adds explicit build IDs so those older log pages
+can be compared with the successful preview. It retains unknown outcomes when
+an explicit build is absent from recent history and validates IDs before requests.
+Five synthetic tests pass; historical log inspection remains pending a live run.
+No root cause, recovery date or production configuration fix is inferred.
+
+## November 23 production readiness continuation
+
+PR160 merged as 79b79de86c2b29845736678da3a12de07364f1c9 after scanner CI
+45231227692 and its Cloudflare preview succeeded. The targeted live diagnostic
+run remains outstanding: the available connector has no workflow-dispatch action
+and the current browser is signed out. Run Cloudflare build diagnostics (read only)
+on main with its default historical build IDs; retain the sanitized result.
+PR157 incorporates this main release while preserving both ledger histories;
+its connection-guidance change requires fresh head CI and preview validation.
+Earlier quota screenshots remain historical evidence; later preview successes
+do not establish the cause of earlier failures or prove account path changes.
+Live owner quote/token/Discord acceptance and prospective research gates remain
+independent. No scores, eligibility or live alert activation changes.
