@@ -374,3 +374,38 @@ rotating-token renewal, fee reconciliation and owner-confirmed Discord receipt.
 The user reports Workers Paid; documented entitlements are assessed separately
 from verified billing state and actual resource usage. Pages historical URL
 compatibility, activation and comparable publish timing remain explicit gates.
+
+## November 23 collection/diagnostic release verified
+
+PR163 synchronized reviewed source to supported staging as
+2515f570e8061a922da605b59d683924844b0ef5, preserving data tree
+8c77cb32b9788ee9a7e607876b8c831892a3b393 byte-for-byte and retaining
+staging-only regression coverage. PR162 merged as
+9dfe16c1366f8366dd7b2a2d9946262f0bc39c0a after latest-head scanner CI,
+phone/private-workflow QA, desktop/phone Contract Watch QA and candidate packaging
+passed. Main checks: 45293690115, 45293690081, 45293690210, 45293690214.
+Staging checks: 45293699116, 45293699032, 45293699033; production packaging
+correctly skips isolated staging reviews because production delivery data is absent.
+
+Worker deployment 45294045316 succeeded on November 23 at 19:04:23 ET
+(November 24 00:04:23Z), version 22e2a8e1-9a8e-4959-b096-c65e658815a2.
+Its log confirms STAGING_COLLECTION_ENABLED=true. The new dispatcher uses a
+small validated scan-health calendar record; old/failed/non-OPEN health cannot
+trigger it. Production scan cadence, trading alert flags and scoring are unchanged.
+Installation is verified; a subsequent OPEN-session dispatch and fresh packet
+are still outstanding. Local inspection of the preserved staging tree found zero
+frozen input packets, which explains why no prospective IWM session is usable.
+Missing sessions are not backfilled. U03/U04 remain evidence-gated.
+
+The compact public Pages candidate uploaded as artifact 14874818355 in run
+45293690214 (compressed artifact 1,728,774 bytes). It is not activated and this
+size is not a measured production speedup. Historical URL compatibility, source
+configuration/activation and comparable publish timing remain queued. A historical
+post-close public snapshot has 74 provider timings with p50 2,429.5 ms and p95
+3,514.6 ms; this is not a market-hours speed benchmark. New reports retain sample
+counts, unknowns and provider failures without raising request concurrency.
+
+The privately supplied November 23 quote export advances first-session 5/10/15
+capture evidence. Two-session request timing, actual rotating-token renewal,
+fee/net evidence and real open-position Discord receipt remain separate gates.
+No private account, contract, price, fill, fee or token records are published here.
