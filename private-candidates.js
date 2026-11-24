@@ -20,6 +20,7 @@ export function projectCandidates(snapshot){
    const key=JSON.stringify(identity);if(seen.has(key))continue;seen.add(key);total++;
    const ask=num(o.ask);if(!(ask>0&&ask<=.30))continue;priceQualifying++;
    // Reuse published research screens; never turn absent evidence into a pass.
+   if(['UP','DOWN'].includes(c.direction)&&o.side!==(c.direction==='UP'?'call':'put'))continue;
    if(o.quote_valid!==true||o.near_atm!==true||o.usable_spread!==true||!(num(o.volume)>=20)||!Number.isInteger(o.dte)||o.dte<0||o.dte>14)continue;
    // A missing public Greek may be verified privately; an observed out-of-range delta cannot.
    const pendingDelta=o.delta_ok!==true&&o.greeks_verified===false&&num(o.delta)===0;
@@ -32,7 +33,8 @@ export function projectCandidates(snapshot){
   if(screened.length)groups.push(screened);
  }
  // Prefer a confirmed stock setup within the bounded verification cohort.
- groups.sort((a,b)=>Number(b[0].stock.setup_qualified===true&&['TRIGGERED','CONFIRMED'].includes(b[0].stock.execution_state))-Number(a[0].stock.setup_qualified===true&&['TRIGGERED','CONFIRMED'].includes(a[0].stock.execution_state)));
+ const priority=group=>group[0].stock.setup_qualified===true?(['TRIGGERED','CONFIRMED'].includes(group[0].stock.execution_state)?2:1):0;
+ groups.sort((a,b)=>priority(b)-priority(a));
  const setup_rejection_counts={};
  for(const group of groups){const stock=group[0].stock;for(const reason of stock.qualification_reasons||[])if(typeof reason==='string')setup_rejection_counts[reason]=(setup_rejection_counts[reason]||0)+1;}
  const perTicker=new Map();
