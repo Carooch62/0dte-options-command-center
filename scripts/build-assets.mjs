@@ -44,6 +44,7 @@ const assets = [
   "candidate-quotes.html",
   "candidate-quotes.js",
   "candidate-quotes-panel.js",
+  "private-setup-check.js",
   "quote-review-bridge.js",
   "quote-evidence.js",
   "quote-session.js",
