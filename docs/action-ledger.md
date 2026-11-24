@@ -430,3 +430,30 @@ are synthetic regression/build results, not owner-session, prospective-session,
 token-renewal, fee, Discord-delivery or profitability acceptance. No production
 ranking/eligibility settings, trading alerts or stored evidence were changed.
 Main and isolated staging review/deployment results will be recorded separately.
+
+
+### November 23 quality audit: merged and deployed
+
+PR166 merged as 4574a6f68a331b0bde2a8a5e92aef164c7907fe7 after scanner
+CI 45301457471, phone/private workflow QA 45301457386 and desktop/phone
+Contract Watch QA 45301457389 passed at reviewed head afc9c949431b6d17599fc9c0822657a0ec9fc87f.
+Worker deployment 45301660261 succeeded at November 23 20:00:55 ET
+(November 24 01:00:55Z), version cbe624b5-d42a-4eda-a1df-8d713f87bae9.
+Registered-client/protected prerequisite setup also passed; this does not prove
+owner token renewal or market-hours quote acceptance.
+
+PR167 applied the same source/test fixes to isolated staging and merged as
+846a69c1d58f7437d8597aa76a531f284314bd76 after scanner CI 45301494023,
+phone/private workflow QA 45301493940 and Contract Watch QA 45301493993 passed.
+Local staging checks: 198 Python /346 Node tests passed. Its review commit
+cebccd9c4ebd7176cd3f8f75076cdb42a99c19a3 preserved data tree
+4600d4147075d65ea204943af94dbb65c771bf9a exactly. A subsequent existing
+IWM review independently updated its report at 415059e045958b01b7508bd416b1cdbb8d6555b6;
+that report still has zero accepted current-spec observations and zero covered
+sessions. No prospective evidence was invented or backfilled by this audit.
+
+A nonblocking deployment annotation reports legacy checkout/setup-node action
+runtimes being forced from Node 20 to Node 24. Keep explicit action-runtime
+maintenance queued for a separate tested change; current deploy/bundle/browser
+gates passed and remain intact. Production score/eligibility promotion and live
+owner acceptance remain deferred to their existing evidence gates.
