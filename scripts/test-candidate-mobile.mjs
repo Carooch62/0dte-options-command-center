@@ -62,7 +62,7 @@ try{
  await page.getByText('Live ask is above $0.30.',{exact:false}).waitFor();
  assert.equal(await page.locator('#capture-refresh').innerText(),'Refresh captured batch');
  assert.match(await page.locator('#batch-counts').innerText(),/1 selected contracts.*1 matched.*0 unmatched/);
- assert.match(await page.locator('td[data-label="Setup eligibility"]').innerText(),/Not evaluated/);
+ assert.match(await page.locator('td[data-label="Setup eligibility"]').innerText(),/Stock setup unavailable/);
  assert.match(await page.locator('#workflow-help').innerText(),/does not load a newer scanner batch/);
  await page.locator('#rows .quote-details summary').click();
  await page.clock.runFor(1000);
