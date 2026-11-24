@@ -43,6 +43,11 @@ try{
   assert.equal(await page.locator('#board article').count(),0);
   await page.locator('#expiration').evaluate(el=>{el.value='week';el.dispatchEvent(new Event('input',{bubbles:true}));});
   await page.waitForFunction(()=>document.querySelector('#boardAvailability').textContent.includes('None of the 2 returned'));
+  await page.locator('.clean-nav a[href="#cleanJournal"]').click();
+  assert.equal(await page.locator('#cleanJournal').evaluate(el=>el.open),true);
+  await page.waitForFunction(()=>document.querySelector('.clean-nav a[href="#cleanJournal"]').getAttribute('aria-current')==='location');
+  assert.equal(await page.locator('.clean-nav a[href="#candidateBoard"]').getAttribute('aria-current'),null);
+  await page.locator('.clean-nav a[href="#candidateBoard"]').click();
   await page.locator('#allStocks').click();
   assert.equal(await page.locator('#board article').count(),2);
   assert.match(await page.locator('#boardAvailability').innerText(),/verified delta/);

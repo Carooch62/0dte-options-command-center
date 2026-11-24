@@ -108,3 +108,6 @@ body.workspace-ui{font-size:16px;line-height:1.55;--muted:#bccade;--line:#d3e7ff
 .workspace-ui .clean-range input{width:100%}
 .workspace-ui .controls>.smallnote{margin:0}
 @media(max-width:650px){.workspace-ui .layout-menu>summary{min-width:88px}.workspace-ui .theme-links a{font-size:14px;min-height:44px}}
+
+.workspace-ui .clean-nav a[href="#candidateBoard"]{background:transparent;box-shadow:none}
+.workspace-ui .clean-nav a[aria-current="location"]{background:linear-gradient(145deg,#87ceff33,#72b2e215);box-shadow:inset 0 1px 0 #d6efff30;color:#f4faff}
