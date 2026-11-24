@@ -1,0 +1,40 @@
+name: Compact public Pages candidate
+on:
+  pull_request:
+    paths: ['scripts/build-pages-candidate.mjs', 'scripts/build-assets.mjs', '.github/workflows/pages-candidate.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    # Staging intentionally has no production delivery snapshots to package.
+    if: github.event_name == 'workflow_dispatch' || github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !/data/
+            /data/market-dashboard.json
+            /data/market-dashboard-today.json
+            /data/scan-health.json
+            /data/scan-receipts.json
+            /data/later-expiry-shadow.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Package allowlisted public browser files and current delivery data
+        run: |
+          node scripts/build-pages-candidate.mjs
+          cat pages-candidate-size.json >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain candidate for compatibility review without deployment
+        uses: actions/upload-artifact@v4
+        with:
+          name: compact-public-pages-candidate
+          path: |
+            public/
+            pages-candidate-size.json
+          retention-days: 3

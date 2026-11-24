@@ -361,3 +361,16 @@ Earlier quota screenshots remain historical evidence; later preview successes
 do not establish the cause of earlier failures or prove account path changes.
 Live owner quote/token/Discord acceptance and prospective research gates remain
 independent. No scores, eligibility or live alert activation changes.
+
+## November 23 accuracy and delivery implementation
+
+See accuracy-speed-release.md for observed staging run gaps and the isolated
+public research dispatch repair. The review adds IWM exclusion/coverage reasons,
+provider call duration/status summaries, and visible verified-delta coverage.
+No production speed improvement or strategy acceptance is inferred. Prospective
+collection requires source synchronization and actual next-session packets;
+private first-session quote evidence remains distinct from two-session timing,
+rotating-token renewal, fee reconciliation and owner-confirmed Discord receipt.
+The user reports Workers Paid; documented entitlements are assessed separately
+from verified billing state and actual resource usage. Pages historical URL
+compatibility, activation and comparable publish timing remain explicit gates.

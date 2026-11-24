@@ -18,7 +18,9 @@ export function sourceGaps(coverage = {}, candidates = []) {
     ? `Missing stock rows: ${configured - received}/${configured}.` : '';
   const failed = [...new Set(candidates.filter(row => row.chain_status === 'SOURCE_FAILURE').map(row => row.ticker))].sort();
   const chains = failed.length ? `Failed option sources: ${failed.slice(0, 12).join(', ')}${failed.length > 12 ? ` (+${failed.length - 12} more)` : ''}.` : '';
-  return [stock, chains].filter(Boolean).join(' ');
+  const total=coverage.same_day_contract_observations, verified=coverage.same_day_verified_delta_observations;
+  const quality=Number.isInteger(total)&&total>=0&&Number.isInteger(verified)&&verified>=0&&verified<=total ? `Verified delta: ${verified}/${total} returned same-day contract observations. Quote freshness and entry checks remain separate.` : '';
+  return [stock, chains, quality].filter(Boolean).join(' ');
 }
 
 export function boardAvailability(rows, matchingStocks) {

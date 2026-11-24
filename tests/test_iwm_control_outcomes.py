@@ -43,3 +43,16 @@ class IwmControlOutcomeTests(unittest.TestCase):
         self.assertEqual(report['ranking_effect'],'NONE')
         self.assertFalse(report['execution'])
         self.assertEqual(compare(packets,datetime(2026,11,20,20,50,tzinfo=timezone.utc))['coverage_eligible_sessions'],4)
+
+    def test_diagnostics_explain_legacy_missing_source_and_partial_session(self):
+        legacy={'packet_id':'old','market_session':'OPEN'}
+        missing=packet('2026-11-19T15:00:00+00:00');missing['iwm_control']['rows']=[]
+        valid=packet('2026-11-19T15:15:00+00:00')
+        r=compare([legacy,missing,valid],datetime(2026,11,19,22,tzinfo=timezone.utc))
+        d=r['collection_diagnostics']
+        self.assertEqual(d['input_packets'],3);self.assertEqual(d['accepted_observations'],1)
+        self.assertEqual(d['excluded_by_reason']['UNSUPPORTED_OR_LEGACY_SPEC'],1)
+        self.assertEqual(d['excluded_by_reason']['MISSING_OR_AMBIGUOUS_IWM_ROW'],1)
+        self.assertEqual(r['sessions'][0]['coverage_blockers'],['FEWER_THAN_FIVE_BASELINES','NO_COMPLETE_EXACT_HORIZONS','MISSING_LATE_COVERAGE'])
+        self.assertEqual(r['coverage_eligible_sessions'],0)
+        self.assertIsNone(compare([],datetime(2026,11,19,22,tzinfo=timezone.utc))['collection_diagnostics']['latest_accepted_capture'])

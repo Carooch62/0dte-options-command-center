@@ -30,7 +30,7 @@ def validate(stage):
     if shadow.get('mode')!='SHADOW_RESEARCH_ONLY' or any(shadow.get(key)!='NONE' for key in ('ranking_effect','eligibility_effect','scoring_effect','alert_effect')):
         raise ValueError('Later-expiry research is not isolated')
     return {'status':'DEGRADED' if raw.get('core_missing') or received<configured*.9 or any(raw['coverage']['chain_status_counts'].get(status) for status in ('SOURCE_FAILURE','EMPTY_UNVERIFIED')) else 'SUCCESS',
-            'coverage':raw['coverage'],'core_missing':raw.get('core_missing',[]),'scan_id':raw['scan_id']}
+            **{key:raw.get(key) for key in ('market_session','session_open_at','session_close_at','generated_at')},'option_provider_health':raw.get('option_provider_health'),'coverage':raw['coverage'],'core_missing':raw.get('core_missing',[]),'scan_id':raw['scan_id']}
 
 def run():
     started = time.perf_counter()
