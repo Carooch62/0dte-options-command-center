@@ -12,7 +12,7 @@ const encode = bytes=>{
 const required = env=>Boolean(env.PLAID_CLIENT_ID&&env.PLAID_SECRET&&env.PLAID_STORE&&env.PLAID_ENCRYPTION_KEY&&env.PLAID_ENV&&env.CF_ACCESS_TEAM_DOMAIN&&env.CF_ACCESS_AUD&&env.CF_ACCESS_EMAIL);
 
 // Fixed categories only: never return or log claims, credentials, or binding values.
-export async function accessCheck(request,env,now=Date.now()) {
+export async function accessCheck(request,env,now=Date.now(),diagnose=false) {
   const domain=env.CF_ACCESS_TEAM_DOMAIN;
   if(!/^[a-z0-9-]+\.cloudflareaccess\.com$/.test(domain||'')||typeof env.CF_ACCESS_AUD!=='string'||!env.CF_ACCESS_AUD||typeof env.CF_ACCESS_EMAIL!=='string'||!env.CF_ACCESS_EMAIL)return 'CONFIGURATION_INVALID';
   const token=request.headers.get('Cf-Access-Jwt-Assertion');
@@ -22,13 +22,21 @@ export async function accessCheck(request,env,now=Date.now()) {
   let header,payload;
   try{header=JSON.parse(decoder.decode(decode(pieces[0])));payload=JSON.parse(decoder.decode(decode(pieces[1])));}catch{return 'ASSERTION_MALFORMED';}
   try {
-    if(!header||!payload||header.alg!=='RS256'||!header.kid||payload.iss!==`https://${domain}`||!Array.isArray(payload.aud)||!payload.aud.includes(env.CF_ACCESS_AUD)||typeof payload.email!=='string'||payload.email.toLowerCase()!==env.CF_ACCESS_EMAIL.toLowerCase()||!(payload.exp>now/1000)||!(payload.nbf===undefined||payload.nbf<=now/1000))return 'CLAIMS_REJECTED';
+    if(!header||!payload||header.alg!=='RS256'||!header.kid)return 'CLAIMS_REJECTED';
+    const claimFailure=payload.iss!==`https://${domain}`?'ISSUER_REJECTED':
+      !Array.isArray(payload.aud)||!payload.aud.includes(env.CF_ACCESS_AUD)?'AUDIENCE_REJECTED':
+      typeof payload.email!=='string'||payload.email.toLowerCase()!==env.CF_ACCESS_EMAIL.toLowerCase()?'OWNER_REJECTED':
+      !(payload.exp>now/1000)||!(payload.nbf===undefined||payload.nbf<=now/1000)?'TIME_REJECTED':null;
+    // Ordinary verification rejects claims before fetching keys. On the explicit
+    // diagnostic route, authenticate the signature before disclosing a category.
+    if(claimFailure&&!diagnose)return 'CLAIMS_REJECTED';
     let certs;
     try{certs=await fetch(`https://${domain}/cdn-cgi/access/certs`,{signal:AbortSignal.timeout(7000)});}catch{return 'KEY_SERVICE_UNAVAILABLE';}
     if(!certs.ok)return 'KEY_SERVICE_UNAVAILABLE';
     const jwk=(await certs.json()).keys?.find(k=>k.kid===header.kid&&k.kty==='RSA');if(!jwk)return 'SIGNING_KEY_UNAVAILABLE';
     const key=await crypto.subtle.importKey('jwk',jwk,{name:'RSASSA-PKCS1-v1_5',hash:'SHA-256'},false,['verify']);
-    return await crypto.subtle.verify('RSASSA-PKCS1-v1_5',key,decode(pieces[2]),encoder.encode(`${pieces[0]}.${pieces[1]}`))?'ASSERTION_VERIFIED':'SIGNATURE_REJECTED';
+    if(!await crypto.subtle.verify('RSASSA-PKCS1-v1_5',key,decode(pieces[2]),encoder.encode(`${pieces[0]}.${pieces[1]}`)))return 'SIGNATURE_REJECTED';
+    return claimFailure||'ASSERTION_VERIFIED';
   }catch{return 'VALIDATION_ERROR';}
 }
 export async function verifyAccess(request,env,now=Date.now()) {

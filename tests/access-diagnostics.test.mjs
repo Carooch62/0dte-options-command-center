@@ -33,10 +33,13 @@ test('only valid signed claims authenticate; failure categories contain no token
   const valid=await token({});
   assert.equal(await accessCheck(request(valid),env,now),'ASSERTION_VERIFIED');
   assert.equal(await verifyAccess(request(valid),env,now),true);
-  for(const change of [{iss:'https://other.example.test'},{aud:['wrong']},{email:'other@example.test'},{exp:now/1000},{nbf:now/1000+1}]){
+  for(const [change,category] of [[{iss:'https://other.example.test'},'ISSUER_REJECTED'],[{aud:['wrong']},'AUDIENCE_REJECTED'],[{email:'other@example.test'},'OWNER_REJECTED'],[{exp:now/1000},'TIME_REJECTED'],[{nbf:now/1000+1},'TIME_REJECTED']]){
    const before=calls,bad=await token(change),result=await accessCheck(request(bad),env,now);
    assert.equal(result,'CLAIMS_REJECTED');assert.equal(calls,before);
    assert.equal(await verifyAccess(request(bad),env,now),false);
+   assert.equal(await accessCheck(request(bad),env,now,true),category);
+   const forged=bad.split('.').slice(0,2).join('.')+'.'+Buffer.alloc(256).toString('base64url');
+   assert.equal(await accessCheck(request(forged),env,now,true),'SIGNATURE_REJECTED');
   }
   const badSignature=valid.split('.').slice(0,2).join('.')+'.'+Buffer.alloc(256).toString('base64url');
   assert.equal(await accessCheck(request(badSignature),env,now),'SIGNATURE_REJECTED');
