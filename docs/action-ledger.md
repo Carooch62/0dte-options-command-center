@@ -457,3 +457,20 @@ runtimes being forced from Node 20 to Node 24. Keep explicit action-runtime
 maintenance queued for a separate tested change; current deploy/bundle/browser
 gates passed and remain intact. Production score/eligibility promotion and live
 owner acceptance remain deferred to their existing evidence gates.
+
+
+### November 23 dashboard workspace UI (review)
+
+Improve the existing Liquid dashboard through a presentation-only release:
+compact layout chooser, clearer data/scan controls, readable freshness warnings,
+larger labels and touch targets, a ticker/ask toolbar, and candidate cards ahead
+of optional contract-watch and shadow research panels. Preserve the existing
+quote/journal/entry-plan controls, source limitations, disclosure persistence,
+selection/ranking behavior and live acceptance gates. Add a keyboard skip link
+and a focusable candidate section; retain reduced-transparency/contrast support.
+The stylesheet is included in the explicit asset allowlist and deploy/browser QA
+path filters. Expand synthetic board checks to 320/390/768/1280px, candidate-first
+reading order, status readability, keyboard navigation and layout-menu access.
+Local Node regressions pass (346); static assets and syntax checks pass. Desktop
+preview inspection uses labeled synthetic fixtures only. Hosted browser checks
+must pass before merge; no real quotes, fills or private account data are used.

@@ -16,6 +16,7 @@ on:
       - 'scripts/test-dashboard-option-quotes.mjs'
       - 'dashboard_clean.html'
       - 'dashboard_liquid.html'
+      - 'dashboard-workspace.css'
       - 'index.html'
       - 'dashboard.html'
       - 'scripts/test-contract-watch-ui.mjs'
