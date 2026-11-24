@@ -525,3 +525,20 @@ selects legacy credential and position-plan storage. Preserve existing mappings
 before an intentional owner change. No reconnect, token renewal, successful
 quote capture or Discord acceptance is inferred. Suppress duplicate requests
 until the identity/configuration evidence changes.
+
+### November 24 preserve private storage before owner correction (review)
+
+The owner identified the intended login identity privately. Preserve existing
+storage identity in the fixed Robinhood coordinator before correcting the
+login-email binding. The mapping is initialized once from the current deployed
+configuration under Durable Object serialization. Later login-email edits cannot
+select a different legacy credential key or position-plan object. Existing plans,
+revisions and delivery markers are not copied, reset or activated. A malformed
+mapping fails closed. Authentication still checks the configured login identity.
+
+An internal read-only readiness check reports only mapping existence on the
+signature-verified OWNER_REJECTED sign-in diagnostic; no identity or record values
+are returned. It does not initialize storage through failed authentication.
+Deploy this source with the existing owner binding and verify the existing
+scheduled position path has pinned the mapping before any binding correction.
+Synthetic preservation tests do not prove this deployment/migration occurred.
