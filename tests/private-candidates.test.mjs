@@ -90,3 +90,8 @@ test('batch counts setup reasons across eligible groups and preserves explicit c
  assert.equal(p.setup_rejection_counts['Company-specific catalyst not confirmed'],1);
  assert.equal(p.candidates[0].options[0].setup_context.qualification_checks.momentum_confirmed,true);
 });
+
+test('known stock direction excludes the opposite option side from private slots',()=>{
+ const p=projectCandidates({generated_at:'2026-10-14T14:00:00Z',candidates:[{ticker:'SPY',direction:'DOWN',options:[{...c,side:'call',ask:.2,...research},{...c,side:'put',ask:.2,...research}]}]});
+ assert.equal(p.included_contracts,1);assert.equal(p.candidates[0].options[0].side,'put');
+});
