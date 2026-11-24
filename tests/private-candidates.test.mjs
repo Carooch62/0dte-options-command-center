@@ -74,3 +74,8 @@ test('unverified public delta can reach private quote check without passing fina
 test('old price-only batches are rejected until a screened batch is regenerated',async()=>{
  const p=projectCandidates({generated_at:'2026-10-14T14:00:00Z',candidates:[]});delete p.selection_policy;await assert.rejects(readSnapshot(Response.json(p)),/batch/);
 });
+
+test('private handoff carries bounded same-scan setup context',()=>{
+ const p=projectCandidates({scan_id:'scan-1',generated_at:'2026-10-14T14:00:00Z',candidates:[{ticker:'SPY',direction:'DOWN',execution_state:'TRIGGERED',setup_qualified:true,bar_end:'2026-10-14T13:55:00Z',options:[{...c,ask:.2,...research}]}]});
+ assert.deepEqual(p.candidates[0].options[0].setup_context,{scan_id:'scan-1',bar_end:'2026-10-14T13:55:00Z',execution_state:'TRIGGERED',setup_qualified:true,direction:'DOWN',side:'put',near_atm:true,volume:20});
+});
