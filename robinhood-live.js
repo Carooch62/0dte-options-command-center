@@ -31,6 +31,13 @@ async function ownerRequest(env,path,body){
  if(!response.ok)throw Error('Robinhood authorization unavailable; reconnect or retry later');
  return response.json();
 }
+// Internal Durable Object lookup; this value never reaches a browser response.
+export async function privateStorageOwner(env){
+ if(!env.ROBINHOOD_COORDINATOR)return env.CF_ACCESS_EMAIL.toLowerCase();
+ const result=await ownerRequest(env,'/storage-owner');
+ if(typeof result.email!=='string'||!result.email)throw Error('Private storage mapping unavailable');
+ return result.email;
+}
 async function connectionState(env){
  if(env.ROBINHOOD_COORDINATOR)return ownerRequest(env,'/token');
  const saved=await legacyConnection(env);
@@ -65,6 +72,10 @@ export class RobinhoodCoordinator {
   }
   return this.state.blockConcurrencyWhile(async()=>{
   const path=new URL(request.url).pathname;
+  if(path==='/storage-owner-ready'){
+   const saved=await this.state.storage.get('storage-owner-email-v1');
+   return Response.json({ready:typeof saved==='string'&&saved.length>0});
+  }
   if(path==='/evidence-read'){
    const {day}=await request.json();if(!/^\d{4}-\d\d-\d\d$/.test(day||''))return new Response(null,{status:400});
    const raw=await this.state.storage.get('evidence:'+day);
@@ -80,22 +91,31 @@ export class RobinhoodCoordinator {
    await this.state.storage.put('evidence-days',days.slice(-30));
    return Response.json({stored:records.length});
   }
+  let storageEmail=await this.state.storage.get('storage-owner-email-v1');
+  if(storageEmail===undefined){
+   if(typeof this.env.CF_ACCESS_EMAIL!=='string'||!this.env.CF_ACCESS_EMAIL)throw Error('Private owner unavailable');
+   storageEmail=this.env.CF_ACCESS_EMAIL.toLowerCase();
+   await this.state.storage.put('storage-owner-email-v1',storageEmail);
+  }
+  if(typeof storageEmail!=='string'||!storageEmail)throw Error('Private storage mapping unavailable');
+  const storageEnv={...this.env,CF_ACCESS_EMAIL:storageEmail};
+  if(path==='/storage-owner')return Response.json({email:storageEmail});
   if(path==='/save'){
    const {sealed}=await request.json();await unseal(sealed,this.env);
    await this.state.storage.put('credential',{sealed});
-   await this.env.PLAID_STORE.delete(storageKey(this.env));
+   await this.env.PLAID_STORE.delete(storageKey(storageEnv));
    return Response.json({ok:true});
   }
   if(path==='/disconnect'){
    // Tombstone prevents an eventually consistent legacy KV read resurrecting access.
    await this.state.storage.put('credential',{sealed:null});
-   await this.env.PLAID_STORE.delete(storageKey(this.env));
+   await this.env.PLAID_STORE.delete(storageKey(storageEnv));
    return Response.json({ok:true});
   }
   if(path!=='/token')return new Response(null,{status:404});
   let stored=await this.state.storage.get('credential');
   if(stored===undefined){
-   const saved=await legacyConnection(this.env);
+   const saved=await legacyConnection(storageEnv);
    stored={sealed:saved?await seal(saved,this.env):null};
    await this.state.storage.put('credential',stored);
   }
@@ -225,7 +245,16 @@ export async function handleRobinhood(request,env){
  const requestStarted=performance.now();
  const url=new URL(request.url),path=url.pathname;
  const access=await accessCheck(request,env,Date.now(),path==='/private/plaid/robinhood/sign-in'&&request.method==='GET');
- if(access!=='ASSERTION_VERIFIED')return reply({ok:false,error:'Private sign in required',...(path==='/private/plaid/robinhood/sign-in'&&request.method==='GET'?{access_check:access}:{})},401);
+ if(access!=='ASSERTION_VERIFIED'){
+  const diagnostic=path==='/private/plaid/robinhood/sign-in'&&request.method==='GET';
+  let storageReady=null;
+  // OWNER_REJECTED is emitted only after signature, issuer and audience pass.
+  // Read mapping existence only; never initialize storage from a failed login.
+  if(diagnostic&&access==='OWNER_REJECTED'&&env.ROBINHOOD_COORDINATOR){
+   try{storageReady=(await ownerRequest(env,'/storage-owner-ready')).ready===true;}catch{/* unknown remains null */}
+  }
+  return reply({ok:false,error:'Private sign in required',...(diagnostic?{access_check:access,...(access==='OWNER_REJECTED'?{storage_mapping_ready:storageReady}:{})}:{})},401);
+ }
  // Top-level navigation lets Access establish the website session before returning
  // to the selected quote. It neither inspects nor changes Robinhood credentials.
  if(path==='/private/plaid/robinhood/sign-in'){

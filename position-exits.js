@@ -1,6 +1,6 @@
 // Owner-protected position plans and background long-option BID checkpoint reviews.
 import {verifyAccess} from './plaid-sync.js';
-import {quoteWatchContracts} from './robinhood-live.js';
+import {quoteWatchContracts,privateStorageOwner} from './robinhood-live.js';
 import {candidateQuotes} from './candidate-quotes.js';
 import {configuredDiscordWebhook} from './watch-discord-config.js';
 const reply=(body,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
@@ -95,15 +95,15 @@ export class PositionExitMonitor {
   }catch{await this.change(s=>{s.failures=Math.min(4,(s.failures||0)+1);s.next_at=now+Math.min(900000,300000*2**s.failures);s.last_check={at:new Date(now).toISOString(),status:'request-failed',retry_at:new Date(s.next_at).toISOString()};});return {status:'request-failed'};}finally{this.running=false;}
  }
 }
-const owner=env=>env.POSITION_EXIT_MONITOR.get(env.POSITION_EXIT_MONITOR.idFromName('private-exit-owner:'+env.CF_ACCESS_EMAIL.toLowerCase()));
+const owner=async env=>env.POSITION_EXIT_MONITOR.get(env.POSITION_EXIT_MONITOR.idFromName('private-exit-owner:'+await privateStorageOwner(env)));
 export async function handlePositionExits(request,env){
  if(env.APP_ENV==='preview')return reply({ok:false,error:'Private positions disabled in preview'},403);
  if(!await verifyAccess(request,env))return reply({ok:false,error:'Private sign in required'},401);
  if(!env.POSITION_EXIT_MONITOR||!env.PLAID_ENCRYPTION_KEY)return reply({ok:false,error:'Private position storage unavailable'},503);
- const url=new URL(request.url);if(request.method==='GET'&&url.pathname==='/private/plaid/robinhood/position-plans')return owner(env).fetch('https://positions/list');
+ const url=new URL(request.url);if(request.method==='GET'&&url.pathname==='/private/plaid/robinhood/position-plans')return (await owner(env)).fetch('https://positions/list');
  if(request.method!=='POST'||!['/private/plaid/robinhood/position-plans','/private/plaid/robinhood/position-plans/pause','/private/plaid/robinhood/position-plans/test'].includes(url.pathname))return reply({ok:false,error:'Invalid position operation'},405);
  if(request.headers.get('Origin')!==url.origin||request.headers.get('X-Requested-With')!=='RobinhoodQuotes')return reply({ok:false,error:'Invalid request origin'},403);
  const raw=await request.text();if(raw.length>8000)return reply({ok:false,error:'Position request too large'},413);
- return owner(env).fetch('https://positions/'+(url.pathname.endsWith('/pause')?'pause':url.pathname.endsWith('/test')?'test':'save'),{method:'POST',body:raw});
+ return (await owner(env)).fetch('https://positions/'+(url.pathname.endsWith('/pause')?'pause':url.pathname.endsWith('/test')?'test':'save'),{method:'POST',body:raw});
 }
-export async function scheduledPositionExits(env){if(env.APP_ENV==='preview'||env.POSITION_EXIT_ALERTS_ENABLED!=='true'||!env.POSITION_EXIT_MONITOR||!env.CF_ACCESS_EMAIL)return {status:'disabled'};return (await owner(env).fetch('https://positions/tick',{method:'POST'})).json();}
+export async function scheduledPositionExits(env){if(env.APP_ENV==='preview'||env.POSITION_EXIT_ALERTS_ENABLED!=='true'||!env.POSITION_EXIT_MONITOR||!env.CF_ACCESS_EMAIL)return {status:'disabled'};return (await (await owner(env)).fetch('https://positions/tick',{method:'POST'})).json();}
