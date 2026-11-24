@@ -67,6 +67,22 @@ export function attachDashboardOptionQuotes({board,getTrades=()=>[],getSnapshot=
  }
  function select(raw){if(inFlight)return;poller.enable(false);validation=[];metrics={requests:0,successful:0,fresh:0,last_ms:null};selected=optionIdentity(raw);generation++;busy=false;record=null;error='';errorCode='';render();panel.scrollIntoView({block:'center'});}
  function addControls(){
+  if(privateOrigin)for(const article of board.querySelectorAll('article.candidate')){
+   if(article.querySelector('[data-discover-option]'))continue;
+   const ticker=article.querySelector('[data-star]')?.dataset.star;
+   if(!ticker)continue;
+   const button=document.createElement('button');button.type='button';button.dataset.discoverOption=ticker;button.textContent='Verify call / put with Robinhood';
+   const result=document.createElement('p');result.className='smallnote';result.setAttribute('role','status');
+   button.onclick=async()=>{
+    button.disabled=true;result.textContent='Checking current stock setup, complete expiration and nearby Robinhood contracts…';
+    try{
+     const data=await read('/private/plaid/robinhood/discover',{method:'POST',headers:{'Content-Type':'application/json','X-Requested-With':'RobinhoodQuotes'},body:JSON.stringify({ticker})},120000);
+     if(data.status==='VERIFIED_WATCH'&&data.best){const b=data.best;result.textContent=`Best verified watch among ${data.checked} checked (${data.near_atm} nearby): ${ticker} ${b.expiry} $${b.strike} ${b.side.toUpperCase()} · ask $${b.ask.toFixed(2)} · delta ${b.delta.toFixed(2)} · spread ${b.spread_pct.toFixed(1)}% · volume ${b.volume} · quote ${b.quote_updated_at}. Check the current quote and remaining risk filters before trading. ${data.limitation}`;}
+     else result.textContent=`No verified contract: ${data.reason||data.status||'unknown'}. ${data.checked??0} checked${data.expiry?' for '+data.expiry:''}.`;
+    }catch(e){result.textContent=e.message||'Robinhood verification unavailable.';}finally{button.disabled=false;}
+   };
+   article.append(button,result);
+  }
   for(const source of board.querySelectorAll('.purchase-action [data-record-fill],button[data-watch]')){
    if(source.parentElement.querySelector('[data-rh-quote]'))continue;
    let contract;try{contract=optionIdentity(JSON.parse(decodeURIComponent(source.dataset.recordFill||source.dataset.watch)));}catch{continue;}
