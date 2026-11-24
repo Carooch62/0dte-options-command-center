@@ -40,7 +40,7 @@ export function projectCandidates(snapshot){
 }
 
 export function validateBatch(s){
- if(s?.format!=='candidate-identities-v1'||s.selection_policy!=='private-delta-handoff-v2'||s.max_per_ticker!==2||!Number.isFinite(Date.parse(s.generated_at))||!Array.isArray(s.candidates)||s.candidates.length>20)throw Error('Invalid candidate batch');
+ if(s?.format!=='candidate-identities-v1'||!['private-delta-handoff-v2','published-research-screens-v1'].includes(s.selection_policy)||s.max_per_ticker!==2||!Number.isFinite(Date.parse(s.generated_at))||!Array.isArray(s.candidates)||s.candidates.length>20)throw Error('Invalid candidate batch');
  const contracts=[],counts=new Map();
  for(const c of s.candidates){if(!Array.isArray(c.options)||c.options.length!==1||!(num(c.options[0].scanner_ask)>0&&num(c.options[0].scanner_ask)<=.30))throw Error('Invalid batch selection');counts.set(c.ticker,(counts.get(c.ticker)||0)+1);if(counts.get(c.ticker)>2)throw Error('Invalid ticker batch limit');contracts.push({...c.options[0],ticker:c.ticker});}
  if(contracts.length)contractRequest({contracts});
