@@ -11,21 +11,28 @@ const encode = bytes=>{
 };
 const required = env=>Boolean(env.PLAID_CLIENT_ID&&env.PLAID_SECRET&&env.PLAID_STORE&&env.PLAID_ENCRYPTION_KEY&&env.PLAID_ENV&&env.CF_ACCESS_TEAM_DOMAIN&&env.CF_ACCESS_AUD&&env.CF_ACCESS_EMAIL);
 
-export async function verifyAccess(request,env,now=Date.now()) {
+// Fixed categories only: never return or log claims, credentials, or binding values.
+export async function accessCheck(request,env,now=Date.now()) {
   const domain=env.CF_ACCESS_TEAM_DOMAIN;
-  if(!/^[a-z0-9-]+\.cloudflareaccess\.com$/.test(domain||''))return false;
+  if(!/^[a-z0-9-]+\.cloudflareaccess\.com$/.test(domain||'')||typeof env.CF_ACCESS_AUD!=='string'||!env.CF_ACCESS_AUD||typeof env.CF_ACCESS_EMAIL!=='string'||!env.CF_ACCESS_EMAIL)return 'CONFIGURATION_INVALID';
   const token=request.headers.get('Cf-Access-Jwt-Assertion');
-  if(!token||token.length>10000)return false;
-  const pieces=token.split('.');if(pieces.length!==3)return false;
+  if(!token)return 'ASSERTION_MISSING';
+  if(token.length>10000)return 'ASSERTION_MALFORMED';
+  const pieces=token.split('.');if(pieces.length!==3)return 'ASSERTION_MALFORMED';
+  let header,payload;
+  try{header=JSON.parse(decoder.decode(decode(pieces[0])));payload=JSON.parse(decoder.decode(decode(pieces[1])));}catch{return 'ASSERTION_MALFORMED';}
   try {
-    const header=JSON.parse(decoder.decode(decode(pieces[0]))),payload=JSON.parse(decoder.decode(decode(pieces[1])));
-    if(header.alg!=='RS256'||!header.kid||payload.iss!==`https://${domain}`||!Array.isArray(payload.aud)||!payload.aud.includes(env.CF_ACCESS_AUD)||payload.email?.toLowerCase()!==env.CF_ACCESS_EMAIL.toLowerCase()||!(payload.exp>now/1000)||!(payload.nbf===undefined||payload.nbf<=now/1000))return false;
-    const certs=await fetch(`https://${domain}/cdn-cgi/access/certs`,{signal:AbortSignal.timeout(7000)});
-    if(!certs.ok)return false;
-    const jwk=(await certs.json()).keys?.find(k=>k.kid===header.kid&&k.kty==='RSA');if(!jwk)return false;
+    if(!header||!payload||header.alg!=='RS256'||!header.kid||payload.iss!==`https://${domain}`||!Array.isArray(payload.aud)||!payload.aud.includes(env.CF_ACCESS_AUD)||typeof payload.email!=='string'||payload.email.toLowerCase()!==env.CF_ACCESS_EMAIL.toLowerCase()||!(payload.exp>now/1000)||!(payload.nbf===undefined||payload.nbf<=now/1000))return 'CLAIMS_REJECTED';
+    let certs;
+    try{certs=await fetch(`https://${domain}/cdn-cgi/access/certs`,{signal:AbortSignal.timeout(7000)});}catch{return 'KEY_SERVICE_UNAVAILABLE';}
+    if(!certs.ok)return 'KEY_SERVICE_UNAVAILABLE';
+    const jwk=(await certs.json()).keys?.find(k=>k.kid===header.kid&&k.kty==='RSA');if(!jwk)return 'SIGNING_KEY_UNAVAILABLE';
     const key=await crypto.subtle.importKey('jwk',jwk,{name:'RSASSA-PKCS1-v1_5',hash:'SHA-256'},false,['verify']);
-    return crypto.subtle.verify('RSASSA-PKCS1-v1_5',key,decode(pieces[2]),encoder.encode(`${pieces[0]}.${pieces[1]}`));
-  }catch{return false;}
+    return await crypto.subtle.verify('RSASSA-PKCS1-v1_5',key,decode(pieces[2]),encoder.encode(`${pieces[0]}.${pieces[1]}`))?'ASSERTION_VERIFIED':'SIGNATURE_REJECTED';
+  }catch{return 'VALIDATION_ERROR';}
+}
+export async function verifyAccess(request,env,now=Date.now()) {
+  return await accessCheck(request,env,now)==='ASSERTION_VERIFIED';
 }
 
 async function cipherKey(env){const bytes=decode(env.PLAID_ENCRYPTION_KEY);if(bytes.length!==32)throw Error('Encryption key must contain 32 bytes');return crypto.subtle.importKey('raw',bytes,'AES-GCM',false,['encrypt','decrypt']);}
