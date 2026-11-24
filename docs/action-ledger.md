@@ -557,7 +557,42 @@ f37672ee-9697-451c-9bb1-363160a27894. A subsequent live check at approximately
 that the existing storage identity is persisted before an owner-binding change.
 No private identity or records are published.
 
-The next owner action is to correct only CF_ACCESS_EMAIL to the privately
-identified intended login email and deploy; storage lookup identity stays pinned.
-Keep other bindings unchanged. Actual successful private status/quote access,
-token renewal and Discord receipt still require separate verification.
+The owner subsequently corrected only the login binding and deployed it;
+the live result is recorded below. Storage lookup identity stays pinned.
+
+### November 24 owner quote capture — live evidence
+
+After the owner corrected the login binding, the private sign-in route reached
+the candidate page, the stored broker connection reported available, and exact
+contract matching and quote retrieval succeeded. This resolves the immediate
+U01 owner-access prerequisite; the pinned storage mapping remains in place. No
+reconnect or rotating-token renewal is inferred.
+
+The owner-session export was retained privately outside this repository. Its
+November 24 current-scanner cohort contained 20 exactly matched contracts and
+15 successful quote responses, with 300 contract observations: 270 passing
+quote checks and 30 requiring recheck. One additional quote request returned a
+sign-in-required response and is retained as a failure; a later top-level
+sign-in completed and capture resumed. Browser request median was 699 ms over
+the 15 successful responses. This is request duration, not exchange latency.
+
+The live capture summary reported 20/20 five-minute, 20/20 ten-minute and
+16/20 fifteen-minute windows. Four fifteen-minute windows are missing and must
+not be backfilled. The November 23 private export had eight successful quote
+responses, 71/72 passing observations across nine contracts, and a 585.5 ms
+browser-request median. Both were observed during the regular XNYS session
+using the same quote source and scanner snapshots generated before first quote
+receipt. The cohorts have zero exact-contract overlap, so the 23 successful
+requests across two sessions support a request-speed sample but do not form a
+same-contract longitudinal series or prove renewal, hidden-tab recovery or
+trade eligibility. Keep U01 live acceptance open for those distinct checks.
+
+U02 exact November 19 execution/quantity review remains complete privately;
+fees/net results and publication permission remain unknown. U03's current
+`iwm-control-v1` report still has zero coverage-eligible sessions and three
+legacy-spec packets excluded. U04 research promotion, U05 any further concrete
+owner usability gap, and U06 actual open-position Discord receipt remain gated
+by their separate prospective/live evidence. No production scores, eligibility,
+alerts, trades, or unrelated automations changed. The official NYSE calendar
+has regular November 24–25 sessions, Thanksgiving closure November 26 and a
+November 27 close at 13:00 ET for equities (13:15 for eligible options).
