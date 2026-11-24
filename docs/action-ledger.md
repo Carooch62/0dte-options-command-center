@@ -542,3 +542,22 @@ are returned. It does not initialize storage through failed authentication.
 Deploy this source with the existing owner binding and verify the existing
 scheduled position path has pinned the mapping before any binding correction.
 Synthetic preservation tests do not prove this deployment/migration occurred.
+
+
+### November 24 private storage preservation verified
+
+PR176 merged as 05796e0c1a71c987336bfce1fb1c389ee0f20d58. Scanner/dashboard
+CI 45473903374, Contract Watch QA 45473903305 and phone/bundle QA
+45473902101 passed; all 354 local Node tests passed. Deployment 45474220168
+succeeded. The initial live response exposed the readiness field, then omitted
+it while main still contained it; the serving-version cause was not established.
+The reviewed deployment was retried once and succeeded as Worker version
+f37672ee-9697-451c-9bb1-363160a27894. A subsequent live check at approximately
+14:57 ET returned OWNER_REJECTED with storage_mapping_ready=true, confirming
+that the existing storage identity is persisted before an owner-binding change.
+No private identity or records are published.
+
+The next owner action is to correct only CF_ACCESS_EMAIL to the privately
+identified intended login email and deploy; storage lookup identity stays pinned.
+Keep other bindings unchanged. Actual successful private status/quote access,
+token renewal and Discord receipt still require separate verification.
