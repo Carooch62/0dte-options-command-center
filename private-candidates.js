@@ -26,7 +26,9 @@ export function projectCandidates(snapshot){
    if(o.delta_ok!==true&&!pendingDelta)continue;
    eligible++;screened.push({identity,option:o,ask,stock:c});
   }
-  screened.sort((a,b)=>(Number.isFinite(num(b.option.contract_score))?num(b.option.contract_score):-Infinity)-(Number.isFinite(num(a.option.contract_score))?num(a.option.contract_score):-Infinity));
+  // Spend the two verification slots on contracts aligned with the stock move first.
+  const aligned=item=>item.stock.direction===(item.option.side==='call'?'UP':'DOWN')?1:0;
+  screened.sort((a,b)=>aligned(b)-aligned(a)||(Number.isFinite(num(b.option.contract_score))?num(b.option.contract_score):-Infinity)-(Number.isFinite(num(a.option.contract_score))?num(a.option.contract_score):-Infinity));
   if(screened.length)groups.push(screened);
  }
  // Prefer a confirmed stock setup within the bounded verification cohort.
