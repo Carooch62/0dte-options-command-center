@@ -9,5 +9,5 @@ export class QuotePoller {
 }
 export function quoteSessionOpen(snapshot,now=Date.now()){
  const generated=Date.parse(snapshot?.generated_at),open=Date.parse(snapshot?.session_open_at),close=Date.parse(snapshot?.session_close_at);
- return snapshot?.market_session==='OPEN'&&Number.isFinite(generated)&&generated<=now&&now-generated<=600000&&Number.isFinite(open)&&Number.isFinite(close)&&open<=now&&now<close;
+ return snapshot?.market_session==='OPEN'&&Number.isFinite(generated)&&generated<=now&&now-generated<=600000&&Number.isFinite(open)&&Number.isFinite(close)&&open<=generated&&generated<close&&open<=now&&now<close;
 }

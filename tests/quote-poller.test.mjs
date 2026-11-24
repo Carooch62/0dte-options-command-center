@@ -4,3 +4,10 @@ test('auto polling is opt-in and completion-spaced without overlapping requests'
 test('hidden/session-blocked work never fetches; failures back off and authorization stops polling',async()=>{let allowed=false,result={ok:false,code:'NETWORK'},calls=0;const h=setup(async()=>{calls++;return result;},()=>allowed);h.p.enable(true);await h.fire();assert.equal(calls,0);allowed=true;await h.fire();assert.equal([...h.timers.values()][0].delay,120000);result={ok:true};await h.fire();assert.equal([...h.timers.values()][0].delay,60000);result={ok:false,code:'SIGN_IN'};await h.fire();assert.equal(h.p.enabled,false);assert.equal(h.timers.size,0);});
 test('closing during an in-flight refresh cannot restart the loop',async()=>{let finish;const h=setup(()=>new Promise(r=>finish=r));h.p.enable(true);const pending=h.fire();h.p.enable(false);finish({ok:true});await pending;assert.equal(h.timers.size,0);});
 test('foreground requires a current OPEN scan and actual session boundaries',()=>{const now=Date.parse('2026-11-19T15:00:00Z'),s={generated_at:'2026-11-19T14:59:00Z',market_session:'OPEN',session_open_at:'2026-11-19T14:30:00Z',session_close_at:'2026-11-19T21:00:00Z'};assert.equal(quoteSessionOpen(s,now),true);for(const x of [{...s,market_session:'CLOSED'},{...s,generated_at:'2026-11-19T14:00:00Z'},{...s,session_close_at:null}])assert.equal(quoteSessionOpen(x,now),false);});
+
+
+test('an OPEN label cannot make a pre-open snapshot current session evidence',()=>{
+ const snapshot={market_session:'OPEN',generated_at:'2026-11-19T14:29:00Z',session_open_at:'2026-11-19T14:30:00Z',session_close_at:'2026-11-19T21:00:00Z'};
+ assert.equal(quoteSessionOpen(snapshot,Date.parse('2026-11-19T14:35:00Z')),false);
+ assert.equal(quoteSessionOpen({...snapshot,generated_at:'2026-11-19T14:30:00Z'},Date.parse('2026-11-19T14:35:00Z')),true);
+});
