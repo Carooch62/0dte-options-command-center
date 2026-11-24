@@ -58,7 +58,7 @@ try{
   await page.waitForFunction(()=>document.querySelector('#boardAvailability').textContent.includes('1 stocks have contracts'));
   assert.doesNotMatch(await page.locator('#boardAvailability').innerText(),/missing provider/);
   assert.deepEqual(errors,[]);
-  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no document overflow with journal open at '+width+'px');
   await (await import('node:fs/promises')).mkdir('test-results/mobile',{recursive:true});
   await page.screenshot({path:`test-results/mobile/workspace-${width}.png`,fullPage:true});
   await page.close();
