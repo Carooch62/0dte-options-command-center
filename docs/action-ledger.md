@@ -507,3 +507,21 @@ keys before distinguishing issuer, audience, owner or time rejection. Forged
 assertions cannot obtain these detailed categories. Ordinary private requests
 retain their existing early claim rejection. All 348 Node regressions pass,
 including signed mismatches and forged assertions with mismatched claims.
+
+
+### November 24 signed owner mismatch confirmed live
+
+PR171 merged as 80b2598b76e22ea0e8781fa0f0edcae75195fdad after scanner/dashboard
+CI 45443381309 and mobile/Worker-bundle QA 45443381189 passed. Deployment
+45443716792 succeeded. The subsequent browser sign-in check returned
+OWNER_REJECTED after signature verification. The configured team's signature,
+issuer and audience checks passed; the signed identity did not match the
+configured owner. Time validity is checked after owner identity and is not
+inferred from this rejection. No owner email, claim or token value is published.
+
+The next owner check is the identity used for the latest Private Brokerage
+Access login in its audit log. Do not blindly rotate CF_ACCESS_EMAIL: it also
+selects legacy credential and position-plan storage. Preserve existing mappings
+before an intentional owner change. No reconnect, token renewal, successful
+quote capture or Discord acceptance is inferred. Suppress duplicate requests
+until the identity/configuration evidence changes.
