@@ -36,7 +36,7 @@
 </section>
 <section>
 <h2>1 · Load a research batch</h2>
-<p>Load up to 20 scanner contracts with research asks of $0.30 or less that pass the scanner’s quote, volume, strike-distance, delta and spread screens. At most two contracts per ticker. Then resolve their exact Robinhood metadata and refresh their live quotes. Review the scan age before using this batch.</p>
+<p>Load up to 20 scanner contracts with research asks of $0.30 or less that pass the scanner’s quote, volume, strike-distance and spread screens. Missing public delta is checked using a private quote; no contract passes final eligibility without a verified delta. At most two contracts per ticker. Then resolve their exact Robinhood metadata and refresh their live quotes. Review the scan age before using this batch.</p>
 <div class="quote-controls">
 <button id="load-current">Load current $0.30 scanner batch</button>
 <button id="load-validation">Load staging validation batch</button>
