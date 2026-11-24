@@ -35,7 +35,7 @@ test('passing quote and budget checks do not establish setup eligibility',async(
  const h=await harness();const row=h.get('rows').children[0];
  assert.equal(row.children.length,6);
  assert.equal(row.children[3].textContent,'Above $0.30 · outside budget');
- assert.match(row.children[5].textContent,/Not evaluated/);
+ assert.match(row.children[5].textContent,/Stock setup unavailable/);
  assert.match(h.get('capture-refresh').textContent,/Refresh captured batch/);
  assert.match(h.get('workflow-help').textContent,/does not load a newer scanner batch/);
 });
