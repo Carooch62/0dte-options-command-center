@@ -474,3 +474,22 @@ reading order, status readability, keyboard navigation and layout-menu access.
 Local Node regressions pass (346); static assets and syntax checks pass. Desktop
 preview inspection uses labeled synthetic fixtures only. Hosted browser checks
 must pass before merge; no real quotes, fills or private account data are used.
+
+### November 24 private Access failure diagnosis (review)
+
+After the owner updated the application's AUD binding, an independent browser
+check still returned the Worker's generic private sign-in rejection, including
+on the top-level sign-in route. No successful quote, renewal or capture clock is
+inferred. The existing verifier collapses missing assertions, invalid local
+configuration, rejected claims and signing-key failures into one boolean, so the
+observed response does not identify a cause.
+
+A small diagnostic change exposes only fixed failure categories on GET of the
+existing private sign-in route. Other private responses retain their generic
+rejection. No binding values, assertion/header/cookie contents, claims, account
+records or provider errors are returned or logged. Signature, issuer, audience,
+owner identity and time checks remain mandatory; failed checks cannot read
+broker credentials or private storage. The category is diagnostic evidence only,
+not proof that a Cloudflare policy or owner connection is configured correctly.
+Deployed diagnosis remains pending. Do not rotate unrelated settings or replace
+the owner email (which also identifies stored connections) without evidence.

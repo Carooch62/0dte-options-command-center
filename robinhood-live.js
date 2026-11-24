@@ -2,7 +2,7 @@
 import {evidenceRecords,mergeEvidence} from './private-evidence.js';
 import {contractRequest,resolveContracts,readSnapshot} from './private-candidates.js';
 import {validateRecoveryBatch} from './private-recovery.js';
-import {verifyAccess} from './plaid-sync.js';
+import {accessCheck} from './plaid-sync.js';
 import {quoteRequestTiming} from './quote-timing.js';
 import {runWatchQuotePilot} from './watch-quote-pilot.js';
 import {marketSessions} from './market-session.js';
@@ -224,7 +224,8 @@ export async function quoteWatchContracts(env, input) {
 export async function handleRobinhood(request,env){
  const requestStarted=performance.now();
  const url=new URL(request.url),path=url.pathname;
- if(!await verifyAccess(request,env))return reply({ok:false,error:'Private sign in required'},401);
+ const access=await accessCheck(request,env);
+ if(access!=='ASSERTION_VERIFIED')return reply({ok:false,error:'Private sign in required',...(path==='/private/plaid/robinhood/sign-in'&&request.method==='GET'?{access_check:access}:{})},401);
  // Top-level navigation lets Access establish the website session before returning
  // to the selected quote. It neither inspects nor changes Robinhood credentials.
  if(path==='/private/plaid/robinhood/sign-in'){
