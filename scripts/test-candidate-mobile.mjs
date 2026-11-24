@@ -5,7 +5,7 @@ import {createServer} from 'node:http';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 await mkdir('test-results/mobile',{recursive:true});
 import assert from 'node:assert/strict';
-const server=createServer(async(req,res)=>{try{const path=req.url==='/'?'candidate-quotes.html':req.url.slice(1).split('?')[0];if(!['private-request.js','candidate-quotes.html','candidate-quotes-panel.js','quote-review-bridge.js','candidate-quotes.js','robinhood-review.js','quote-evidence.js','quote-session.js','quote-timing.js','connection-ui.css','brokerage.html','dashboard-broker.js','dashboard-broker-logic.js','brokerage-history.js','execution-evidence.js','robinhood-panel.js','robinhood-connect.js','server-evidence-link.js'].includes(path)){res.writeHead(404);res.end();return;}res.setHeader('Content-Type',path.endsWith('.js')?'text/javascript':path.endsWith('.css')?'text/css':'text/html');res.end(await readFile(new URL('../'+path,import.meta.url)));}catch{res.writeHead(500);res.end();}});
+const server=createServer(async(req,res)=>{try{const path=req.url==='/'?'candidate-quotes.html':req.url.slice(1).split('?')[0];if(!['private-request.js','candidate-quotes.html','candidate-quotes-panel.js','private-setup-check.js','quote-review-bridge.js','candidate-quotes.js','robinhood-review.js','quote-evidence.js','quote-session.js','quote-timing.js','connection-ui.css','brokerage.html','dashboard-broker.js','dashboard-broker-logic.js','brokerage-history.js','execution-evidence.js','robinhood-panel.js','robinhood-connect.js','server-evidence-link.js'].includes(path)){res.writeHead(404);res.end();return;}res.setHeader('Content-Type',path.endsWith('.js')?'text/javascript':path.endsWith('.css')?'text/css':'text/html');res.end(await readFile(new URL('../'+path,import.meta.url)));}catch{res.writeHead(500);res.end();}});
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 let browser;
 let quoteOnlySample=null;
@@ -62,7 +62,7 @@ try{
  await page.getByText('Live ask is above $0.30.',{exact:false}).waitFor();
  assert.equal(await page.locator('#capture-refresh').innerText(),'Refresh captured batch');
  assert.match(await page.locator('#batch-counts').innerText(),/1 selected contracts.*1 matched.*0 unmatched/);
- assert.match(await page.locator('td[data-label="Setup eligibility"]').innerText(),/Not evaluated/);
+ assert.match(await page.locator('td[data-label="Setup eligibility"]').innerText(),/Stock setup unavailable/);
  assert.match(await page.locator('#workflow-help').innerText(),/does not load a newer scanner batch/);
  await page.locator('#rows .quote-details summary').click();
  await page.clock.runFor(1000);
