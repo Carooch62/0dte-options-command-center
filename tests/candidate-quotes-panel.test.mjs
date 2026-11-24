@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {candidateQuotes} from '../candidate-quotes.js';
+import {privateSetupCheck} from '../private-setup-check.js';
 import {validateRobinhoodPack} from '../robinhood-review.js';
 import {quoteGuidance,appendQuoteEvidence,quoteEvidenceInput,scannerFromEvidencePacket,validationTiming} from '../quote-evidence.js';
 import {SESSION_KEY,sessionPayload,restoreSession} from '../quote-session.js';
@@ -14,7 +15,7 @@ async function harness(responses=[],storage=new Map(),prime=true,consent=()=>tru
  const get=id=>{if(!nodes.has(id))nodes.set(id,node());return nodes.get(id);};let tick;
  const calls=[];const fetch=async(...args)=>{calls.push(args);return responses.shift();};
  const sessionStorage={getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)};
- new Function('document','fetch','setInterval','candidateQuotes','validateRobinhoodPack','quoteGuidance','appendQuoteEvidence','quoteEvidenceInput','scannerFromEvidencePacket','validationTiming','SESSION_KEY','sessionPayload','restoreSession','sessionStorage','confirm','quoteRequestTiming','requestJSON','safeRequestAttempts','captureWindows','captureAction',source)({getElementById:get,createElement:node},fetch,fn=>tick=fn,candidateQuotes,validateRobinhoodPack,quoteGuidance,appendQuoteEvidence,quoteEvidenceInput,scannerFromEvidencePacket,validationTiming,SESSION_KEY,sessionPayload,restoreSession,sessionStorage,consent,quoteRequestTiming,(url,options,ms)=>requestJSON(url,options,ms,fetch),safeRequestAttempts,captureWindows,captureAction);
+ new Function('document','fetch','setInterval','candidateQuotes','validateRobinhoodPack','quoteGuidance','appendQuoteEvidence','quoteEvidenceInput','scannerFromEvidencePacket','validationTiming','SESSION_KEY','sessionPayload','restoreSession','sessionStorage','confirm','quoteRequestTiming','requestJSON','safeRequestAttempts','captureWindows','captureAction','privateSetupCheck',source)({getElementById:get,createElement:node},fetch,fn=>tick=fn,candidateQuotes,validateRobinhoodPack,quoteGuidance,appendQuoteEvidence,quoteEvidenceInput,scannerFromEvidencePacket,validationTiming,SESSION_KEY,sessionPayload,restoreSession,sessionStorage,consent,quoteRequestTiming,(url,options,ms)=>requestJSON(url,options,ms,fetch),safeRequestAttempts,captureWindows,captureAction,privateSetupCheck);
  const load=async(id,data)=>get(id).onchange({target:{files:[{size:100,text:async()=>JSON.stringify(data)}]}});
  const id='bbdbf613-f3e0-4f68-9cc7-fc090ca84e24';const now=new Date().toISOString();
  if(prime){await load('scanner',{candidates:[{ticker:'SPY',options:[{strike:778,side:'call',expiry:'2026-10-12'}]}]});
