@@ -14,9 +14,11 @@ def stamp(value):
     return parse_time(value)
 
 def observations(packets, diagnostics=None):
-    rows=[];gaps=0;seen=set()
+    rows=[];gaps=0;seen={};conflicts=set()
     diagnostics = diagnostics if diagnostics is not None else Counter()
     for packet in packets:
+        if not isinstance(packet,dict) or not isinstance(packet.get('iwm_control',{}),dict):
+            gaps+=1;diagnostics['MALFORMED_PACKET']+=1;continue
         control=packet.get('iwm_control') or {}
         if control.get('spec_version')!='iwm-control-v1':
             diagnostics['UNSUPPORTED_OR_LEGACY_SPEC']+=1;continue
@@ -28,16 +30,22 @@ def observations(packets, diagnostics=None):
         info=session_info(generated)
         if info['session']!='OPEN' or captured>=parse_time(info['close_at']):
             gaps+=1;diagnostics['OUTSIDE_EXCHANGE_SESSION']+=1;continue
-        matches=[r for r in control.get('rows',[]) if r.get('ticker')=='IWM']
+        source_rows=control.get('rows',[])
+        if not isinstance(source_rows,list) or any(not isinstance(r,dict) for r in source_rows) or any(not isinstance(packet.get(k),str) or not packet[k].strip() for k in ('packet_id','scan_id')):
+            gaps+=1;diagnostics['MALFORMED_PACKET']+=1;continue
+        matches=[r for r in source_rows if r.get('ticker')=='IWM']
         if len(matches)!=1:
             gaps+=1;diagnostics['MISSING_OR_AMBIGUOUS_IWM_ROW']+=1;continue
         row=matches[0];bar=stamp(row.get('bar_end'));price=row.get('price')
-        if not bar or not parse_time(info['open_at'])<bar<=generated or not 0<=(generated-bar).total_seconds()<=480 or type(price) not in (float,int) or not math.isfinite(price) or price<=0 or not row.get('price_source'):
+        if not bar or not parse_time(info['open_at'])<bar<=generated or not 0<=(generated-bar).total_seconds()<=480 or type(price) not in (float,int) or not math.isfinite(price) or price<=0 or not isinstance(row.get('price_source'),str) or not row['price_source'].strip():
             gaps+=1;diagnostics['INVALID_OR_STALE_SOURCE_BAR']+=1;continue
         key=(packet.get('packet_id'),packet.get('scan_id'))
         if key in seen:
-            diagnostics['DUPLICATE_PACKET']+=1;continue
-        seen.add(key)
+            if packet!=seen[key]:
+                diagnostics['CONFLICTING_PACKET_IDENTITY']+=1;conflicts.add(key);gaps+=1
+            else:diagnostics['DUPLICATE_PACKET']+=1
+            continue
+        seen[key]=packet
         rows.append({'packet_id':packet.get('packet_id'),'scan_id':packet.get('scan_id'),
                      'generated_at':packet['generated_at'],'captured_at':packet['captured_at'],
                      'market_date':info['market_date'],'open_at':info['open_at'],'close_at':info['close_at'],
@@ -46,6 +54,7 @@ def observations(packets, diagnostics=None):
                      'direction':row.get('direction'),'news_status':row.get('news_status'),
                      'pattern_research':row.get('pattern_research'),'trend_context':row.get('trend_context'),
                      'qualification_reasons':row.get('qualification_reasons')})
+    rows=[r for r in rows if (r['packet_id'],r['scan_id']) not in conflicts]
     return sorted(rows,key=lambda r:(stamp(r['captured_at']),stamp(r['generated_at']))),gaps
 
 def compare(packets,now=None):
@@ -53,10 +62,15 @@ def compare(packets,now=None):
     diagnostics=Counter();rows,gaps=observations(packets,diagnostics)
     diagnostics['FUTURE_CAPTURE_EXCLUDED']=sum(stamp(r['captured_at'])>now for r in rows)
     rows=[r for r in rows if stamp(r['captured_at'])<=now]
-    indexed={};sessions=defaultdict(list)
+    indexed={};sessions=defaultdict(list);ambiguous=set()
     for row in rows:
-        # First recorded observation of a bar wins. Later revisions are not backfilled.
-        indexed.setdefault((row['market_date'],row['bar_end'],row['price_source']),row)
+        # Keep the first recorded bar; conflicting simultaneous captures are unusable.
+        key=(row['market_date'],row['bar_end'],row['price_source'])
+        first=indexed.setdefault(key,row)
+        if (stamp(first['captured_at']),stamp(first['generated_at'])) == (stamp(row['captured_at']),stamp(row['generated_at'])) and any(first[k]!=row[k] for k in ('price','setup_qualified','direction','execution_state','news_status','pattern_research','trend_context','qualification_reasons')):
+            ambiguous.add(key)
+    for key in ambiguous:del indexed[key]
+    diagnostics['AMBIGUOUS_FIRST_BAR']=len(ambiguous)
     baselines=list(indexed.values());results=[]
     for row in baselines:
         outcomes=[]
@@ -100,7 +114,12 @@ def compare(packets,now=None):
 def collect(data_dir='data',now=None):
     data=Path(data_dir)
     if json.loads((data/'staging-environment.json').read_text()).get('environment')!='staging':raise ValueError('Staging marker required')
-    packets=[json.loads(path.read_text()) for path in sorted((data/'shadow-evidence').glob('*')) if path.is_file() and path.suffix!='.tmp']
+    packets=[]
+    for path in sorted((data/'shadow-evidence').glob('*')):
+        if not path.is_file() or path.suffix=='.tmp':continue
+        try:packets.append(json.loads(path.read_text()))
+        except (json.JSONDecodeError,UnicodeDecodeError):packets.append(None)
+
     result=compare(packets,now)
     from shadow_evidence import atomic_json
     atomic_json(data/'iwm-control-outcomes.json',result)

@@ -56,3 +56,48 @@ class IwmControlOutcomeTests(unittest.TestCase):
         self.assertEqual(r['sessions'][0]['coverage_blockers'],['FEWER_THAN_FIVE_BASELINES','NO_COMPLETE_EXACT_HORIZONS','MISSING_LATE_COVERAGE'])
         self.assertEqual(r['coverage_eligible_sessions'],0)
         self.assertIsNone(compare([],datetime(2026,11,19,22,tzinfo=timezone.utc))['collection_diagnostics']['latest_accepted_capture'])
+
+
+    def test_malformed_packets_are_excluded_without_losing_valid_observations(self):
+        valid=packet('2026-11-19T15:00:00+00:00')
+        malformed=[None,[],{'iwm_control':[]}, {**valid,'iwm_control':{'spec_version':'iwm-control-v1','rows':None}},packet('2026-11-19T15:15:00+00:00',price_source={'source':'PUBLIC'}),{**valid,'packet_id':[]},{**valid,'scan_id':''}]
+        report=compare([*malformed,valid],datetime(2026,11,19,22,tzinfo=timezone.utc))
+        self.assertEqual(len(report['results']),1)
+        self.assertEqual(report['invalid_or_missing_packets'],len(malformed))
+        self.assertEqual(report['coverage_eligible_sessions'],0)
+
+    def test_conflicting_first_observations_do_not_depend_on_input_order_or_use_revisions(self):
+        base=packet('2026-11-19T15:00:00+00:00')
+        target=packet('2026-11-19T15:15:00+00:00',101)
+        conflict=copy.deepcopy(target);conflict['packet_id']='conflict';conflict['iwm_control']['rows'][0]['price']=999
+        revision=copy.deepcopy(target);revision['packet_id']='revision';revision['captured_at']='2026-11-19T15:16:00+00:00'
+        for packets in [[base,target,conflict,revision],[revision,conflict,target,base]]:
+            report=compare(packets,datetime(2026,11,19,22,tzinfo=timezone.utc))
+            self.assertEqual(report['results'][0]['outcomes'][0]['status'],'MISSING_EXACT_BAR')
+            self.assertEqual(report['collection_diagnostics']['excluded_by_reason']['AMBIGUOUS_FIRST_BAR'],1)
+
+    def test_corrupt_file_does_not_block_atomic_report_or_fabricate_coverage(self):
+        import json
+        import tempfile
+        from pathlib import Path
+        from iwm_control_outcomes import collect
+        with tempfile.TemporaryDirectory() as root:
+            data=Path(root);(data/'shadow-evidence').mkdir()
+            (data/'staging-environment.json').write_text(json.dumps({'environment':'staging'}))
+            (data/'shadow-evidence'/'broken').write_text('{')
+            (data/'shadow-evidence'/'valid').write_text(json.dumps(packet('2026-11-19T15:00:00+00:00')))
+            collect(root,datetime(2026,11,19,22,tzinfo=timezone.utc))
+            result=json.loads((data/'iwm-control-outcomes.json').read_text())
+            self.assertEqual(result['collection_diagnostics']['accepted_observations'],1)
+            self.assertEqual(result['invalid_or_missing_packets'],1)
+            self.assertEqual(result['coverage_eligible_sessions'],0)
+
+
+    def test_duplicate_identity_conflicts_withhold_both_versions(self):
+        valid=packet('2026-11-19T15:00:00+00:00')
+        conflict=copy.deepcopy(valid);conflict['iwm_control']['rows'][0]['price']=999
+        for packets in [[valid,conflict],[conflict,valid]]:
+            report=compare(packets,datetime(2026,11,19,22,tzinfo=timezone.utc))
+            self.assertEqual(report['results'],[])
+            self.assertEqual(report['collection_diagnostics']['excluded_by_reason']['CONFLICTING_PACKET_IDENTITY'],1)
+        self.assertEqual(len(compare([valid,valid],datetime(2026,11,19,22,tzinfo=timezone.utc))['results']),1)

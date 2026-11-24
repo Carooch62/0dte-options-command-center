@@ -6,7 +6,7 @@ test('reports attempted coverage and limits missed-candidate conclusions', () =>
   assert.deepEqual(coverageReport({chains_attempted: 76, chains_not_attempted: 130}), {
     summary: 'Option-chain checks: 76/206 (36.9%).', incomplete: true,
   });
-  assert.equal(coverageReport({chains_attempted: 10, chains_not_attempted: 0}).incomplete, false);
+  assert.equal(coverageReport({chains_attempted: 10, chains_not_attempted: 0}).incomplete, true);
   assert.equal(coverageReport({}).summary, 'Option-chain coverage unknown.');
   assert.equal(coverageReport({chains_attempted: 10, chains_not_attempted: -1}).incomplete, true);
 });
@@ -42,4 +42,12 @@ test('verified delta coverage does not imply quote freshness or invent legacy co
  assert.match(sourceGaps({same_day_contract_observations:20,same_day_verified_delta_observations:5}),/freshness and entry checks remain separate/);
  assert.equal(sourceGaps({same_day_contract_observations:2,same_day_verified_delta_observations:3}),'');
  assert.equal(sourceGaps({}),'');
+});
+
+
+test('full attempts need reconciled numeric status counts before coverage is complete',()=>{
+ for(const counts of [null,{}, {SUCCESS:9},{SUCCESS:11},{SUCCESS:'10'},{SUCCESS:10,UNKNOWN:-1},{SUCCESS:10,UNKNOWN:NaN},['SUCCESS']])
+  assert.equal(coverageReport({chains_attempted:10,chains_not_attempted:0,chain_status_counts:counts}).incomplete,true);
+ assert.equal(coverageReport({chains_attempted:10,chains_not_attempted:0,chain_status_counts:{SUCCESS:9,NO_EXPIRATION_TODAY:1}}).incomplete,false);
+ for(const attempted of ['10',true,null])assert.equal(coverageReport({chains_attempted:attempted,chains_not_attempted:0,chain_status_counts:{SUCCESS:10}}).summary,'Option-chain coverage unknown.');
 });

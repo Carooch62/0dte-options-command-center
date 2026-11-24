@@ -409,3 +409,24 @@ The privately supplied November 23 quote export advances first-session 5/10/15
 capture evidence. Two-session request timing, actual rotating-token renewal,
 fee/net evidence and real open-position Discord receipt remain separate gates.
 No private account, contract, price, fill, fee or token records are published here.
+
+### November 23 quality audit: evidence integrity fixes (review)
+
+Regression checks reproduced incomplete chain results being shown as complete,
+pre-open snapshots qualifying as OPEN-session quote evidence, malformed frozen
+IWM records aborting report generation, and tied conflicting bar observations
+producing input-order-dependent outcomes. Coverage now requires numeric,
+reconciled source-status counts. Quote polling/session evidence requires a snapshot
+generated within the declared session. IWM reporting excludes malformed inputs,
+conflicting packet identities and ambiguous first bars, reports exclusions, and
+never substitutes later revisions. A corrupt packet file is counted rather than
+preventing a report from the remaining valid records. Staging capture also requires
+a nonempty request ID matching both validated health and snapshot; three missing
+IDs no longer satisfy that check.
+
+Local validation: 196 Python tests and 346 Node tests pass; browser asset and
+compact candidate builds, JavaScript syntax and whitespace checks pass. These
+are synthetic regression/build results, not owner-session, prospective-session,
+token-renewal, fee, Discord-delivery or profitability acceptance. No production
+ranking/eligibility settings, trading alerts or stored evidence were changed.
+Main and isolated staging review/deployment results will be recorded separately.
