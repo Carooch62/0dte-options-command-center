@@ -29,6 +29,8 @@ export function projectCandidates(snapshot){
   screened.sort((a,b)=>(Number.isFinite(num(b.option.contract_score))?num(b.option.contract_score):-Infinity)-(Number.isFinite(num(a.option.contract_score))?num(a.option.contract_score):-Infinity));
   if(screened.length)groups.push(screened);
  }
+ // Prefer a confirmed stock setup within the bounded verification cohort.
+ groups.sort((a,b)=>Number(b[0].stock.setup_qualified===true&&['TRIGGERED','CONFIRMED'].includes(b[0].stock.execution_state))-Number(a[0].stock.setup_qualified===true&&['TRIGGERED','CONFIRMED'].includes(a[0].stock.execution_state)));
  const perTicker=new Map();
  for(const group of groups)for(const {identity,option,ask,stock} of group){
   if(selected.length>=20)break;
