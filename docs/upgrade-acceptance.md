@@ -8,6 +8,15 @@ Open the private Liquid dashboard in the owner's Safari session, select one exac
 
 Speed acceptance needs at least 20 passing OPEN quotes across at least two sessions. Export separate captures if needed; review their exact contract/source and operating conditions before pooling. The displayed p50/p95 are browser request durations, not exchange-to-screen latency. A sample count cannot validate token renewal. Observe actual expiration/renewal and the server's rotated-token handling without displaying/exporting tokens. Authentication failure, hidden-tab recovery and throttling backoff need live acceptance as well as regression tests.
 
+November 24 live check: two regular-session private exports now contain 23
+successful quote requests and 341 passing contract observations in total. The
+November 24 cohort captured 20/20 five-minute, 20/20 ten-minute and 16/20
+fifteen-minute windows; four remain missing. The exact contracts do not overlap
+between sessions. These counts support a two-session request-speed review,
+subject to comparable-condition interpretation, while real token renewal,
+hidden-tab and throttling acceptance remain unverified. The exports remain
+private; do not put identities, prices, tokens or failures' raw payloads here.
+
 ## Actual fills and exits
 
 Read-only broker execution and position retrieval is available. The November 19 execution reconciliation is already complete privately. Preserve original entry-session classifications. Fees and net results remain unverified. Consult the existing private case before repeating reconciliation. Fetch only from the exact authorized account. Reconcile execution IDs, exact contract metadata, execution times including timezone, quantities, partial fills, cancellations, subsequent sells, and current position quantity. Missing executions or later sales require manual reconciliation. Confirm fee totals separately; zero entered/default fees are not evidence of zero broker fees. Research quotes and manually entered fills must remain distinguishable. Never infer a missing entry clock, fee or net result from a closing-review summary.
