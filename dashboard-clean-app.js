@@ -435,6 +435,11 @@ function setupCleanLayout(){
   $('check').title='Download the latest published results without requesting a scan';
   $('scan').title='Request a new scanner run; execution may queue';
   controls.prepend($('scan'));
+  filters.append(shortcuts,help);
+  const scanPanel=controls.closest('.scan-panel'),scanHelp=scanPanel.querySelector(':scope > .smallnote');
+  if(scanHelp)progress.append(scanHelp);
+  progress.append(advanced,scanPanel.querySelector('.coverage-details'));
+  $('freshness').after(progress);
   const updateSection=()=>{for(const link of document.querySelectorAll('.clean-nav a')){if(link.getAttribute('href')===(location.hash||'#candidateBoard'))link.setAttribute('aria-current','location');else link.removeAttribute('aria-current');}};
   window.addEventListener('hashchange',updateSection);updateSection();
   range.querySelector('label small').textContent='Ask minimum ($)';range.querySelectorAll('label small')[1].textContent='Ask maximum ($)';

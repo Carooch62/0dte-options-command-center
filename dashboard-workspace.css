@@ -114,3 +114,10 @@ body.workspace-ui{font-size:16px;line-height:1.55;--muted:#bccade;--line:#d3e7ff
 .workspace-ui .filters .filterbox small{font-size:14px;line-height:1.5}
 .workspace-ui #cleanJournal .controls>label{display:grid;gap:8px;width:100%;max-width:100%;min-width:0;font-size:14px}
 .workspace-ui input[type="file"]{width:100%;max-width:100%;min-width:0;font-size:14px}
+
+.workspace-ui .clock #clock:empty{display:none}
+.workspace-ui .clock #clock:empty:before{content:none}
+.workspace-ui #cleanScanDetails>.smallnote{font-size:14px;margin:8px 0}
+.workspace-ui #filterPanel>[aria-label="Saved dashboard views"]{margin-top:16px}
+.workspace-ui .board-navigation .controls button{white-space:nowrap;flex:0 1 auto}
+@media(max-width:650px){.workspace-ui .eyebrow{display:none}.workspace-ui .board-navigation .controls button{font-size:14px;padding:8px 10px}.workspace-ui #freshness .notice{margin-top:12px}}

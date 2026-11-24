@@ -31,6 +31,7 @@ try{
   await page.goto(`http://127.0.0.1:${server.address().port}/dashboard_liquid.html`);
   await page.locator('#board').getByText(/Matching contracts only is on/).waitFor();
   assert.ok(await page.locator('#candidateBoard').evaluate(board=>['earlyWatchPanel','laterExpiryShadowPanel','contractWatchPanel'].every(id=>!!(board.compareDocumentPosition(document.getElementById(id))&Node.DOCUMENT_POSITION_FOLLOWING))),'candidates precede optional research in reading order');
+  assert.equal(await page.locator('[data-view=save]').isVisible(),false,'saved views stay in advanced filters');
   assert.ok(await page.locator('#freshness .notice').evaluate(el=>parseFloat(getComputedStyle(el).fontSize)>=14),'freshness stays readable');
   assert.ok(await page.locator('#scan').evaluate(el=>el.getBoundingClientRect().height>=44),'scan touch target');
   await page.getByRole('link',{name:'Skip to candidate board',exact:true}).focus();
