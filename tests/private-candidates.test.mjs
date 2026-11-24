@@ -51,11 +51,11 @@ test('nullable empty provider lists and terminal cursor are treated as missing o
  assert.equal((await resolveContracts([c],provider([instrument()],null)))[0].status,'EXACT_METADATA_MATCH');
 });
 
-test('price alone cannot pass; each missing or failed research screen excludes the contract',()=>{
+test('price alone cannot pass; each missing or failed non-delta research screen excludes the contract',()=>{
  const make=o=>projectCandidates({generated_at:'2026-10-14T14:00:00Z',candidates:[{ticker:'SPY',options:[{...c,ask:.20,...o}]}]});
  assert.equal(make({}).included_contracts,0);
- for(const field of ['quote_valid','near_atm','delta_ok','usable_spread','volume','dte']){const o={...research};delete o[field];assert.equal(make(o).included_contracts,0,field);}
- for(const field of ['quote_valid','near_atm','delta_ok','usable_spread'])assert.equal(make({...research,[field]:false}).included_contracts,0,field);
+ for(const field of ['quote_valid','near_atm','usable_spread','volume','dte']){const o={...research};delete o[field];assert.equal(make(o).included_contracts,0,field);}
+ for(const field of ['quote_valid','near_atm','usable_spread'])assert.equal(make({...research,[field]:false}).included_contracts,0,field);
  assert.equal(make({...research,volume:19}).included_contracts,0);assert.equal(make({...research,dte:15}).included_contracts,0);
 });
 test('batch respects published contract scores, two per ticker, global 20 and discloses research rejects',()=>{
@@ -66,6 +66,11 @@ test('batch respects published contract scores, two per ticker, global 20 and di
  const rejected=projectCandidates({generated_at:s.generated_at,candidates:[{ticker:'SPY',options:[{...c,ask:.20}]}]});assert.equal(rejected.price_qualifying_contracts,1);assert.equal(rejected.research_rejected_contracts,1);assert.equal(rejected.included_contracts,0);
 });
 
+test('unverified public delta can reach private quote check without passing final eligibility',()=>{
+ const p=projectCandidates({generated_at:'2026-10-14T14:00:00Z',candidates:[{ticker:'SPY',options:[{...c,ask:.20,...research,delta_ok:false,greeks_verified:false,delta:0}]}]});
+ assert.equal(p.included_contracts,1);assert.equal(p.candidates[0].options[0].delta_ok,undefined);
+ const failed=projectCandidates({generated_at:'2026-10-14T14:00:00Z',candidates:[{ticker:'SPY',options:[{...c,ask:.20,...research,delta_ok:false,greeks_verified:true,delta:.2}]}]});assert.equal(failed.included_contracts,0);
+});
 test('old price-only batches are rejected until a screened batch is regenerated',async()=>{
  const p=projectCandidates({generated_at:'2026-10-14T14:00:00Z',candidates:[]});delete p.selection_policy;await assert.rejects(readSnapshot(Response.json(p)),/batch/);
 });
