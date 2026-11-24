@@ -27,7 +27,7 @@ try{
    assert.match(await page.locator('#batch-counts').innerText(),/missing-delta research candidates; none approved/);
    await page.locator('#resolve').click();await page.locator('#quote-summary').filter({hasText:'1 fresh quotes within'}).waitFor();
    await page.locator('#rows details > summary').click();assert.match(await page.locator('#rows details').innerText(),/Delta: 0.4 · PREFERRED_RANGE/);
-   assert.match(await page.locator('#rows td').last().innerText(),/Not evaluated/);
+   assert.match(await page.locator('#rows td').last().innerText(),/Stock setup unavailable/);
    await page.reload();await page.locator('#batch-identity').filter({hasText:'PRIVATE RECOVERY RESEARCH'}).waitFor();assert.match(await page.locator('#batch-counts').innerText(),/none approved/);
    assert.ok(!(await page.evaluate(()=>sessionStorage.getItem('private-quote-session-v1'))).includes('NEVER_STORE'));
    // Reload collapses the recovery disclosure; reopen before the next selection.
