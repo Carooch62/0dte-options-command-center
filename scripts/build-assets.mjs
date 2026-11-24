@@ -23,6 +23,7 @@ const assets = [
   "dashboard_glass_previous.html",
   "dashboard_mobile_preview.html",
   "dashboard-mobile.css",
+  "dashboard-workspace.css",
   "connection-ui.css",
   "dashboard-app-previous.js",
   "dashboard-app.js",

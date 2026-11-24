@@ -35,7 +35,7 @@ function trendContext(x){
  const contextStatus=t.status==='READY'?'Completed daily bars':t.status==='INSUFFICIENT_HISTORY'?'Some horizons lack complete history':t.status==='STALE'?'Historical daily data':t.status==='SOURCE_FAILURE'?'Daily source unavailable; retained history only':'Daily context not recorded yet';
  return `<section class="trend-context"><div class="row"><b>Longer-term trend</b><span class="tag ${color}">${esc(labels[t.alignment])}</span></div><div class="metrics">${t.periods.map(p=>`<div class="metric"><small>${esc(p.label.toUpperCase())} · ${p.sessions} SESSIONS</small><b>${movePercent(p.change)}</b><small>${esc(p.direction)} · highs ${esc(p.highs.toLowerCase())} · lows ${esc(p.lows.toLowerCase())}</small></div>`).join('')}</div><p class="smallnote">${esc(contextStatus)}${t.asOf?' · as of '+esc(t.asOf):''}. Adjusted for splits and dividends. Daily context only; verify today’s entry separately.</p></section>`;
 }
-function stockLink(ticker){const url=robinhoodStockUrl(ticker);return url?`<a class="broker-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Open ${esc(ticker)} in Robinhood ↗</a>`:'';}
+function stockLink(ticker){const url=robinhoodStockUrl(ticker);return url?`<a class="broker-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Open ${esc(ticker)} in Robinhood</a>`:'';}
 function tradeChecklist(x){
  const key=x.ticker+'|'+String(data?.generated_at||'').slice(0,10),plans=read('0dteEntryPlans',{}),p=plans[key]||{};
  return `<section class="entry-plan" data-plan-key="${esc(key)}"><b>Before opening a trade</b><p class="smallnote">${esc(x.expiration_window?'Later-expiry research only':entryReadiness(x,dataDownloadFailed?{...data,generated_at:null}:data))}<br>Setup qualified: ${x.setup_qualified===true?'Yes':x.setup_qualified===false?'No':'Unknown'} · chase ${esc(x.chase_risk||'UNKNOWN')}<br>Bar age ${value(minutes(x.bar_end),1)} min · invalidation ${money(x.invalidation_price)}<br>WATCH is not entry confirmation. Verify the current trigger, bid/ask and quote time.</p><details class="details" data-ticker="${esc(x.ticker)}" data-section="plan"><summary>My entry plan · saved on this device</summary><div class="plan-fields">${[['contract','Contract / expiration','text'],['entry','Intended premium ($/share)','number'],['maxLoss','Maximum planned loss ($)','number'],['exit','Exit / invalidation condition','text']].map(([field,label,type])=>`<label>${label}<input data-plan-field="${field}" type="${type}" ${type==='number'?'min="0" step="0.01"':''} value="${esc(p[field]||'')}"></label>`).join('')}</div><label><input type="checkbox" data-plan-field="checked" ${p.checked&&p.scanId===data?.scan_id?'checked':''}> I checked a fresh setup and current quote</label><p class="smallnote">A personal reminder, not scanner confirmation or an order. Planned loss is not a guaranteed stop; a long option can lose its full premium. Recheck after each new scan.</p><span class="plan-save-status" role="status"></span></details></section>`;
@@ -426,6 +426,28 @@ function setupCleanLayout(){
   for(const link of document.querySelectorAll('a[href="#'+id+'"]'))link.addEventListener('click',()=>{details.open=true;});
  }
 
+ if(document.body.classList.contains('workspace-ui')){
+  // Keep stock candidates ahead of optional research panels in visual and keyboard order.
+  const board=$('candidateBoard');
+  let previous=board;
+  for(const id of ['contractWatchPanel','earlyWatchPanel','laterExpiryShadowPanel']){const section=$(id);previous.after(section);previous=section;}
+  $('check').textContent='Reload data';$('scan').textContent='Request new scan';
+  $('check').title='Download the latest published results without requesting a scan';
+  $('scan').title='Request a new scanner run; execution may queue';
+  controls.prepend($('scan'));
+  filters.append(shortcuts,help);
+  const scanPanel=controls.closest('.scan-panel'),scanHelp=scanPanel.querySelector(':scope > .smallnote');
+  if(scanHelp)progress.append(scanHelp);
+  progress.append(advanced,scanPanel.querySelector('.coverage-details'));
+  $('freshness').after(progress);
+  const updateSection=()=>{for(const link of document.querySelectorAll('.clean-nav a')){if(link.getAttribute('href')===(location.hash||'#candidateBoard'))link.setAttribute('aria-current','location');else link.removeAttribute('aria-current');}};
+  window.addEventListener('hashchange',updateSection);updateSection();
+  range.querySelector('label small').textContent='Ask minimum ($)';range.querySelectorAll('label small')[1].textContent='Ask maximum ($)';
+  advanced.querySelector('summary').textContent='Update settings';
+  const researchLink=document.createElement('a');researchLink.href='#contractWatchPanel';researchLink.className='quiet-link';researchLink.textContent='Contract watch';
+  $('candidateBoard').querySelector('.board-heading').append(researchLink);
+  researchLink.addEventListener('click',()=>{$('contractWatchPanel').querySelector('details').open=true;});
+ }
 }
 setupCleanLayout();
 attachTradeExitAssistant({board:$('board'),journal:$('journal'),getSnapshot:()=>data});

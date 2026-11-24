@@ -16,6 +16,7 @@ on:
       - 'scripts/test-dashboard-option-quotes.mjs'
       - 'dashboard_clean.html'
       - 'dashboard_liquid.html'
+      - 'dashboard-workspace.css'
       - 'index.html'
       - 'dashboard.html'
       - 'scripts/test-contract-watch-ui.mjs'
@@ -51,3 +52,11 @@ jobs:
       - run: node scripts/test-candidate-board-ui.mjs
 
       - run: node scripts/test-dashboard-option-quotes.mjs
+      - name: Preserve synthetic dashboard layout screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-workspace-${{ github.run_id }}
+          path: test-results/mobile/workspace-*.png
+          if-no-files-found: warn
+          retention-days: 7
