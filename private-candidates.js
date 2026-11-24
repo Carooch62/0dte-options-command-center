@@ -24,17 +24,17 @@ export function projectCandidates(snapshot){
    // A missing public Greek may be verified privately; an observed out-of-range delta cannot.
    const pendingDelta=o.delta_ok!==true&&o.greeks_verified===false&&num(o.delta)===0;
    if(o.delta_ok!==true&&!pendingDelta)continue;
-   eligible++;screened.push({identity,option:o,ask});
+   eligible++;screened.push({identity,option:o,ask,stock:c});
   }
   screened.sort((a,b)=>(Number.isFinite(num(b.option.contract_score))?num(b.option.contract_score):-Infinity)-(Number.isFinite(num(a.option.contract_score))?num(a.option.contract_score):-Infinity));
   if(screened.length)groups.push(screened);
  }
  const perTicker=new Map();
- for(const group of groups)for(const {identity,option,ask} of group){
+ for(const group of groups)for(const {identity,option,ask,stock} of group){
   if(selected.length>=20)break;
   if((perTicker.get(identity.ticker)||0)>=2)continue;
   perTicker.set(identity.ticker,(perTicker.get(identity.ticker)||0)+1);
-  selected.push({ticker:identity.ticker,options:[{contract_id:option.contract_id||`${identity.ticker} ${identity.strike} ${identity.side} ${identity.expiry}`,...identity,scanner_ask:ask}]});
+  selected.push({ticker:identity.ticker,options:[{contract_id:option.contract_id||`${identity.ticker} ${identity.strike} ${identity.side} ${identity.expiry}`,...identity,scanner_ask:ask,setup_context:{scan_id:snapshot.scan_id??null,bar_end:stock.bar_end??null,execution_state:stock.execution_state??null,setup_qualified:stock.setup_qualified===true,direction:stock.direction??null,side:option.side,near_atm:option.near_atm===true,volume:num(option.volume)}}]});
  }
  return {format:'candidate-identities-v1',selection_policy:'private-delta-handoff-v2',environment:'production',source:'main / market-dashboard.json',generated_at:snapshot.generated_at,scan_id:snapshot.scan_id??null,market_session:snapshot.market_session??null,candidates:selected,scanned_contracts:total,price_qualifying_contracts:priceQualifying,research_rejected_contracts:priceQualifying-eligible,total_contracts:eligible,qualifying_contracts:eligible,included_contracts:selected.length,omitted_contracts:eligible-selected.length,max_per_ticker:2,selection:'Research ask > $0 and <= $0.30; published quote, volume >=20, near-ATM and usable-spread checks required; missing public delta awaits private verification; DTE 0–14. At most 2 per ticker, using scanner ticker order and published contract scores. Live quote and trading eligibility remain separate.',ranking_effect:'NONE'};
 }
