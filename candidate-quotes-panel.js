@@ -1,4 +1,5 @@
 import {privateSetupCheck} from './private-setup-check.js';
+import {bestVerifiedContract} from './private-contract-rank.js';
 import {quoteOnlyResearchPack} from './quote-review-bridge.js';
 import {candidateQuotes} from './candidate-quotes.js?v=20261120-private-recovery';
 import {validateRobinhoodPack} from './robinhood-review.js';
@@ -83,7 +84,8 @@ function render(){
  $('rows').replaceChildren();if(!scanner){$('refresh').disabled=true;$('quote-summary').textContent='No quotes checked.';renderWorkflow([]);return [];}
  const rows=candidateQuotes(scanner,observations);
  const within=rows.filter(r=>r.status==='QUOTE_CHECK_PASSED'&&r.premium_status==='WITHIN_LIMIT').length,above=rows.filter(r=>r.status==='QUOTE_CHECK_PASSED'&&r.premium_status==='ABOVE_LIMIT').length;
- $('quote-summary').textContent=`${within} fresh quotes within $0.30 · ${above} fresh quotes above limit · ${rows.length-within-above} unverified or requires recheck. Quote checks are not setup eligibility or trade recommendations.`;
+ const best=bestVerifiedContract(scanner,rows);
+ $('quote-summary').textContent=`${within} fresh quotes within $0.30 · ${above} fresh quotes above limit · ${rows.length-within-above} unverified or requires recheck. ${best?`Best verified watch in this ${rows.length}-contract batch: ${best.contract} · ask $${best.ask.toFixed(2)} · delta ${best.delta.toFixed(2)} · spread ${best.spread_pct.toFixed(1)}%. Review remaining filters and current quote before any trade.`:'No contract in this batch has both a current confirmed stock setup and passing private quote, price and delta checks.'}`;
 
  for(const row of rows.filter(r=>!$('verified-only').checked||r.status==='QUOTE_CHECK_PASSED'&&r.premium_status==='WITHIN_LIMIT')){
  const tr=document.createElement('tr');
