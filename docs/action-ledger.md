@@ -493,3 +493,17 @@ broker credentials or private storage. The category is diagnostic evidence only,
 not proof that a Cloudflare policy or owner connection is configured correctly.
 Deployed diagnosis remains pending. Do not rotate unrelated settings or replace
 the owner email (which also identifies stored connections) without evidence.
+
+PR170 merged as a7fe7304e416560be5ae75d18dd4ea8f1afd68f5. Scanner/dashboard
+CI 45442436953 and hosted mobile/Worker-bundle QA 45442437186 passed;
+Worker deployment 45442892627 succeeded. A subsequent live browser GET of the
+sign-in route returned CLAIMS_REJECTED. This establishes that an assertion
+reaches the Worker and local configuration passes format checks; it does not
+establish signature validity or identify which claim differs. Authentication and
+quote capture remain blocked. No claim values or private records are recorded.
+
+The follow-up diagnostic verifies the signature against the configured team's
+keys before distinguishing issuer, audience, owner or time rejection. Forged
+assertions cannot obtain these detailed categories. Ordinary private requests
+retain their existing early claim rejection. All 348 Node regressions pass,
+including signed mismatches and forged assertions with mismatched claims.

@@ -224,7 +224,7 @@ export async function quoteWatchContracts(env, input) {
 export async function handleRobinhood(request,env){
  const requestStarted=performance.now();
  const url=new URL(request.url),path=url.pathname;
- const access=await accessCheck(request,env);
+ const access=await accessCheck(request,env,Date.now(),path==='/private/plaid/robinhood/sign-in'&&request.method==='GET');
  if(access!=='ASSERTION_VERIFIED')return reply({ok:false,error:'Private sign in required',...(path==='/private/plaid/robinhood/sign-in'&&request.method==='GET'?{access_check:access}:{})},401);
  // Top-level navigation lets Access establish the website session before returning
  // to the selected quote. It neither inspects nor changes Robinhood credentials.
