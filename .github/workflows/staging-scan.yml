@@ -73,6 +73,9 @@ jobs:
       - name: Capture frozen evidence from the newly validated OPEN scan
         if: steps.gate.outputs.collect == 'true'
         run: python scripts/capture_staging.py
+      - name: Update prospective IWM coverage from the newly frozen inputs
+        if: steps.gate.outputs.collect == 'true'
+        run: python iwm_control_outcomes.py
       - name: Publish staging results only
         if: always() && !cancelled() && steps.gate.outputs.collect == 'true'
         run: |
