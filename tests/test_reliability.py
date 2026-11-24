@@ -162,11 +162,14 @@ class ReliabilityTests(unittest.TestCase):
                 'scoring_effect':'NONE','alert_effect':'NONE','candidates':[]}))
             for chain_status,expected in [('EMPTY_UNVERIFIED','DEGRADED'),('SOURCE_FAILURE','DEGRADED'),('NO_EXPIRATION_TODAY','SUCCESS'),('SUCCESS','SUCCESS')]:
                 with self.subTest(chain_status=chain_status):
-                    raw={'universe_size':1,'scan_id':'health-qc','candidates':[{'chain_attempted':True}],
+                    raw={'market_session':'OPEN','session_open_at':'2026-11-23T14:30:00Z','session_close_at':'2026-11-23T21:00:00Z','generated_at':'2026-11-23T15:06:00Z','universe_size':1,'scan_id':'health-qc','candidates':[{'chain_attempted':True}],
                          'coverage':{'chains_attempted':1,'chain_status_counts':{chain_status:1}}}
                     (stage/'data/market.json').write_text(json.dumps(raw))
                     (stage/'data/market-dashboard.json').write_text(json.dumps({'schema_version':7,'candidates':[{'execution_state':'WATCH','preferred_contracts':[]}]}))
-                    self.assertEqual(pipeline.validate(stage)['status'],expected)
+                    health=pipeline.validate(stage)
+                    self.assertEqual(health['status'],expected)
+                    for key in ('market_session','session_open_at','session_close_at','generated_at'):
+                        self.assertEqual(health[key],raw[key])
 
     def test_pipeline_failure_preserves_last_good_files(self):
         with tempfile.TemporaryDirectory() as d:

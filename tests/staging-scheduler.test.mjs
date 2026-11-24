@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {collectionSnapshotOpen,coordinateStaging,scheduledStagingCollection} from '../staging-scheduler.js';
 const now=new Date('2026-11-23T15:10:00Z');
-const snapshot={market_session:'OPEN',generated_at:'2026-11-23T15:06:00Z',session_open_at:'2026-11-23T14:30:00Z',session_close_at:'2026-11-23T21:00:00Z'};
+const snapshot={stage:'VALIDATED',status:'DEGRADED',market_session:'OPEN',generated_at:'2026-11-23T15:06:00Z',session_open_at:'2026-11-23T14:30:00Z',session_close_at:'2026-11-23T21:00:00Z'};
 const state=()=>{const values=new Map();return {storage:{get:async k=>values.get(k),put:async(k,v)=>values.set(k,v)}};};
 test('collection requires fresh real source session bounds and rejects holiday/early close/stale clocks',()=>{
  assert.equal(collectionSnapshotOpen(snapshot,now),true);
@@ -36,4 +36,9 @@ test('Worker uses a separate object and fails closed when the feature is disable
  let blocked=0;const owner=new ScanCoordinator({blockConcurrencyWhile:async f=>{blocked++;return f();}},{});
  const r=await owner.fetch(new Request('https://scan-coordinator/staging',{method:'POST',body:JSON.stringify({id:'staging-slot-1994991'})}));
  assert.equal((await r.json()).status,'disabled');assert.equal(blocked,1);
+});
+
+test('failed or unfinished health cannot trigger research even with copied OPEN metadata',async()=>{
+ const env={STAGING_COLLECTION_ENABLED:'true',GITHUB_TOKEN:'private',SCAN_COORDINATOR:{get:()=>{throw Error('must not dispatch');}}};
+ for(const changed of [{status:'FAILED'},{stage:'ARCHIVE'}]) assert.equal(await scheduledStagingCollection(env,now,async()=>Response.json({...snapshot,...changed})),'no-fresh-open-calendar');
 });

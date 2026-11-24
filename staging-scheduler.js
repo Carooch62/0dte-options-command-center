@@ -26,10 +26,10 @@ export async function scheduledStagingCollection(env,now=new Date(),fetcher=fetc
  if(!env.GITHUB_TOKEN||!env.SCAN_COORDINATOR)return 'prerequisites-unavailable';
  let snapshot;
  try{
-  const r=await fetcher(`https://raw.githubusercontent.com/${REPO}/main/data/market-dashboard.json`,{cache:'no-store',cf:{cacheTtl:0},signal:AbortSignal.timeout(10000)});
+  const r=await fetcher(`https://raw.githubusercontent.com/${REPO}/main/data/scan-health.json`,{cache:'no-store',cf:{cacheTtl:0},signal:AbortSignal.timeout(10000)});
   if(!r.ok)return 'calendar-source-unavailable';snapshot=await r.json();
  }catch{return 'calendar-source-unavailable';}
- if(!collectionSnapshotOpen(snapshot,now))return 'no-fresh-open-calendar';
+ if(snapshot?.stage!=='VALIDATED'||!['SUCCESS','DEGRADED'].includes(snapshot?.status)||!collectionSnapshotOpen(snapshot,now))return 'no-fresh-open-calendar';
  const owner=env.SCAN_COORDINATOR.get(env.SCAN_COORDINATOR.idFromName('prospective-staging-collection'));
  const r=await owner.fetch('https://scan-coordinator/staging',{method:'POST',body:JSON.stringify({id:`staging-slot-${Math.floor(now.getTime()/900000)}`})});
  return (await r.json()).status;
