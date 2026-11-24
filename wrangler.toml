@@ -29,11 +29,13 @@ binding = "PLAID_STORE"
 id = "c141007029b0432abe871df0e27c3bdf"
 
 [vars]
+STAGING_COLLECTION_ENABLED = "true"
 ROBINHOOD_FILL_LOOKUP_ENABLED = "false"
 FAST_SCAN_ENABLED = "false"
 ROBINHOOD_UNATTENDED_CONFIRMED = "true"
 WATCH_QUOTE_PILOT_ENABLED = "true"
 WATCH_VERIFIED_ALERTS_ENABLED = "false"
+POSITION_EXIT_ALERTS_ENABLED = "true"
 
 # Branch previews intentionally have no brokerage storage or private connection.
 # Never copy the production PLAID_STORE ID into this block.
@@ -52,3 +54,11 @@ class_name = "RobinhoodCoordinator"
 tag = "robinhood-coordinator-v1"
 new_sqlite_classes = ["RobinhoodCoordinator"]
 
+
+[[durable_objects.bindings]]
+name = "POSITION_EXIT_MONITOR"
+class_name = "PositionExitMonitor"
+
+[[migrations]]
+tag = "position-exit-monitor-v1"
+new_sqlite_classes = ["PositionExitMonitor"]

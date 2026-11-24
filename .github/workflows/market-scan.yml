@@ -66,6 +66,9 @@ jobs:
       - name: Generate compact quote-check batch
         if: success()
         run: node scripts/write-candidate-batch.mjs
+      - name: Generate separate missing-delta research identities
+        if: success()
+        run: node scripts/write-recovery-batches.mjs
       - name: Audit research readiness
         if: success()
         run: python ml_readiness.py > data/ml-readiness.json

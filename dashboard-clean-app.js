@@ -1,5 +1,5 @@
 import {attachDashboardOptionQuotes} from './dashboard-option-quotes.js?v=20261119-auto-exits';
-import {coverageReport} from './coverage-report.js';
+import {coverageReport,sourceGaps,boardAvailability} from './coverage-report.js?v=20261123-provider-quality';
 import {attachTradeExitAssistant,purchaseRecordAction} from './trade-exit-assistant.js?v=20261119-qc';
 import {loadDashboardSnapshot} from './dashboard-delivery.js';
 import {entryReadiness,trendSummary,matchesTrend,quoteKey,observePremiums,premiumChange,positionEstimate,reentryProblem,positionAlerts,validPlan} from './trade-review.js?v=20261119-qc';
@@ -148,16 +148,17 @@ function renderFilterChips(){
  const chips=changed.filter(id=>!['askMin','askMax'].includes(id)).map(id=>`<button class="filter-chip" data-clear-filter="${id}" aria-label="Clear ${esc(labels[id])} filter">${esc($(id).selectedOptions[0].textContent)} <span aria-hidden="true">×</span></button>`);
  if(changed.some(id=>['askMin','askMax'].includes(id)))chips.push(`<button class="filter-chip" data-clear-filter="price" aria-label="Reset ask range">Ask ${money($('askMin').value)}–${money($('askMax').value)} <span aria-hidden="true">×</span></button>`);
  $('activeFilters').innerHTML=chips.join('')+(changed.length?'<button class="filter-reset" data-clear-filter="all">Reset all</button>':'');
- $('filterSummary').textContent=`${changed.length?changed.length+' controls changed':'All candidates'} · ask ${money($('askMin').value)}–${money($('askMax').value)}`;
+ $('filterSummary').textContent=`${$('state').selectedOptions[0].textContent}${changed.length?' · '+changed.length+' controls changed':''} · ask ${money($('askMin').value)}–${money($('askMax').value)}`;
 }
 
 function tickerMatches(ticker,query){return String(ticker||'').toUpperCase().includes(String(query||'').trim().toUpperCase());}
 const navigation=document.createElement('div');navigation.className='board-navigation';
 navigation.innerHTML='<label>Find a ticker<input id="tickerSearch" type="search" placeholder="e.g. NVDA" autocomplete="off" autocapitalize="characters" spellcheck="false"></label><div class="controls"><button id="allStocks" type="button">All stocks</button><button id="watchStocks" type="button">★ Watchlist</button><button id="clearSearch" type="button">Clear search</button></div><p id="watchlistNotice" class="smallnote" role="status"></p>';
 $('board').before(navigation);
+const boardNotice=document.createElement('p');boardNotice.id='boardAvailability';boardNotice.className='smallnote';boardNotice.setAttribute('role','status');$('board').before(boardNotice);
 $('tickerSearch').addEventListener('input',()=>render());
 $('clearSearch').onclick=()=>{$('tickerSearch').value='';render();$('tickerSearch').focus();};
-$('allStocks').onclick=()=>{$('onlyContracts').value='all';persistFilters();render();};
+$('allStocks').onclick=()=>{$('onlyContracts').value='all';$('state').value='ALL';persistFilters();render();};
 $('watchStocks').onclick=()=>{$('onlyContracts').value='starred';persistFilters();render();};
 const expandedCards=new Set();
 $('board').addEventListener('toggle',event=>{const el=event.target;if(el.tagName!=='DETAILS'||!el.dataset.ticker||!el.isConnected)return;const key=el.dataset.ticker+'|'+(el.dataset.section||'contracts');if(el.open)expandedCards.add(key);else expandedCards.delete(key);},true);
@@ -232,6 +233,7 @@ function render(){if(!data)return;
  // Update freshness above even while protecting an in-progress entry-plan edit.
  if($('board').contains(document.activeElement)&&document.activeElement.matches('input,textarea,select'))return;
  if(needsFullSnapshot()){
+   $('boardAvailability').textContent='Loading the selected expiration snapshot; contract availability is unknown until it arrives.';
    $('board').textContent='Full expiration snapshot required.';
    $('earlyWatchList').replaceChildren();$('shown').textContent='';
    renderFilterChips();
@@ -241,8 +243,9 @@ function render(){if(!data)return;
  const c=data.coverage||{};
  $('stats').innerHTML=[['STOCK ROWS',c.stocks_received??data.scanned_rows??0],['CHAIN ATTEMPTS',c.chains_attempted??'Unknown'],['WITH SAME-DAY CHAIN',c.chains_with_contracts??'Unknown'],['LAST TRIGGERED',counts.TRIGGERED||0],['LAST SECOND-WAVE',counts['SECOND-WAVE']||0],['LAST CONFIRMED',counts['CONFIRMED DELAYED']||0]].map(([a,b])=>`<div class="panel stat"><b>${esc(b)}</b><span>${a}</span></div>`).join('');
  const report=coverageReport(c);
- $('coverage').textContent=`${report.summary} ${report.incomplete?'Missed-candidate analysis is incomplete because not all chains were checked. ':''}Universe: ${data.universe_size??'unknown'} · ${c.chains_not_attempted??'unknown'} chains not yet attempted · ${Object.entries(c.chain_status_counts||{}).map(([a,b])=>a+': '+b).join(' · ')}. Broader discovery: ${Object.entries(data.discovery||{}).map(([a,b])=>a+' '+b.status).join(', ')}.`;
+ $('coverage').textContent=`${report.summary} ${report.incomplete?'Missed-candidate analysis is incomplete because chain coverage is missing or unverified. ':''}${sourceGaps(c,data.candidates||[])} Universe: ${data.universe_size??'unknown'} · ${c.chains_not_attempted??'unknown'} chains not yet attempted · ${Object.entries(c.chain_status_counts||{}).map(([a,b])=>a+': '+b).join(' · ')}. Broader discovery: ${Object.entries(data.discovery||{}).map(([a,b])=>a+' '+b.status).join(', ')}.`;
  const min=Number($('askMin').value),max=Number($('askMax').value);$('filterNotice').textContent=(!Number.isFinite(min)||!Number.isFinite(max)||min<0||max<min)?'Enter a valid minimum and maximum.':'';
+ $('boardAvailability').textContent=boardAvailability(all,all.filter(x=>selectableContracts(x,min,max).length).length);
  let rows=all.filter(x=>tickerMatches(x.ticker,$('tickerSearch').value)&&matchesState(x,dataDownloadFailed?{...data,generated_at:null}:data,$('state').value)&&($('direction').value==='ALL'||x.direction===$('direction').value)&&matchesTrend(x,$('trendPeriod').value,$('trendDirection').value,$('trendAlignment').value,dataDownloadFailed?{...data,generated_at:null}:data)&&($('catalyst').value==='ALL'||x.catalyst_level===$('catalyst').value)&&($('onlyContracts').value!=='contracts'||selectableContracts(x,min,max).length)&&($('onlyContracts').value!=='starred'||stars.includes(x.ticker)));
  const order={'CONFIRMED DELAYED':7,TRIGGERED:6,'SECOND-WAVE':5,WATCH:4,DECAYING:3,PASS:2,'STALE PRICE DATA':1,'STALE SCAN':1,'MARKET CLOSED':1,'DATA UNAVAILABLE':0};
  rows.sort((a,b)=>$('sort').value==='score'?(b.score||0)-(a.score||0):$('sort').value==='move'?Math.abs(b.move_5m||0)-Math.abs(a.move_5m||0):(order[recordedState(b)]||0)-(order[recordedState(a)]||0)||contractRank(b,min,max)-contractRank(a,min,max)||(b.score||0)-(a.score||0));
@@ -250,7 +253,7 @@ function render(){if(!data)return;
  $('earlyWatchList').innerHTML=early.length?early.map(x=>`<div class="change-item"><b>${esc(x.ticker)} · ${esc(x.direction)} · EARLY WATCH</b><p class="smallnote">Observed stock ${money(x.price)} · reference trigger ${money(x.pattern_research.trigger)} · bar ${esc(time(x.bar_end))}. Await a fresh level break with volume and qualifying option quotes; no entry approval.</p>${stockLink(x.ticker)}</div>`).join(''):'<p class="smallnote">No fresh shadow patterns match these filters. Older snapshots without pattern evidence remain unknown; no setup is manufactured.</p>';
  const detailKey=d=>d.dataset.ticker+'|'+(d.dataset.section||'contracts');
  const opened=new Set([...expandedCards,...[...$('board').querySelectorAll('details[open]')].map(detailKey)]);
- $('shown').textContent=rows.length+' candidates';$('board').innerHTML=rows.map(card).join('')||'<p class="empty">No candidates match. Clear the search or adjust your filters. Star a stock to add it to your watchlist.</p>';
+ $('shown').textContent=rows.length+' candidates';$('board').innerHTML=rows.map(card).join('')||`<p class="empty">No stock rows match all selected filters. ${$('onlyContracts').value==='contracts'?'Matching contracts only is on. Choose All stocks to include stocks without qualifying option contracts; other filters still apply.':'Clear the ticker search or reset the candidate filters.'} Stock rows alone are not option entry confirmation.</p>`;
  for(const details of $('board').querySelectorAll('details'))details.open=opened.has(detailKey(details));
  const watching=$('onlyContracts').value==='starred',available=new Set(all.map(x=>x.ticker)),missing=stars.filter(t=>!available.has(t));
  $('watchStocks').textContent='★ Watchlist ('+stars.length+')';
@@ -410,6 +413,19 @@ function setupCleanLayout(){
  }
  const journalLink=document.querySelector('.clean-nav [href="#cleanJournal"]');if(journalLink)journalLink.onclick=()=>{$('cleanJournal').open=true;};
  const changes=$('changes').closest('section');changes.id='cleanChanges';
+ for(const id of ['earlyWatchPanel','laterExpiryShadowPanel','contractWatchPanel','cleanChanges']){
+  const section=$(id),heading=section.querySelector('h2'),details=document.createElement('details'),summary=document.createElement('summary');
+  details.className='clean-secondary';details.open=read('0dteSectionOpen:'+id,false)===true;
+  summary.textContent=heading.textContent;summary.style.cssText='font-size:18px;font-weight:650;min-height:44px;cursor:pointer';
+  heading.remove();details.append(summary);
+  while(section.firstChild)details.append(section.firstChild);
+  section.append(details);
+  details.addEventListener('toggle',()=>save('0dteSectionOpen:'+id,details.open));
+  const reveal=()=>{if(location.hash==='#'+id)details.open=true;};
+  window.addEventListener('hashchange',reveal);reveal();
+  for(const link of document.querySelectorAll('a[href="#'+id+'"]'))link.addEventListener('click',()=>{details.open=true;});
+ }
+
 }
 setupCleanLayout();
 attachTradeExitAssistant({board:$('board'),journal:$('journal'),getSnapshot:()=>data});

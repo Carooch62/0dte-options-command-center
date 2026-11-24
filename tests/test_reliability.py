@@ -144,8 +144,8 @@ class ReliabilityTests(unittest.TestCase):
     def test_source_failure_is_not_no_expiry(self):
         with patch.object(scanner,'fetch_cboe',side_effect=ValueError()),patch.object(scanner,'nasdaq_options',side_effect=ValueError()):
             self.assertEqual(scanner.options('TEST')['status'],'SOURCE_FAILURE')
-        with patch.object(scanner,'fetch_cboe',return_value={'contracts':[],'status':'NO_EXPIRATION_TODAY'}),patch.object(scanner,'nasdaq_options') as fallback:
-            self.assertEqual(scanner.options('TEST')['status'],'NO_EXPIRATION_TODAY');fallback.assert_not_called()
+        with patch.object(scanner,'fetch_cboe') as unsupported,patch.object(scanner,'nasdaq_options',return_value={'contracts':[],'status':'EMPTY_UNVERIFIED'}):
+            self.assertEqual(scanner.options('TEST')['status'],'EMPTY_UNVERIFIED');unsupported.assert_not_called()
     def test_retry_only_transient_errors(self):
         import requests
         r=requests.Response();r.status_code=429
@@ -162,11 +162,14 @@ class ReliabilityTests(unittest.TestCase):
                 'scoring_effect':'NONE','alert_effect':'NONE','candidates':[]}))
             for chain_status,expected in [('EMPTY_UNVERIFIED','DEGRADED'),('SOURCE_FAILURE','DEGRADED'),('NO_EXPIRATION_TODAY','SUCCESS'),('SUCCESS','SUCCESS')]:
                 with self.subTest(chain_status=chain_status):
-                    raw={'universe_size':1,'scan_id':'health-qc','candidates':[{'chain_attempted':True}],
+                    raw={'market_session':'OPEN','session_open_at':'2026-11-23T14:30:00Z','session_close_at':'2026-11-23T21:00:00Z','generated_at':'2026-11-23T15:06:00Z','universe_size':1,'scan_id':'health-qc','candidates':[{'chain_attempted':True}],
                          'coverage':{'chains_attempted':1,'chain_status_counts':{chain_status:1}}}
                     (stage/'data/market.json').write_text(json.dumps(raw))
                     (stage/'data/market-dashboard.json').write_text(json.dumps({'schema_version':7,'candidates':[{'execution_state':'WATCH','preferred_contracts':[]}]}))
-                    self.assertEqual(pipeline.validate(stage)['status'],expected)
+                    health=pipeline.validate(stage)
+                    self.assertEqual(health['status'],expected)
+                    for key in ('market_session','session_open_at','session_close_at','generated_at'):
+                        self.assertEqual(health[key],raw[key])
 
     def test_pipeline_failure_preserves_last_good_files(self):
         with tempfile.TemporaryDirectory() as d:

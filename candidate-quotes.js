@@ -26,7 +26,7 @@ export function candidateQuotes(snapshot,observations,now=Date.now()){
  const x=[...matches].sort((a,b)=>millis(b.received_at)-millis(a.received_at))[0],i=x.instrument,q=x.quote||{};
  row.instrument_id=i.id;
  const latestCopies=matches.filter(value=>millis(value.received_at)===millis(x.received_at));
- const signature=value=>JSON.stringify([value.instrument?.id,value.instrument?.state,value.instrument?.tradability,number(value.instrument?.trade_value_multiplier),value.instrument?.sellout_datetime,value.quote?.instrument_id,value.quote?.updated_at,number(value.quote?.bid_price),number(value.quote?.ask_price),providerBookEvidence(value.quote),quoteRequestTiming(value.request_timing)]);
+ const signature=value=>JSON.stringify([value.instrument?.id,value.instrument?.state,value.instrument?.tradability,number(value.instrument?.trade_value_multiplier),value.instrument?.sellout_datetime,value.quote?.instrument_id,value.quote?.updated_at,number(value.quote?.bid_price),number(value.quote?.ask_price),number(value.quote?.delta),number(value.quote?.gamma),number(value.quote?.theta),providerBookEvidence(value.quote),quoteRequestTiming(value.request_timing)]);
  if(new Set(latestCopies.map(signature)).size>1){row.reasons.push('CONFLICTING_QUOTE_OBSERVATIONS');row.status='REQUIRES_RECHECK';rows.push(row);continue;}
  // Retain the exact evaluated observation clocks and allowlisted timings.
  row.observed_at=q.updated_at;row.received_at=x.received_at;
@@ -48,6 +48,11 @@ export function candidateQuotes(snapshot,observations,now=Date.now()){
  else{row.bid=bid;row.ask=ask;row.spread=ask-bid;row.spread_pct=100*(ask-bid)/((ask+bid)/2);if(row.spread>.10+1e-9||row.spread_pct>30+1e-9)row.reasons.push('WIDE_SPREAD');}
  row.status=row.reasons.length?'REQUIRES_RECHECK':'QUOTE_CHECK_PASSED';
  row.premium_status=row.reasons.length?'UNKNOWN':ask<=.30?'WITHIN_LIMIT':'ABOVE_LIMIT';
+ const delta=number(q.delta),gamma=number(q.gamma),theta=number(q.theta);
+ row.delta=Number.isFinite(delta)?delta:null;row.gamma=Number.isFinite(gamma)&&gamma>=0?gamma:null;row.theta=Number.isFinite(theta)&&theta<=0?theta:null;
+ const signed=Number.isFinite(delta)&&((o.side==='call'&&delta>0&&delta<=1)||(o.side==='put'&&delta<0&&delta>=-1));
+ row.delta_check=row.status!=='QUOTE_CHECK_PASSED'?'QUOTE_RECHECK_REQUIRED':!signed?'UNAVAILABLE':Math.abs(delta)>=.30&&Math.abs(delta)<=.50?'PREFERRED_RANGE':'OUTSIDE_PREFERRED_RANGE';
+ row.greek_calculation_time=null;
  rows.push(row);
  }}return rows;
 }

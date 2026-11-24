@@ -39,7 +39,7 @@ try{
  await page.getByText('Contract metadata has not been matched.',{exact:false}).waitFor();
  assert.match(await page.locator('#snapshot-info').innerText(),/Staging.*2026-10-12T14:00:00Z/);
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'page overflow');
- for(const button of await page.locator('button').all()){const box=await button.boundingBox();assert.ok(box.height>=44);assert.ok(box.x>=0&&box.x+box.width<=width);}
+ for(const button of await page.locator('button:visible').all()){const box=await button.boundingBox();assert.ok(box.height>=44);assert.ok(box.x>=0&&box.x+box.width<=width);}
  await page.screenshot({path:`test-results/mobile/${width}-loaded.png`,fullPage:true});
  await page.route('**/health',r=>r.fulfill({json:{environment:'production'}}));
  await page.getByRole('button',{name:'Load staging scanner snapshot',exact:true}).click();

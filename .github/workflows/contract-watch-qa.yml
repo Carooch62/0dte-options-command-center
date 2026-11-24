@@ -19,6 +19,7 @@ on:
       - 'index.html'
       - 'dashboard.html'
       - 'scripts/test-contract-watch-ui.mjs'
+      - 'scripts/test-candidate-board-ui.mjs'
       - '.github/workflows/contract-watch-qa.yml'
   workflow_dispatch:
 permissions:
@@ -47,5 +48,6 @@ jobs:
       - run: node --check worker.js
       - run: node --check dashboard-clean-app.js
       - run: node scripts/test-contract-watch-ui.mjs
+      - run: node scripts/test-candidate-board-ui.mjs
 
       - run: node scripts/test-dashboard-option-quotes.mjs

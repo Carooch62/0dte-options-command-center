@@ -1,3 +1,4 @@
+import {coordinateStaging,scheduledStagingCollection} from './staging-scheduler.js';
 import {handlePositionExits,scheduledPositionExits} from './position-exits.js';
 export {PositionExitMonitor} from './position-exits.js';
 import {handleRobinhood} from './robinhood-live.js';
@@ -44,6 +45,11 @@ export class ScanCoordinator {
 
   async fetch(request){
     return this.state.blockConcurrencyWhile(async()=>{
+      if(new URL(request.url).pathname==='/staging'){
+        const {id}=await request.json();
+        if(this.env.APP_ENV==='preview'||this.env.STAGING_COLLECTION_ENABLED!=='true')return Response.json({status:'disabled'});
+        return coordinateStaging(this.state,this.env,id,api);
+      }
       const {id,mode,scheduled}=await request.json();
       const pending=await this.state.storage.get('pending');
       const {workflow_runs:runs}=await api(scanRuns,this.env,{timeoutMs:7000});
@@ -108,6 +114,10 @@ export default {
   async scheduled(controller,env) {
     if(env.APP_ENV==='preview')return;
     const now=new Date(controller.scheduledTime);
+    if(now.getUTCMinutes()%15===10){
+      try{console.log(JSON.stringify({staging_collection:await scheduledStagingCollection(env,now)}));}
+      catch{console.log(JSON.stringify({staging_collection:'request-failed'}));}
+    }
     const legacyTick=now.getUTCMinutes()%5===1;
     if(legacyTick||(env.FAST_SCAN_ENABLED==='true'&&env.SCAN_COORDINATOR)){
       try{const result=await scheduledScan(env,now);console.log(JSON.stringify({scheduler:result,scheduled_at:controller.scheduledTime}));}

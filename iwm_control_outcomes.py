@@ -1,5 +1,5 @@
 """Observe exact stock-bar horizons from frozen staging inputs. No option P/L."""
-from collections import defaultdict
+from collections import defaultdict, Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import json
@@ -13,23 +13,30 @@ def stamp(value):
     if not isinstance(value,str) or not (value.endswith('Z') or '+' in value[10:] or '-' in value[10:]):return None
     return parse_time(value)
 
-def observations(packets):
+def observations(packets, diagnostics=None):
     rows=[];gaps=0;seen=set()
+    diagnostics = diagnostics if diagnostics is not None else Counter()
     for packet in packets:
         control=packet.get('iwm_control') or {}
-        if control.get('spec_version')!='iwm-control-v1' or packet.get('market_session')!='OPEN':continue
+        if control.get('spec_version')!='iwm-control-v1':
+            diagnostics['UNSUPPORTED_OR_LEGACY_SPEC']+=1;continue
+        if packet.get('market_session')!='OPEN':
+            diagnostics['NOT_OPEN_PACKET']+=1;continue
         generated=stamp(packet.get('generated_at'));captured=stamp(packet.get('captured_at'))
         if not generated or not captured or not 0<=(captured-generated).total_seconds()<=480:
-            gaps+=1;continue
+            gaps+=1;diagnostics['INVALID_CAPTURE_CLOCK']+=1;continue
         info=session_info(generated)
-        if info['session']!='OPEN' or captured>=parse_time(info['close_at']):gaps+=1;continue
+        if info['session']!='OPEN' or captured>=parse_time(info['close_at']):
+            gaps+=1;diagnostics['OUTSIDE_EXCHANGE_SESSION']+=1;continue
         matches=[r for r in control.get('rows',[]) if r.get('ticker')=='IWM']
-        if len(matches)!=1:gaps+=1;continue
+        if len(matches)!=1:
+            gaps+=1;diagnostics['MISSING_OR_AMBIGUOUS_IWM_ROW']+=1;continue
         row=matches[0];bar=stamp(row.get('bar_end'));price=row.get('price')
         if not bar or not parse_time(info['open_at'])<bar<=generated or not 0<=(generated-bar).total_seconds()<=480 or type(price) not in (float,int) or not math.isfinite(price) or price<=0 or not row.get('price_source'):
-            gaps+=1;continue
+            gaps+=1;diagnostics['INVALID_OR_STALE_SOURCE_BAR']+=1;continue
         key=(packet.get('packet_id'),packet.get('scan_id'))
-        if key in seen:continue
+        if key in seen:
+            diagnostics['DUPLICATE_PACKET']+=1;continue
         seen.add(key)
         rows.append({'packet_id':packet.get('packet_id'),'scan_id':packet.get('scan_id'),
                      'generated_at':packet['generated_at'],'captured_at':packet['captured_at'],
@@ -43,7 +50,8 @@ def observations(packets):
 
 def compare(packets,now=None):
     now=now or datetime.now(timezone.utc)
-    rows,gaps=observations(packets)
+    diagnostics=Counter();rows,gaps=observations(packets,diagnostics)
+    diagnostics['FUTURE_CAPTURE_EXCLUDED']=sum(stamp(r['captured_at'])>now for r in rows)
     rows=[r for r in rows if stamp(r['captured_at'])<=now]
     indexed={};sessions=defaultdict(list)
     for row in rows:
@@ -72,15 +80,18 @@ def compare(packets,now=None):
         complete=sum(all(o['status']=='OBSERVED' for o in r['outcomes']) for r in group)
         closed=now>=stamp(group[0]['close_at'])
         covered=closed and len(group)>=5 and complete>0 and first<=stamp(group[0]['open_at'])+timedelta(minutes=45) and last>=stamp(group[0]['close_at'])-timedelta(minutes=30)
+        blockers=[]
+        for condition,label in [(closed,'SESSION_NOT_CLOSED'),(len(group)>=5,'FEWER_THAN_FIVE_BASELINES'),(complete>0,'NO_COMPLETE_EXACT_HORIZONS'),(first<=stamp(group[0]['open_at'])+timedelta(minutes=45),'MISSING_EARLY_COVERAGE'),(last>=stamp(group[0]['close_at'])-timedelta(minutes=30),'MISSING_LATE_COVERAGE')]:
+            if not condition:blockers.append(label)
         arms=[]
         for state in ('QUALIFIED','UNQUALIFIED','UNKNOWN'):
             selected=[r for r in group if ('QUALIFIED' if r['setup_qualified'] is True else 'UNQUALIFIED' if r['setup_qualified'] is False else 'UNKNOWN')==state]
             arms.append({'arm':state,'baselines':len(selected),'horizons':[{'minutes':m,'observed':len(values:=[o['stock_change_pct'] for r in selected for o in r['outcomes'] if o['minutes']==m and o['status']=='OBSERVED']), 'mean_stock_change_pct':round(sum(values)/len(values),6) if values else None} for m in HORIZONS]})
-        summaries.append({'market_date':day,'closed':closed,'baselines':len(group),'first_bar_end':first.isoformat(),'last_bar_end':last.isoformat(),'complete_horizons':complete,'coverage_eligible':covered,'arms':arms})
+        summaries.append({'market_date':day,'closed':closed,'baselines':len(group),'first_bar_end':first.isoformat(),'last_bar_end':last.isoformat(),'complete_horizons':complete,'coverage_eligible':covered,'coverage_blockers':blockers,'arms':arms})
     count=sum(s['coverage_eligible'] for s in summaries)
     return {'format':'iwm-control-outcomes-v1','spec_version':'iwm-control-v1','checked_at':now.isoformat(),
             'status':'READY_FOR_EXPLORATORY_REVIEW' if count>=5 else 'WAITING_FOR_FIVE_COVERED_SESSIONS',
-            'coverage_eligible_sessions':count,'invalid_or_missing_packets':gaps,'sessions':summaries,'results':results,
+            'coverage_eligible_sessions':count,'collection_diagnostics':{'input_packets':len(packets),'accepted_observations':len(rows),'excluded_by_reason':dict(diagnostics),'latest_accepted_capture':max((r['captured_at'] for r in rows),key=stamp,default=None),'horizon_status_counts':dict(Counter(o['status'] for r in results for o in r['outcomes']))},'invalid_or_missing_packets':gaps,'sessions':summaries,'results':results,
             'ranking_effect':'NONE','execution':False,'limitations':['Prospective frozen stock-only inputs. No option P/L or causal signal edge inferred.',
               'Exact same-session, same-source bar ends only; missing horizons remain missing. Later revisions do not replace first observations.',
               'Arm averages are descriptive and may differ in direction/time of day; not matched trading performance. Sessions, not scans, are independent units.',

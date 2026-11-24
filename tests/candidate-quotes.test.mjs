@@ -8,6 +8,13 @@ const observation=()=>({instrument:{id,chain_symbol:'SPY',strike_price:'778.0000
 test('exact contract passes without changing scanner or source observation',()=>{
  const s=scanner(),o=observation(),before=JSON.stringify([s,o]);const r=candidateQuotes(s,[o],now)[0];assert.equal(r.status,'QUOTE_CHECK_PASSED');assert.equal(r.age_seconds,1);assert.equal(r.ranking_effect,'NONE');assert.equal(JSON.stringify([s,o]),before);
 });
+test('private Greeks are descriptive, range checked and never change eligibility',()=>{
+ const o=observation();Object.assign(o.quote,{delta:'.40',gamma:'.03',theta:'-.02'});
+ const r=candidateQuotes(scanner(),[o],now)[0];assert.equal(r.delta,.4);assert.equal(r.gamma,.03);assert.equal(r.theta,-.02);assert.equal(r.delta_check,'PREFERRED_RANGE');assert.equal(r.greek_calculation_time,null);assert.equal(r.eligibility_effect,'NONE');
+ for(const [delta,expected] of [['.2','OUTSIDE_PREFERRED_RANGE'],['-.4','UNAVAILABLE'],[null,'UNAVAILABLE'],['NaN','UNAVAILABLE']]){o.quote.delta=delta;assert.equal(candidateQuotes(scanner(),[o],now)[0].delta_check,expected);}
+ o.quote.delta='.4';assert.equal(candidateQuotes(scanner(),[o],now+61000)[0].delta_check,'QUOTE_RECHECK_REQUIRED');
+ const conflict=structuredClone(o);conflict.quote.delta='.5';assert.ok(candidateQuotes(scanner(),[o,conflict],now)[0].reasons.includes('CONFLICTING_QUOTE_OBSERVATIONS'));
+});
 test('each identity field must match and duplicate mappings are ambiguous',()=>{
  for(const [field,value] of [['chain_symbol','QQQ'],['strike_price','779'],['type','put'],['expiration_date','2026-10-13']]){const o=observation();o.instrument[field]=value;assert.deepEqual(candidateQuotes(scanner(),[o],now)[0].reasons,['NO_CONTRACT_MATCH']);}
  const a=observation(),b=observation();b.instrument.id='11111111-1111-1111-1111-111111111111';assert.deepEqual(candidateQuotes(scanner(),[a,b],now)[0].reasons,['AMBIGUOUS_CONTRACT']);

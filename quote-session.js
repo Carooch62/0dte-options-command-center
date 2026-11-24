@@ -2,7 +2,7 @@
 import {candidateQuotes,providerBookEvidence} from './candidate-quotes.js';
 import {quoteRequestTiming} from './quote-timing.js';
 import {quoteDiagnostics} from './quote-evidence.js?v=20261102-quote-bridge';
-import {safeRequestAttempts} from './private-request.js';
+import {safeRequestAttempts} from './private-request.js?v=20261120-private-recovery';
 import {millis} from './robinhood-review.js';
 export const SESSION_KEY='private-quote-session-v1';
 export const SESSION_MAX_AGE=24*60*60*1000;
@@ -11,7 +11,7 @@ const pick=(value,keys)=>Object.fromEntries(keys.filter(k=>value?.[k]!==undefine
 export function sessionPayload(scanner,observations,history,source,now=Date.now(),attempts=[]){
  const requests=safeRequestAttempts(attempts);
  if(!scanner)return requests.length?{format:'private-quote-session-v1',saved_at:now,scanner:null,observations:[],history:[],source:'No snapshot',requests}:null;
- const snapshot=pick(scanner,['generated_at','captured_at','scan_id','packet_id','market_session','included_contracts','total_contracts','omitted_contracts','qualifying_contracts','research_rejected_contracts','scanned_contracts']);
+ const snapshot=pick(scanner,['generated_at','captured_at','scan_id','packet_id','market_session','included_contracts','total_contracts','omitted_contracts','qualifying_contracts','research_rejected_contracts','scanned_contracts','recovery_mode','expiration_window','research_seed_contracts','eligibility_effect']);
  snapshot.candidates=scanner.candidates.map(c=>({ticker:c.ticker,options:[...(c.options||[]),...Object.values(c.expiry_groups||{}).flatMap(g=>g?.options||[])].map(o=>pick(o,['contract_id','strike','side','expiry']))}));
  if(snapshot.candidates.reduce((n,c)=>n+c.options.length,0)>20)throw Error('Recovery supports bounded batches of at most 20 contracts. Export observations before leaving.');
  const withTiming=x=>{const timing=quoteRequestTiming(x.request_timing);return Object.keys(timing).length?{request_timing:timing}:{};};
