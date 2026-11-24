@@ -1,3 +1,4 @@
+import {privateSetupCheck} from './private-setup-check.js';
 import {quoteOnlyResearchPack} from './quote-review-bridge.js';
 import {candidateQuotes} from './candidate-quotes.js?v=20261120-private-recovery';
 import {validateRobinhoodPack} from './robinhood-review.js';
@@ -87,7 +88,9 @@ function render(){
  for(const row of rows.filter(r=>!$('verified-only').checked||r.status==='QUOTE_CHECK_PASSED'&&r.premium_status==='WITHIN_LIMIT')){
  const tr=document.createElement('tr');
  const labels=['Contract','Bid / ask','Age (seconds)','$0.30 live ask','Quote check','Setup eligibility'];
- const values=[row.contract,row.bid===undefined?'Unknown':`${row.bid} / ${row.ask}`,Number.isFinite(row.age_seconds)?row.age_seconds.toFixed(1):'Unknown',row.premium_status==='WITHIN_LIMIT'?'Within $0.30':row.premium_status==='ABOVE_LIMIT'?'Above $0.30 · outside budget':'Unknown · quote check required',quoteGuidance(row),'Not evaluated · research screens only'];
+ const source=scanner.candidates.flatMap(c=>c.options||[]).find(o=>(o.contract_id||`${o.ticker} ${o.strike} ${o.side} ${o.expiry}`)===row.contract);
+ const setup=privateSetupCheck(scanner,source?.setup_context,row);
+ const values=[row.contract,row.bid===undefined?'Unknown':`${row.bid} / ${row.ask}`,Number.isFinite(row.age_seconds)?row.age_seconds.toFixed(1):'Unknown',row.premium_status==='WITHIN_LIMIT'?'Within $0.30':row.premium_status==='ABOVE_LIMIT'?'Above $0.30 · outside budget':'Unknown · quote check required',quoteGuidance(row),setup.label];
  for(const value of values){const td=document.createElement('td');td.textContent=value;td.setAttribute?.('data-label',labels[tr.children.length]);tr.append(td);}
  const details=document.createElement('details');details.className='quote-details';details.setAttribute?.('data-contract',row.contract);details.open=openQuoteDetails.has(row.contract);
  details.ontoggle=()=>{if(!details.isConnected)return;if(details.open)openQuoteDetails.add(row.contract);else openQuoteDetails.delete(row.contract);};
