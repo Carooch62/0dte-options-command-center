@@ -318,8 +318,8 @@ export async function handleRobinhood(request,env){
   const saved=await connection(env);if(!saved||saved.expires_at<=Date.now()+15000)return reply({ok:false,error:'Reconnect Robinhood before checking options'},409);
   try{
    const response=await fetch(`https://raw.githubusercontent.com/Carooch62/0dte-options-command-center/main/data/market-dashboard-today.json?v=${Date.now()}`,{cf:{cacheTtl:0},signal:AbortSignal.timeout(15000)});
-   if(!response.ok||Number(response.headers.get('Content-Length'))>2000000)throw Error('Snapshot unavailable');
-   const raw=await response.text();if(raw.length>2000000)throw Error('Snapshot too large');
+   if(!response.ok||Number(response.headers.get('Content-Length'))>8000000)throw Error('Snapshot unavailable');
+   const raw=await response.text();if(raw.length>8000000)throw Error('Snapshot too large');
    const snapshot=JSON.parse(raw),stock=discoveryStock(snapshot,ticker);
    if(!stock)return reply({ok:true,status:'STOCK_SETUP_UNVERIFIED',ticker,reason:'Fresh confirmed stock setup unavailable'});
    const call=await marketClient(saved.access_token,['get_option_chains','get_option_instruments','get_option_quotes'],saved.expires_at);
