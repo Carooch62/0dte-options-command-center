@@ -66,20 +66,35 @@ export function attachDashboardOptionQuotes({board,getTrades=()=>[],getSnapshot=
   return outcome;
  }
  function select(raw){if(inFlight)return;poller.enable(false);validation=[];metrics={requests:0,successful:0,fresh:0,last_ms:null};selected=optionIdentity(raw);generation++;busy=false;record=null;error='';errorCode='';render();panel.scrollIntoView({block:'center'});}
+ const discovery=new Map();
+ function showDiscovery(ticker){
+  const item=discovery.get(ticker);
+  if(!item)return {text:'',busy:false};
+  if(item.scanId!==getSnapshot()?.scan_id){discovery.delete(ticker);return {text:'',busy:false};}
+  if(item.busy)return {text:'Checking current stock setup, complete expiration and nearby Robinhood contracts…',busy:true};
+  if(item.quoteTime&&Date.now()-Date.parse(item.quoteTime)>60000)return {text:'Verification quote is over 60 seconds old. Verify again before using this contract.',busy:false};
+  return {text:item.text,busy:false};
+ }
  function addControls(){
   if(privateOrigin)for(const article of board.querySelectorAll('article.candidate')){
-   if(article.querySelector('[data-discover-option]'))continue;
    const ticker=article.querySelector('[data-star]')?.dataset.star;
    if(!ticker)continue;
+   if(article.querySelector('[data-discover-option]'))continue;
    const button=document.createElement('button');button.type='button';button.dataset.discoverOption=ticker;button.textContent='Verify call / put with Robinhood';
    const result=document.createElement('p');result.className='smallnote';result.setAttribute('role','status');
+   const initial=showDiscovery(ticker);button.disabled=initial.busy;result.textContent=initial.text;
    button.onclick=async()=>{
-    button.disabled=true;result.textContent='Checking current stock setup, complete expiration and nearby Robinhood contracts…';
+    const scanId=getSnapshot()?.scan_id;
+    discovery.set(ticker,{scanId,busy:true});button.disabled=true;result.textContent=showDiscovery(ticker).text;
     try{
      const data=await read('/private/plaid/robinhood/discover',{method:'POST',headers:{'Content-Type':'application/json','X-Requested-With':'RobinhoodQuotes'},body:JSON.stringify({ticker})},120000);
-     if(data.status==='VERIFIED_WATCH'&&data.best){const b=data.best;result.textContent=`Best verified watch among ${data.checked} checked (${data.near_atm} nearby): ${ticker} ${b.expiry} $${b.strike} ${b.side.toUpperCase()} · ask $${b.ask.toFixed(2)} · delta ${b.delta.toFixed(2)} · spread ${b.spread_pct.toFixed(1)}% · volume ${b.volume} · quote ${b.quote_updated_at}. Check the current quote and remaining risk filters before trading. ${data.limitation}`;}
-     else result.textContent=`No verified contract: ${data.reason||data.status||'unknown'}. ${data.checked??0} checked${data.expiry?' for '+data.expiry:''}.`;
-    }catch(e){result.textContent=e.message||'Robinhood verification unavailable.';}finally{button.disabled=false;}
+     if(scanId!==getSnapshot()?.scan_id){discovery.delete(ticker);return;}
+     let message,quoteTime;
+     if(data.status==='VERIFIED_WATCH'&&data.best){const b=data.best;quoteTime=b.quote_updated_at;message=`Best verified watch among ${data.checked} checked (${data.near_atm} nearby): ${ticker} ${b.expiry} ${b.strike} ${b.side.toUpperCase()} · ask ${b.ask.toFixed(2)} · delta ${b.delta.toFixed(2)} · spread ${b.spread_pct.toFixed(1)}% · volume ${b.volume} · quote ${b.quote_updated_at}. Check the current quote and remaining risk filters before trading. ${data.limitation}`;}
+     else message=`No verified contract: ${data.reason||data.status||'unknown'}. ${data.checked??0} checked${data.expiry?' for '+data.expiry:''}.`;
+     discovery.set(ticker,{scanId,text:message,quoteTime});
+    }catch(e){if(scanId===getSnapshot()?.scan_id)discovery.set(ticker,{scanId,text:e.message||'Robinhood verification unavailable.'});}
+    finally{const current=board.querySelector(`article.candidate [data-discover-option="${ticker}"]`);if(current){const state=showDiscovery(ticker);current.disabled=state.busy;current.nextElementSibling.textContent=state.text;}}
    };
    article.append(button,result);
   }
