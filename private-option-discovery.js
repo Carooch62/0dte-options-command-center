@@ -49,7 +49,7 @@ export async function discoverOptionWatch(stock,call,now=Date.now(),maxPages=12)
   const q=item?.quote,id=q?.instrument_id;if(!byId.has(id)||seen.has(id))return {status:'QUOTE_UNVERIFIED',expiry,checked:cohort.length};seen.add(id);
   const instrument=byId.get(id),bid=numeric(q.bid_price),ask=numeric(q.ask_price),delta=numeric(q.delta),theta=numeric(q.theta),volume=numeric(q.volume),stamp=Date.parse(q.updated_at);
   const spread=ask!==null&&bid!==null?ask-bid:Infinity,relative=spread/((ask+bid)/2);
-  if(!(bid>0&&ask>=bid&&ask>=.10&&ask<=.30&&spread<=.05+1e-9&&relative<=.20+1e-9&&volume>=20&&Number.isFinite(stamp)&&stamp<=now&&now-stamp<=60000&&theta!==null&&theta<=0))continue;
+  if(!(bid>0&&ask>=bid&&ask>0&&ask<=.30&&spread<=.05+1e-9&&relative<=.20+1e-9&&volume>=20&&Number.isFinite(stamp)&&stamp<=now&&now-stamp<=60000&&theta!==null&&theta<=0))continue;
   const min=.30,max=.50;
   if(!(delta!==null&&(side==='call'?delta>=min&&delta<=max:delta<=-min&&delta>=-max)))continue;
   passed.push({ticker:stock.ticker,side,expiry,strike:instrument.strike,contract_id:instrument.id,bid,ask,delta,theta,volume,spread,spread_pct:relative*100,quote_updated_at:q.updated_at,sellout_datetime:instrument.sellout_datetime});

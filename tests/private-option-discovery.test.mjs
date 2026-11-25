@@ -12,6 +12,12 @@ test('finds a verified next-day call when public same-day coverage is empty',asy
  const result=await discoverOptionWatch(stock,provider,now);
  assert.equal(result.status,'VERIFIED_WATCH');assert.equal(result.expiry,'2026-11-25');assert.equal(result.best.contract_id,id);assert.equal(result.complete_chain,true);
 });
+test('allows a positive ask below ten cents when all quote gates pass',async()=>{
+ const cheap={...quote,bid_price:'.07',ask_price:'.08'};
+ const result=await discoverOptionWatch(stock,async name=>name==='get_option_quotes'?{results:[{quote:cheap}]}:provider(name),now);
+ assert.equal(result.status,'VERIFIED_WATCH');
+ assert.equal(result.best.ask,.08);
+});
 test('fails closed on stale setup, incomplete pagination or missing quotes',async()=>{
  assert.equal(discoveryStock(snapshot,ticker,now+9*60000),null);
  assert.equal((await discoverOptionWatch(stock,async name=>name==='get_option_chains'?{chains:[{id:chainId,can_open_position:true,trade_value_multiplier:'100',expiration_dates:['2026-11-25']}]}:name==='get_option_instruments'?{instruments:[instrument],next:'cursor'}:{results:[{quote}]},now,1)).status,'COVERAGE_UNVERIFIED');
