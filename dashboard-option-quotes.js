@@ -66,7 +66,7 @@ export function attachDashboardOptionQuotes({board,getTrades=()=>[],getSnapshot=
   return outcome;
  }
  function select(raw){if(inFlight)return;poller.enable(false);validation=[];metrics={requests:0,successful:0,fresh:0,last_ms:null};selected=optionIdentity(raw);generation++;busy=false;record=null;error='';errorCode='';render();panel.scrollIntoView({block:'center'});}
- const discovery=new Map();
+ const discovery=new Map(),autoAttempted=new Set();
  function showDiscovery(ticker){
   const item=discovery.get(ticker);
   if(!item)return {text:'',busy:false};
@@ -76,6 +76,9 @@ export function attachDashboardOptionQuotes({board,getTrades=()=>[],getSnapshot=
   return {text:item.text,busy:false};
  }
  function addControls(){
+  const snapshot=getSnapshot(),scanAge=Date.now()-Date.parse(snapshot?.generated_at);
+  const autoEligible=privateOrigin&&!document.hidden&&quoteSessionOpen(snapshot)&&scanAge>=0&&scanAge<7*60000;
+  const autoTickers=new Set(autoEligible?(snapshot.candidates||[]).filter(x=>x.setup_qualified===true&&['WATCH','SECOND-WAVE','TRIGGERED','CONFIRMED'].includes(x.execution_state)).slice(0,2).map(x=>x.ticker):[]);
   if(privateOrigin)for(const article of board.querySelectorAll('article.candidate')){
    const ticker=article.querySelector('[data-star]')?.dataset.star;
    if(!ticker)continue;
@@ -97,6 +100,12 @@ export function attachDashboardOptionQuotes({board,getTrades=()=>[],getSnapshot=
     finally{const current=board.querySelector(`article.candidate [data-discover-option="${ticker}"]`);if(current){const state=showDiscovery(ticker);current.disabled=state.busy;current.nextElementSibling.textContent=state.text;}}
    };
    article.append(button,result);
+   const key=snapshot?.scan_id+':'+ticker;
+   if(autoTickers.has(ticker)&&!autoAttempted.has(key)){
+    autoAttempted.add(key);
+    // Only the two highest-ranked eligible stock rows get one private check per scan.
+    queueMicrotask(()=>{if(!document.hidden&&getSnapshot()?.scan_id===snapshot.scan_id&&button.isConnected)button.click();});
+   }
   }
   for(const source of board.querySelectorAll('.purchase-action [data-record-fill],button[data-watch]')){
    if(source.parentElement.querySelector('[data-rh-quote]'))continue;
