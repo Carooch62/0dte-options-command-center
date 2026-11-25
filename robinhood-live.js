@@ -324,7 +324,7 @@ export async function handleRobinhood(request,env){
    if(!stock)return reply({ok:true,status:'STOCK_SETUP_UNVERIFIED',ticker,reason:'Fresh confirmed stock setup unavailable'});
    stage='provider_client';const call=await marketClient(saved.access_token,['get_option_chains','get_option_instruments','get_option_quotes'],saved.expires_at);
    stage='provider_discovery';const result=await discoverOptionWatch(stock,call);
-   return reply({ok:true,ticker,scan_id:snapshot.scan_id,generated_at:snapshot.generated_at,stock_state:stock.execution_state,...result,limitation:'Best among at most 20 nearest-to-stock-price contracts in the nearest available expiration within seven calendar days. WATCH is research, not an entry trigger. Greeks have no separate calculation clock; confirm in Robinhood before trading.'});
+   return reply({ok:true,ticker,scan_id:snapshot.scan_id,generated_at:snapshot.generated_at,stock_state:stock.execution_state,...result,limitation:'Best among at most 20 contracts within 3% of the scan price, prioritizing directional out-of-the-money strikes in the nearest available expiration within seven calendar days. WATCH is research, not an entry trigger. Greeks have no separate calculation clock; confirm in Robinhood before trading.'});
   }catch{return reply({ok:false,status:'DISCOVERY_UNAVAILABLE',reason:`${stage} failed; no option verified`},503);}
  }
  if(path==='/private/plaid/robinhood/resolve'){
