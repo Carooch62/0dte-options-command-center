@@ -325,7 +325,7 @@ export async function handleRobinhood(request,env){
    stage='provider_client';const call=await marketClient(saved.access_token,['get_option_chains','get_option_instruments','get_option_quotes'],saved.expires_at);
    stage='provider_discovery';const result=await discoverOptionWatch(stock,call);
    return reply({ok:true,ticker,scan_id:snapshot.scan_id,generated_at:snapshot.generated_at,stock_state:stock.execution_state,...result,limitation:'Best among at most 20 nearest-to-stock-price contracts in the nearest available expiration within seven calendar days. WATCH is research, not an entry trigger. Greeks have no separate calculation clock; confirm in Robinhood before trading.'});
-  }catch{return reply({ok:true,status:'DISCOVERY_UNAVAILABLE',reason:`${stage} failed; no option verified`},200);}
+  }catch{return reply({ok:false,status:'DISCOVERY_UNAVAILABLE',reason:`${stage} failed; no option verified`},503);}
  }
  if(path==='/private/plaid/robinhood/resolve'){
   let contracts;try{const raw=await request.text();if(raw.length>10000)throw Error();contracts=contractRequest(JSON.parse(raw));}catch{return reply({ok:false,error:'Invalid exact contract request'},400);}
