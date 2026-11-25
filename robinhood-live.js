@@ -316,16 +316,16 @@ export async function handleRobinhood(request,env){
  if(path==='/private/plaid/robinhood/discover'&&request.method==='POST'){
   let ticker;try{const raw=await request.text();if(raw.length>100)throw Error();ticker=JSON.parse(raw).ticker;if(!/^[A-Z][A-Z0-9.-]{0,9}$/.test(ticker))throw Error();}catch{return reply({ok:false,error:'Select one stock ticker'},400);}
   const saved=await connection(env);if(!saved||saved.expires_at<=Date.now()+15000)return reply({ok:false,error:'Reconnect Robinhood before checking options'},409);
-  try{
+  let stage='snapshot_fetch';try{
    const response=await fetch(`https://raw.githubusercontent.com/Carooch62/0dte-options-command-center/main/data/market-dashboard-today.json?v=${Date.now()}`,{cf:{cacheTtl:0},signal:AbortSignal.timeout(15000)});
    if(!response.ok||Number(response.headers.get('Content-Length'))>8000000)throw Error('Snapshot unavailable');
-   const raw=await response.text();if(raw.length>8000000)throw Error('Snapshot too large');
-   const snapshot=JSON.parse(raw),stock=discoveryStock(snapshot,ticker);
+   stage='snapshot_read';const raw=await response.text();if(raw.length>8000000)throw Error('Snapshot too large');
+   stage='snapshot_parse';const snapshot=JSON.parse(raw),stock=discoveryStock(snapshot,ticker);
    if(!stock)return reply({ok:true,status:'STOCK_SETUP_UNVERIFIED',ticker,reason:'Fresh confirmed stock setup unavailable'});
-   const call=await marketClient(saved.access_token,['get_option_chains','get_option_instruments','get_option_quotes'],saved.expires_at);
-   const result=await discoverOptionWatch(stock,call);
+   stage='provider_client';const call=await marketClient(saved.access_token,['get_option_chains','get_option_instruments','get_option_quotes'],saved.expires_at);
+   stage='provider_discovery';const result=await discoverOptionWatch(stock,call);
    return reply({ok:true,ticker,scan_id:snapshot.scan_id,generated_at:snapshot.generated_at,stock_state:stock.execution_state,...result,limitation:'Best among at most 20 nearest-to-stock-price contracts in the nearest available expiration within seven calendar days. WATCH is research, not an entry trigger. Greeks have no separate calculation clock; confirm in Robinhood before trading.'});
-  }catch{return reply({ok:false,error:'Private contract discovery could not be completed; no verified option selected'},502);}
+  }catch{return reply({ok:false,status:'DISCOVERY_UNAVAILABLE',stage,error:'Private contract discovery could not be completed; no verified option selected'},502);}
  }
  if(path==='/private/plaid/robinhood/resolve'){
   let contracts;try{const raw=await request.text();if(raw.length>10000)throw Error();contracts=contractRequest(JSON.parse(raw));}catch{return reply({ok:false,error:'Invalid exact contract request'},400);}
