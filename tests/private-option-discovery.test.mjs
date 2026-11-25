@@ -24,3 +24,20 @@ test('fails closed on stale setup, incomplete pagination or missing quotes',asyn
  assert.equal((await discoverOptionWatch(stock,async name=>name==='get_option_quotes'?{results:[]}:provider(name),now)).status,'QUOTE_UNVERIFIED');
  assert.equal((await discoverOptionWatch(stock,async name=>name==='get_option_quotes'?{results:[{quote:{...quote,updated_at:'2026-11-24T14:58:00Z'}}]}:provider(name),now)).status,'NO_QUALIFYING_QUOTE');
 });
+
+test('spends bounded quote slots on directional OTM strikes across the allowed range',async()=>{
+ const contracts=Array.from({length:31},(_,i)=>({...instrument,id:`00000000-0000-4000-8000-${String(i+1).padStart(12,'0')}`,strike_price:String(97+i*.2)}));
+ const target=contracts[30];
+ let requested=[];
+ const call=async(name,args)=>{
+  if(name==='get_option_chains')return {chains:[{id:chainId,can_open_position:true,trade_value_multiplier:'100',expiration_dates:['2026-11-25']}]};
+  if(name==='get_option_instruments')return {instruments:contracts};
+  requested=args.instrument_ids;
+  return {results:requested.map(instrument_id=>({quote:{...quote,instrument_id,ask_price:instrument_id===target.id?'.20':'1.00'}}))};
+ };
+ const result=await discoverOptionWatch(stock,call,now);
+ assert.equal(requested.length,20);
+ assert.ok(requested.includes(target.id));
+ assert.equal(result.status,'VERIFIED_WATCH');
+ assert.equal(result.best.contract_id,target.id);
+});
