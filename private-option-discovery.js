@@ -37,8 +37,10 @@ export async function discoverOptionWatch(stock,call,now=Date.now(),maxPages=12)
   }while(cursor);
  }
  const unique=[...new Map(instruments.map(x=>[x.id,x])).values()];
- unique.sort((a,b)=>Math.abs(a.strike-stock.price)-Math.abs(b.strike-stock.price)||a.strike-b.strike);
- // Coverage of the full expiration is known; quote coverage is explicitly bounded to 20 near-ATM contracts.
+ const outOfMoney=x=>side==='call'?x.strike>stock.price:x.strike<stock.price;
+ unique.sort((a,b)=>Number(outOfMoney(b))-Number(outOfMoney(a))||Math.abs(a.strike-stock.price)-Math.abs(b.strike-stock.price)||a.strike-b.strike);
+ // Cover the affordable side first; a symmetric nearest-strike sample misses cheap OTM contracts.
+ // Full expiration metadata is checked, while quote coverage remains bounded to 20 contracts.
  const cohort=unique.slice(0,20);
  if(!cohort.length)return {status:'NO_NEAR_ATM_CONTRACTS',expiry,checked:0,near_atm:0};
  const response=await call('get_option_quotes',{instrument_ids:cohort.map(x=>x.id)});
