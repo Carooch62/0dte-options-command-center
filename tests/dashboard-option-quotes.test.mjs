@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {optionIdentity,privateQuoteUrl,quoteSignInUrl,fetchOptionQuote,optionQuoteView,matchingQuoteFills} from '../dashboard-option-quotes.js';
+import {optionIdentity,privateQuoteUrl,quoteSignInUrl,fetchOptionQuote,optionQuoteView,matchingQuoteFills,discoveryMatchesScan} from '../dashboard-option-quotes.js';
 const c={ticker:'TEST',contract_id:'TEST261120C00100000',side:'call',expiry:'2026-11-20',strike:100};
 const id='22222222-2222-4222-8222-222222222222',at='2026-11-19T18:00:00Z',now=Date.parse(at);
 const i={id,chain_symbol:'TEST',type:'call',expiration_date:c.expiry,strike_price:'100',state:'active',tradability:'tradable',trade_value_multiplier:100,sellout_datetime:'2026-11-20T20:45:00Z'};
@@ -34,4 +34,12 @@ test('private sign-in link preserves only selected option identity and returns t
  const u=new URL(quoteSignInUrl({...c,access_token:'NEVER'}),'https://example.test');
  assert.equal(u.pathname,'/private/plaid/robinhood/sign-in');const back=new URL(u.searchParams.get('return_to'),u.origin);
  assert.equal(back.pathname,'/dashboard_liquid.html');assert.deepEqual(JSON.parse(decodeURIComponent(back.hash.slice(10))),c);assert.ok(!u.href.includes('NEVER'));
+});
+test('discovery cannot label a contract verified from a different scan or stock direction',()=>{
+ const snapshot={scan_id:'scan-current',generated_at:at,candidates:[{ticker:'TEST',direction:'UP'}]};
+ const result={status:'VERIFIED_WATCH',scan_id:'scan-current',generated_at:at,ticker:'TEST',best:{ticker:'TEST',side:'call'}};
+ assert.equal(discoveryMatchesScan(result,snapshot,'TEST'),true);
+ for(const changed of [{...result,scan_id:'scan-other'},{...result,generated_at:'2026-11-19T17:55:00Z'},{...result,ticker:'OTHER'},{...result,best:{...result.best,side:'put'}},{...result,best:null}])
+  assert.equal(discoveryMatchesScan(changed,snapshot,'TEST'),false);
+ assert.equal(discoveryMatchesScan(result,{...snapshot,scan_id:null},'TEST'),false);
 });

@@ -12,6 +12,11 @@ export function optionIdentity(raw){
 }
 export function quoteSignInUrl(contract){const back='/dashboard_liquid.html?v=20261119-auto-exits#rh-quote='+encodeURIComponent(JSON.stringify(optionIdentity(contract)));return '/private/plaid/robinhood/sign-in?'+new URLSearchParams({return_to:back});}
 export function privateQuoteUrl(raw){return PRIVATE_DASHBOARD+'#rh-quote='+encodeURIComponent(JSON.stringify(optionIdentity(raw)));}
+export function discoveryMatchesScan(data,snapshot,ticker){
+ return Boolean(data&&snapshot&&typeof snapshot.scan_id==='string'&&snapshot.scan_id&&data.scan_id===snapshot.scan_id&&
+   typeof snapshot.generated_at==='string'&&data.generated_at===snapshot.generated_at&&data.ticker===ticker&&
+   (data.status!=='VERIFIED_WATCH'||(data.best&&data.best.ticker===ticker&&data.best.side===(snapshot.candidates?.find(c=>c.ticker===ticker)?.direction==='UP'?'call':'put'))));
+}
 function exactInstrument(c,i){return i&&uuid.test(i.id)&&i.chain_symbol===c.ticker&&i.type===c.side&&i.expiration_date===c.expiry&&Number(i.strike_price)===c.strike;}
 export async function fetchOptionQuote(raw,read=requestJSON){
  const contract=optionIdentity(raw),{ticker,side,strike,expiry}=contract;
@@ -92,6 +97,10 @@ export function attachDashboardOptionQuotes({board,getTrades=()=>[],getSnapshot=
     try{
      const data=await read('/private/plaid/robinhood/discover',{method:'POST',headers:{'Content-Type':'application/json','X-Requested-With':'RobinhoodQuotes'},body:JSON.stringify({ticker})},120000);
      if(scanId!==getSnapshot()?.scan_id){discovery.delete(ticker);return;}
+     if(!discoveryMatchesScan(data,getSnapshot(),ticker)){
+      discovery.set(ticker,{scanId,text:'Verification came from a different or unverified scan. Reload scanner data and verify again.'});
+      return;
+     }
      let message,quoteTime;
      if(data.status==='VERIFIED_WATCH'&&data.best){const b=data.best;quoteTime=b.quote_updated_at;message=`Best verified watch among ${data.checked} checked (${data.near_atm} nearby): ${ticker} ${b.expiry} ${b.strike} ${b.side.toUpperCase()} · ask ${b.ask.toFixed(2)} · delta ${b.delta.toFixed(2)} · spread ${b.spread_pct.toFixed(1)}% · volume ${b.volume} · quote ${b.quote_updated_at}. Check the current quote and remaining risk filters before trading. ${data.limitation}`;}
      else message=`No verified contract: ${data.reason||data.status||'unknown'}. ${data.checked??0} checked${data.expiry?' for '+data.expiry:''}.`;

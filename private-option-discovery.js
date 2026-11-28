@@ -3,8 +3,8 @@ const dayET=now=>new Date(now).toLocaleDateString('en-CA',{timeZone:'America/New
 const numeric=x=>x!==null&&x!==undefined&&x!==''&&Number.isFinite(Number(x))?Number(x):null;
 const uuid=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 export function discoveryStock(snapshot,ticker,now=Date.now()){
- const generated=Date.parse(snapshot?.generated_at);
- if(snapshot?.market_session!=='OPEN'||!Number.isFinite(generated)||generated>now||now-generated>8*60000)return null;
+ const generated=Date.parse(snapshot?.generated_at),open=Date.parse(snapshot?.session_open_at),close=Date.parse(snapshot?.session_close_at);
+ if(snapshot?.market_session!=='OPEN'||!Number.isFinite(generated)||generated>now||now-generated>8*60000||!Number.isFinite(open)||!Number.isFinite(close)||now<open||now>=close)return null;
  const stock=snapshot.candidates?.find(x=>x.ticker===ticker);
  if(!stock||!['UP','DOWN'].includes(stock.direction)||!['WATCH','SECOND-WAVE','TRIGGERED','CONFIRMED'].includes(stock.execution_state)||stock.setup_qualified!==true||!Number.isFinite(Date.parse(stock.bar_end))||Date.parse(stock.bar_end)>now||now-Date.parse(stock.bar_end)>8*60000||numeric(stock.price)<=0)return null;
  return stock;
@@ -18,7 +18,7 @@ export async function discoverOptionWatch(stock,call,now=Date.now(),maxPages=12)
  if(!dates.length)return {status:'NO_EXPIRATION_IN_WINDOW',checked:0};
  // Check today's expiry if offered, otherwise the nearest expiry; never substitute another date silently.
  const expiry=dates[0],matching=chains.filter(x=>x.expiration_dates.includes(expiry));
- const instruments=[],seenCursor=new Set();let pages=0;
+ const instruments=[],seenCursor=new Set(),identities=new Map();let pages=0;
  for(const chain of matching){
   if(!uuid.test(chain.id)||chain.can_open_position!==true||numeric(chain.trade_value_multiplier)!==100)return {status:'COVERAGE_UNVERIFIED',reason:'Chain metadata unavailable',expiry};
   let cursor;
@@ -29,6 +29,9 @@ export async function discoverOptionWatch(stock,call,now=Date.now(),maxPages=12)
    for(const x of data.instruments){
     const strike=numeric(x?.strike_price);
     if(!uuid.test(x?.id)||x.chain_id!==chain.id||x.chain_symbol!==stock.ticker||x.expiration_date!==expiry||x.type!==side||strike===null)return {status:'COVERAGE_UNVERIFIED',reason:'Contract identity mismatch',expiry};
+    const identity=JSON.stringify([x.chain_id,x.chain_symbol,x.expiration_date,x.type,strike,x.trade_value_multiplier,x.state,x.tradability,x.sellout_datetime]);
+    if(identities.has(x.id)&&identities.get(x.id)!==identity)return {status:'COVERAGE_UNVERIFIED',reason:'Conflicting contract metadata',expiry};
+    identities.set(x.id,identity);
     if(x.state==='active'&&x.tradability==='tradable'&&numeric(x.trade_value_multiplier)===100&&Date.parse(x.sellout_datetime)>now&&Math.abs(strike-stock.price)/stock.price<=.03)instruments.push({...x,strike});
    }
    cursor=data.next||undefined;

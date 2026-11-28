@@ -321,9 +321,11 @@ export async function handleRobinhood(request,env){
    if(!response.ok||Number(response.headers.get('Content-Length'))>8000000)throw Error('Snapshot unavailable');
    stage='snapshot_read';const raw=await response.text();if(raw.length>8000000)throw Error('Snapshot too large');
    stage='snapshot_parse';const snapshot=JSON.parse(raw),stock=discoveryStock(snapshot,ticker);
-   if(!stock)return reply({ok:true,status:'STOCK_SETUP_UNVERIFIED',ticker,reason:'Fresh confirmed stock setup unavailable'});
+   if(!stock)return reply({ok:true,status:'STOCK_SETUP_UNVERIFIED',ticker,scan_id:snapshot.scan_id,generated_at:snapshot.generated_at,reason:'Fresh qualified stock setup unavailable'});
    stage='provider_client';const call=await marketClient(saved.access_token,['get_option_chains','get_option_instruments','get_option_quotes'],saved.expires_at);
    stage='provider_discovery';const result=await discoverOptionWatch(stock,call);
+   if(!discoveryStock(snapshot,ticker)||result.status==='VERIFIED_WATCH'&&Date.now()-Date.parse(result.best?.quote_updated_at)>60000)
+    return reply({ok:true,status:'STOCK_SETUP_UNVERIFIED',ticker,scan_id:snapshot.scan_id,generated_at:snapshot.generated_at,reason:'Stock setup or quote expired during verification'});
    return reply({ok:true,ticker,scan_id:snapshot.scan_id,generated_at:snapshot.generated_at,stock_state:stock.execution_state,...result,limitation:'Best among at most 20 contracts within 3% of the scan price, prioritizing directional out-of-the-money strikes in the nearest available expiration within seven calendar days. WATCH is research, not an entry trigger. Greeks have no separate calculation clock; confirm in Robinhood before trading.'});
   }catch{return reply({ok:false,status:'DISCOVERY_UNAVAILABLE',reason:`${stage} failed; no option verified`},503);}
  }
