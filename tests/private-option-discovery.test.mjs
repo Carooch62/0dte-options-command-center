@@ -41,3 +41,9 @@ test('spends bounded quote slots on directional OTM strikes across the allowed r
  assert.equal(result.status,'VERIFIED_WATCH');
  assert.equal(result.best.contract_id,target.id);
 });
+test('conflicting duplicate contract metadata cannot produce a best watch',async()=>{
+ const call=async(name)=>name==='get_option_instruments'?{instruments:[instrument,{...instrument,strike_price:'102'}]}:provider(name);
+ const result=await discoverOptionWatch(stock,call,now);
+ assert.equal(result.status,'COVERAGE_UNVERIFIED');
+ assert.equal(result.reason,'Conflicting contract metadata');
+});
