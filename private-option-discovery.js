@@ -3,8 +3,8 @@ const dayET=now=>new Date(now).toLocaleDateString('en-CA',{timeZone:'America/New
 const numeric=x=>x!==null&&x!==undefined&&x!==''&&Number.isFinite(Number(x))?Number(x):null;
 const uuid=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 export function discoveryStock(snapshot,ticker,now=Date.now()){
- const generated=Date.parse(snapshot?.generated_at);
- if(snapshot?.market_session!=='OPEN'||!Number.isFinite(generated)||generated>now||now-generated>8*60000)return null;
+ const generated=Date.parse(snapshot?.generated_at),open=Date.parse(snapshot?.session_open_at),close=Date.parse(snapshot?.session_close_at);
+ if(snapshot?.market_session!=='OPEN'||!Number.isFinite(generated)||generated>now||now-generated>8*60000||!Number.isFinite(open)||!Number.isFinite(close)||now<open||now>=close)return null;
  const stock=snapshot.candidates?.find(x=>x.ticker===ticker);
  if(!stock||!['UP','DOWN'].includes(stock.direction)||!['WATCH','SECOND-WAVE','TRIGGERED','CONFIRMED'].includes(stock.execution_state)||stock.setup_qualified!==true||!Number.isFinite(Date.parse(stock.bar_end))||Date.parse(stock.bar_end)>now||now-Date.parse(stock.bar_end)>8*60000||numeric(stock.price)<=0)return null;
  return stock;
